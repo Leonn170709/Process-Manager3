@@ -196,10 +196,11 @@ function _spawnProcess(procRecord) {
       _handleCrash(procs2[name], code, `Process exited with code ${code}`, SEVERITY.ERROR);
     }
 
-    const shouldRestart =
-      procs2[name].autorestart &&
-      procs2[name].restartCount < procs2[name].maxRestarts &&
-      !wasKilled;
+    const maxR = procs2[name].maxRestarts;
+    const underLimit = maxR === -1          // -1 = unlimited
+      ? true
+      : procs2[name].restartCount < maxR;   // 0 = never, N = up to N times
+    const shouldRestart = procs2[name].autorestart && underLimit && !wasKilled;
 
     if (shouldRestart) {
       procs2[name].status = STATUS.RESTARTING;
@@ -234,8 +235,8 @@ function _spawnProcess(procRecord) {
     runtime[name].watcher = watcher;
   }
 
-  // Memory monitor
-  if (procRecord.memoryLimit) {
+  // Memory monitor (-1 and null both mean no limit)
+  if (procRecord.memoryLimit && procRecord.memoryLimit > 0) {
     runtime[name].memCheck = setInterval(() => {
       if (!runtime[name] || !runtime[name].proc) return;
       const pid = runtime[name].proc.pid;

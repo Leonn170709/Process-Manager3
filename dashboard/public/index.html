@@ -498,7 +498,10 @@
     .chart-block { margin-bottom:16px; }
     .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px; }
     .chart-label .cur { font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
+    .chart-hover-area { position:relative;cursor:crosshair; }
     .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:10px 10px 4px;overflow:hidden; }
+    .chart-xhair { position:absolute;top:10px;bottom:4px;width:1px;pointer-events:none;display:none;opacity:0.75; }
+    .chart-tip { position:absolute;top:14px;pointer-events:none;display:none;background:var(--g1);backdrop-filter:blur(24px) saturate(2);-webkit-backdrop-filter:blur(24px) saturate(2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t1);white-space:nowrap;box-shadow:var(--shadow); }
     .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
     .stat-kv-label { font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600; }
     .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-top:1px;word-break:break-all; }
@@ -876,7 +879,7 @@ socket.on('process:update', proc => {
   recordHistory(proc);
   renderProcessRow(proc); updateProcStats();
   if (proc.name === modalLogProcess) updateStdinBar();
-  if (proc.name === statsModalName) refreshStatsModal();
+  if (proc.name === statsModalName) _tickStatsModal();
 });
 socket.on('process:delete', data => {
   delete processes[data.name];
@@ -1301,7 +1304,7 @@ function renderConfig() {
       </div>`;
     } else if (schema.default === null || typeof schema.default === 'number') {
       inputHtml = `<div class="cfg-input-wrap">
-        <input type="number" id="cfg-${key}" value="${val ?? ''}" placeholder="${val===null?'null (unlimited)':schema.default}">
+        <input type="number" id="cfg-${key}" value="${val ?? ''}" placeholder="${val===null?'null (unlimited)':schema.default}" min="-1">
       </div>`;
     } else {
       inputHtml = `<div class="cfg-input-wrap">
@@ -1337,6 +1340,10 @@ async function saveConfig() {
       value = el ? (el.value.trim() === '' ? 'null' : el.value.trim()) : null;
     }
     if (value === null) return;
+    const numCheck = parseFloat(value);
+    if (!isNaN(numCheck) && numCheck < -1) {
+      throw new Error(`${key}: minimum is -1 (use -1 for unlimited, 0 or higher for a real limit)`);
+    }
     return fetch('/api/config', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1407,12 +1414,15 @@ function renderChart(values, color) {
 }
 
 // ── Stats modal ───────────────────────────────────
+let _statsData = { cpu: [], mem: [] };
+
 function openStatsModal(name) {
   statsModalName = name;
   document.getElementById('stats-modal-title').textContent = `Stats — ${name}`;
-  refreshStatsModal();
+  _buildStatsModal();
+  _tickStatsModal();
   document.getElementById('stats-modal').classList.add('open');
-  statsModalTimer = setInterval(refreshStatsModal, 2000);
+  statsModalTimer = setInterval(_tickStatsModal, 2000);
 }
 function closeStatsModal() {
   document.getElementById('stats-modal').classList.remove('open');
@@ -1420,39 +1430,90 @@ function closeStatsModal() {
   statsModalTimer = null;
   statsModalName = null;
 }
-function refreshStatsModal() {
+
+function _buildStatsModal() {
+  document.getElementById('stats-modal-body').innerHTML = `
+    <div class="chart-block">
+      <div class="chart-label">CPU <span class="cur" id="sm-cpu-cur">—</span><span id="sm-cpu-peak" style="font-size:10.5px;color:var(--t3);margin-left:8px"></span></div>
+      <div class="chart-hover-area" id="sm-cpu-area">
+        <div class="chart-wrap" id="sm-cpu-wrap"></div>
+        <div class="chart-xhair" id="sm-cpu-xhair" style="background:var(--accent)"></div>
+        <div class="chart-tip"   id="sm-cpu-tip"></div>
+      </div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-label">RAM <span class="cur" id="sm-mem-cur">—</span><span id="sm-mem-peak" style="font-size:10.5px;color:var(--t3);margin-left:8px"></span></div>
+      <div class="chart-hover-area" id="sm-mem-area">
+        <div class="chart-wrap" id="sm-mem-wrap"></div>
+        <div class="chart-xhair" id="sm-mem-xhair" style="background:var(--accent2)"></div>
+        <div class="chart-tip"   id="sm-mem-tip"></div>
+      </div>
+    </div>
+    <div class="stat-grid" id="sm-kv"></div>`;
+  _attachChartHover('sm-cpu-area', 'sm-cpu-xhair', 'sm-cpu-tip', 'cpu', '%');
+  _attachChartHover('sm-mem-area', 'sm-mem-xhair', 'sm-mem-tip', 'mem', ' MB');
+}
+
+function _attachChartHover(areaId, xhairId, tipId, key, unit) {
+  const area  = document.getElementById(areaId);
+  const xhair = document.getElementById(xhairId);
+  const tip   = document.getElementById(tipId);
+  if (!area) return;
+  area.addEventListener('mousemove', e => {
+    const rect = area.getBoundingClientRect();
+    const x    = e.clientX - rect.left;
+    const pct  = Math.max(0, Math.min(1, x / rect.width));
+    const data = _statsData[key] || [];
+    if (!data.length) return;
+    const idx = Math.min(Math.round(pct * (data.length - 1)), data.length - 1);
+    xhair.style.display = '';
+    xhair.style.left    = x + 'px';
+    tip.style.display   = '';
+    tip.textContent     = data[idx] + unit;
+    tip.style.left      = Math.min(x + 10, rect.width - tip.offsetWidth - 4) + 'px';
+  });
+  area.addEventListener('mouseleave', () => {
+    xhair.style.display = 'none';
+    tip.style.display   = 'none';
+  });
+}
+
+function _tickStatsModal() {
   const name = statsModalName;
   if (!name) return;
   const proc = processes[name];
-  const h = procHistory[name] || { cpu: [], mem: [] };
-  const body = document.getElementById('stats-modal-body');
-  if (!proc) { body.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-title">Process not found</div></div>`; return; }
-  const cpuCur = proc.cpu != null ? proc.cpu + '%' : '—';
-  const memCur = proc.memory ? proc.memory + ' MB' : '—';
-  const cpuMax = h.cpu.length ? Math.max(...h.cpu).toFixed(1) + '%' : '—';
-  const memMax = h.mem.length ? Math.max(...h.mem) + ' MB' : '—';
-  body.innerHTML = `
-    <div class="chart-block">
-      <div class="chart-label">CPU <span class="cur">${cpuCur}</span><span style="font-size:10.5px;color:var(--t3);margin-left:8px">peak ${cpuMax} · 3 min window</span></div>
-      <div class="chart-wrap">${renderChart(h.cpu, 'var(--accent)')}</div>
-    </div>
-    <div class="chart-block">
-      <div class="chart-label">RAM <span class="cur">${memCur}</span><span style="font-size:10.5px;color:var(--t3);margin-left:8px">peak ${memMax} · 3 min window</span></div>
-      <div class="chart-wrap">${renderChart(h.mem, 'var(--accent2)')}</div>
-    </div>
-    <div class="stat-grid">
-      <div><div class="stat-kv-label">Status</div><div class="stat-kv-val"><span class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span></div></div>
-      <div><div class="stat-kv-label">PID</div><div class="stat-kv-val">${proc.pid || '—'}</div></div>
-      <div><div class="stat-kv-label">Uptime</div><div class="stat-kv-val">${formatUptime(proc.uptime)}</div></div>
-      <div><div class="stat-kv-label">Restarts</div><div class="stat-kv-val">${proc.restartCount}</div></div>
-      <div><div class="stat-kv-label">Auto-restart</div><div class="stat-kv-val">${proc.autorestart ? 'Yes' : 'No'}</div></div>
-      <div><div class="stat-kv-label">Max Restarts</div><div class="stat-kv-val">${proc.maxRestarts}</div></div>
-      <div><div class="stat-kv-label">Memory Limit</div><div class="stat-kv-val">${proc.memoryLimit ? proc.memoryLimit + ' MB' : '—'}</div></div>
-      <div><div class="stat-kv-label">Issues</div><div class="stat-kv-val">${issueCountForProc(name)}</div></div>
-      <div style="grid-column:1/-1"><div class="stat-kv-label">Script</div><div class="stat-kv-val">${escapeHtml(proc.script || '—')}</div></div>
-      <div style="grid-column:1/-1"><div class="stat-kv-label">Working Dir</div><div class="stat-kv-val">${escapeHtml(proc.cwd || '—')}</div></div>
-      <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>
-    </div>`;
+  const h    = procHistory[name] || { cpu: [], mem: [] };
+  _statsData = { cpu: h.cpu, mem: h.mem };
+
+  const cpuCur = proc && proc.cpu != null ? proc.cpu + '%' : '—';
+  const memCur = proc && proc.memory      ? proc.memory + ' MB' : '—';
+  const cpuMax = h.cpu.length ? Math.max(...h.cpu).toFixed(1) + '%' : '';
+  const memMax = h.mem.length ? Math.max(...h.mem) + ' MB' : '';
+
+  const setCur  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML  = v; };
+
+  setCur ('sm-cpu-cur',  cpuCur);
+  setCur ('sm-mem-cur',  memCur);
+  setCur ('sm-cpu-peak', cpuMax ? `peak ${cpuMax} · 3 min` : '');
+  setCur ('sm-mem-peak', memMax ? `peak ${memMax} · 3 min` : '');
+  setHTML('sm-cpu-wrap', renderChart(h.cpu, 'var(--accent)'));
+  setHTML('sm-mem-wrap', renderChart(h.mem, 'var(--accent2)'));
+
+  if (!proc) return;
+  setCur('sm-kv', ''); // handled via innerHTML below
+  setHTML('sm-kv', `
+    <div><div class="stat-kv-label">Status</div><div class="stat-kv-val"><span class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span></div></div>
+    <div><div class="stat-kv-label">PID</div><div class="stat-kv-val">${proc.pid || '—'}</div></div>
+    <div><div class="stat-kv-label">Uptime</div><div class="stat-kv-val">${formatUptime(proc.uptime)}</div></div>
+    <div><div class="stat-kv-label">Restarts</div><div class="stat-kv-val">${proc.restartCount}</div></div>
+    <div><div class="stat-kv-label">Auto-restart</div><div class="stat-kv-val">${proc.autorestart ? 'Yes' : 'No'}</div></div>
+    <div><div class="stat-kv-label">Max Restarts</div><div class="stat-kv-val">${proc.maxRestarts}</div></div>
+    <div><div class="stat-kv-label">Memory Limit</div><div class="stat-kv-val">${proc.memoryLimit ? proc.memoryLimit + ' MB' : '—'}</div></div>
+    <div><div class="stat-kv-label">Issues</div><div class="stat-kv-val">${issueCountForProc(name)}</div></div>
+    <div style="grid-column:1/-1"><div class="stat-kv-label">Script</div><div class="stat-kv-val">${escapeHtml(proc.script || '—')}</div></div>
+    <div style="grid-column:1/-1"><div class="stat-kv-label">Working Dir</div><div class="stat-kv-val">${escapeHtml(proc.cwd || '—')}</div></div>
+    <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>`);
 }
 
 // ── Edit modal ────────────────────────────────────

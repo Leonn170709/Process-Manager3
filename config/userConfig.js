@@ -97,6 +97,7 @@ function set(key, rawValue) {
     } else {
       const n = Number(rawValue);
       if (isNaN(n)) throw new Error(`"${key}" expects a number, got: ${rawValue}`);
+      if (n < -1) throw new Error(`"${key}" must be -1 (unlimited) or higher — values below -1 are not allowed`);
       value = n;
     }
   } else if (typeof def === 'boolean') {
