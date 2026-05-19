@@ -10,20 +10,20 @@
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
     :root {
-      --bg: #090b0f;
-      --bg2: #0d1017;
-      --glass: rgba(255,255,255,0.035);
-      --glass-border: rgba(255,255,255,0.08);
-      --glass-hover: rgba(255,255,255,0.06);
+      --bg: #141920;
+      --bg2: #1a2030;
+      --glass: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,255,255,0.13);
+      --glass-hover: rgba(255,255,255,0.10);
       --accent: #4f8eff;
       --accent2: #7c5cff;
       --green: #34d399;
       --red: #f87171;
       --yellow: #fbbf24;
       --cyan: #22d3ee;
-      --text: #e8ecf4;
-      --text2: #8892a4;
-      --text3: #525f72;
+      --text: #f0f4ff;
+      --text2: #a8b4c8;
+      --text3: #6b7a90;
       --radius: 18px;
       --radius-sm: 10px;
     }
@@ -50,12 +50,12 @@
     }
     body::before {
       width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(79,142,255,0.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(79,142,255,0.14) 0%, transparent 70%);
       top: -200px; left: -100px;
     }
     body::after {
       width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(124,92,255,0.07) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(124,92,255,0.12) 0%, transparent 70%);
       bottom: -150px; right: -100px;
     }
 
@@ -75,7 +75,7 @@
       padding: 0 28px;
       height: 60px;
       border-bottom: 1px solid var(--glass-border);
-      background: rgba(9,11,15,0.8);
+      background: rgba(20,25,32,0.92);
       backdrop-filter: blur(20px);
       flex-shrink: 0;
     }
@@ -352,7 +352,7 @@
 
     /* Log panel */
     .log-container {
-      background: rgba(5,7,11,0.8);
+      background: rgba(15,20,28,0.9);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius);
       overflow: hidden;
@@ -439,7 +439,7 @@
     }
     .modal-overlay.open { display: flex; }
     .modal {
-      background: #10141c;
+      background: #1c2433;
       border: 1px solid var(--glass-border);
       border-radius: 20px;
       width: 640px;
@@ -540,7 +540,7 @@
 
     /* Stack trace */
     .stack-trace {
-      background: rgba(5,7,11,0.9);
+      background: rgba(15,20,28,0.95);
       border: 1px solid var(--glass-border);
       border-radius: 8px;
       padding: 12px;
@@ -853,7 +853,7 @@ setInterval(fetchSystem, 5000);
 
 function updateSysMetrics(data) {
   document.getElementById('sys-cpu').textContent = data.cpu + '%';
-  document.getElementById('sys-ram').textContent = data.memory ? data.memory.percent + '%' : '-';
+  document.getElementById('sys-ram').textContent = data.memory ? (data.memory.used ? Math.round(data.memory.used/1024/1024) + ' MB' : data.memory.percent + '%') : '-';
   if (data.uptime) document.getElementById('sys-uptime').textContent = formatUptime(data.uptime);
   if (data.processCount !== undefined) document.getElementById('sys-procs').textContent = data.processCount;
 
@@ -1197,6 +1197,7 @@ function toast(msg, type = 'info') {
 // ─── Helpers ─────────────────────────────────────────────────
 function formatUptime(s) {
   if (!s) return '-';
+  s = Math.floor(s);
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
     m = Math.floor((s % 3600) / 60), sec = s % 60;
   if (d > 0) return `${d}d ${h}h`;

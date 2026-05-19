@@ -26,6 +26,10 @@ function generateId() {
   return ids.length ? Math.max(...ids) + 1 : 0;
 }
 
+function isNodeScript(s) {
+  return s.endsWith('.js') || s.endsWith('.mjs') || s.endsWith('.cjs');
+}
+
 function resolveCwd(cwd, script) {
   if (cwd) return path.resolve(cwd);
   if (script && !script.startsWith('npm') && !script.startsWith('node')) {
@@ -35,12 +39,12 @@ function resolveCwd(cwd, script) {
 }
 
 function parseCommand(script) {
-  // handle: "node index.js", "npm", raw script path
   const parts = script.trim().split(/\s+/);
   if (parts.length > 1) return { cmd: parts[0], args: parts.slice(1) };
-  // single word: assume it's a node script if it ends with .js
-  if (script.endsWith('.js') || script.endsWith('.mjs') || script.endsWith('.cjs')) {
-    return { cmd: process.execPath, args: [script] };
+  if (isNodeScript(script)) {
+    // Always resolve to absolute path to avoid cwd double-nesting
+    const abs = require('path').resolve(script);
+    return { cmd: process.execPath, args: [abs] };
   }
   return { cmd: parts[0], args: [] };
 }
