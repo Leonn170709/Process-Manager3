@@ -6,780 +6,678 @@
   <title>PM3 Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
-    :root {
-      --bg: #141920;
-      --bg2: #1a2030;
-      --glass: rgba(255,255,255,0.06);
-      --glass-border: rgba(255,255,255,0.13);
-      --glass-hover: rgba(255,255,255,0.10);
-      --accent: #4f8eff;
-      --accent2: #7c5cff;
-      --green: #34d399;
-      --red: #f87171;
-      --yellow: #fbbf24;
-      --cyan: #22d3ee;
-      --text: #f0f4ff;
-      --text2: #a8b4c8;
-      --text3: #6b7a90;
-      --radius: 18px;
-      --radius-sm: 10px;
-    }
-
+    /* ── Reset ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; }
 
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Geist', sans-serif;
-      font-size: 14px;
-      overflow: hidden;
-    }
-
-    /* Ambient background orbs */
-    body::before, body::after {
-      content: '';
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
-      z-index: 0;
-      pointer-events: none;
-    }
-    body::before {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(79,142,255,0.14) 0%, transparent 70%);
-      top: -200px; left: -100px;
-    }
-    body::after {
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, rgba(124,92,255,0.12) 0%, transparent 70%);
-      bottom: -150px; right: -100px;
+    /* ── Light theme ─────────────────────────────── */
+    :root {
+      --g1: rgba(255,255,255,0.22);
+      --g2: rgba(255,255,255,0.14);
+      --g3: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.42);
+      --border-sm: rgba(255,255,255,0.26);
+      --spec: rgba(255,255,255,0.75);
+      --spec-sm: rgba(255,255,255,0.45);
+      --shadow:    0 2px 8px rgba(0,0,0,0.07),  0 1px 3px rgba(0,0,0,0.04);
+      --shadow-md: 0 6px 24px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-lg: 0 16px 56px rgba(0,0,0,0.12),0 4px 16px rgba(0,0,0,0.06);
+      --accent: #2563eb; --accent2: #7c3aed;
+      --green: #059669; --red: #dc2626; --yellow: #d97706; --cyan: #0891b2;
+      --t1: #0f172a; --t2: #334155; --t3: #64748b; --t4: #94a3b8;
+      --r: 14px; --r-sm: 10px; --r-xs: 7px;
+      --nav-h: 50px;
+      --nav-bg: rgba(255,255,255,0.36);
+      --log-bg: rgba(10,14,24,0.93);
+      --log-border: rgba(255,255,255,0.10);
+      --log-text: rgba(200,220,255,0.75);
+      --log-err: rgba(252,165,165,0.9);
     }
 
-    #app {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
+    /* ── Dark theme ──────────────────────────────── */
+    [data-theme="dark"] {
+      --g1: rgba(255,255,255,0.055);
+      --g2: rgba(255,255,255,0.035);
+      --g3: rgba(255,255,255,0.018);
+      --border: rgba(255,255,255,0.13);
+      --border-sm: rgba(255,255,255,0.08);
+      --spec: rgba(255,255,255,0.14);
+      --spec-sm: rgba(255,255,255,0.07);
+      --shadow:    0 2px 8px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.22);
+      --shadow-md: 0 6px 24px rgba(0,0,0,0.42),0 2px 8px rgba(0,0,0,0.28);
+      --shadow-lg: 0 16px 56px rgba(0,0,0,0.55),0 4px 16px rgba(0,0,0,0.32);
+      --accent: #4f8eff; --accent2: #a78bfa;
+      --green: #34d399; --red: #f87171; --yellow: #fbbf24; --cyan: #22d3ee;
+      --t1: #f0f4ff; --t2: #a8b4c8; --t3: #6b7a90; --t4: #3d4f63;
+      --nav-bg: rgba(8,12,22,0.78);
+      --log-bg: rgba(4,6,14,0.97);
+      --log-border: rgba(255,255,255,0.07);
+      --log-text: rgba(180,200,240,0.7);
+      --log-err: rgba(248,113,113,0.85);
     }
 
-    /* Top bar */
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 28px;
-      height: 60px;
-      border-bottom: 1px solid var(--glass-border);
-      background: rgba(20,25,32,0.92);
-      backdrop-filter: blur(20px);
-      flex-shrink: 0;
+    /* ── Backgrounds ─────────────────────────────── */
+    :root {
+      background: linear-gradient(135deg,#c3d9ff 0%,#ddd6fe 35%,#bae6fd 65%,#a7f3d0 100%);
+      background-attachment: fixed;
     }
-    .topbar-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+    [data-theme="dark"] {
+      background: linear-gradient(135deg,#060c18 0%,#0d0a1a 45%,#060e1c 75%,#050d14 100%);
     }
-    .topbar-logo .logo-icon {
-      width: 32px; height: 32px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-    }
-    .topbar-logo span { color: var(--text); }
-    .topbar-logo sub { color: var(--text2); font-size: 11px; font-weight: 400; margin-left: 2px; }
+    body { background: transparent; color: var(--t1); }
 
-    .topbar-sys {
-      display: flex;
-      gap: 20px;
-      align-items: center;
+    /* ── Animated blobs ──────────────────────────── */
+    .blob {
+      position: fixed; border-radius: 50%; filter: blur(90px);
+      pointer-events: none; z-index: 0;
+      animation: blobDrift var(--dur,20s) ease-in-out infinite alternate;
     }
-    .sys-metric {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--text2);
+    .blob-a { width:620px;height:620px;top:-180px;left:-80px;
+      background:radial-gradient(circle,rgba(147,197,253,0.72),rgba(196,181,253,0.42));--dur:18s; }
+    .blob-b { width:520px;height:520px;top:45%;right:-140px;
+      background:radial-gradient(circle,rgba(196,181,253,0.62),rgba(125,211,252,0.38));--dur:23s;animation-direction:alternate-reverse; }
+    .blob-c { width:440px;height:440px;bottom:-80px;left:28%;
+      background:radial-gradient(circle,rgba(167,243,208,0.52),rgba(147,197,253,0.32));--dur:26s; }
+    [data-theme="dark"] .blob-a { background:radial-gradient(circle,rgba(30,60,130,0.55),rgba(65,28,110,0.35)); }
+    [data-theme="dark"] .blob-b { background:radial-gradient(circle,rgba(65,28,110,0.48),rgba(18,55,120,0.32)); }
+    [data-theme="dark"] .blob-c { background:radial-gradient(circle,rgba(15,90,65,0.35),rgba(30,65,130,0.25)); }
+    @keyframes blobDrift {
+      from { transform:translate(0,0) scale(1); }
+      to   { transform:translate(38px,28px) scale(1.07); }
     }
-    .sys-metric .label { color: var(--text3); }
-    .sys-metric .val { color: var(--text); font-weight: 500; font-family: 'Geist Mono', monospace; }
 
-    .topbar-actions {
-      display: flex;
-      gap: 10px;
+    /* ── App shell ───────────────────────────────── */
+    #app { position:relative;z-index:1;display:flex;flex-direction:column;height:100vh; }
+
+    /* ── Navbar ──────────────────────────────────── */
+    .navbar {
+      height:var(--nav-h);flex-shrink:0;
+      display:flex;align-items:center;gap:6px;padding:0 14px;
+      background:var(--nav-bg);
+      backdrop-filter:blur(60px) saturate(2.8) brightness(1.04);
+      -webkit-backdrop-filter:blur(60px) saturate(2.8) brightness(1.04);
+      border-bottom:1px solid var(--border);
+      box-shadow:inset 0 1px 0 var(--spec), var(--shadow-md);
     }
+    .nav-logo {
+      display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;
+      letter-spacing:-0.4px;color:var(--t1);padding-right:14px;margin-right:2px;
+      border-right:1px solid var(--border-sm);flex-shrink:0;
+    }
+    .nav-logo-icon {
+      width:28px;height:28px;border-radius:8px;display:flex;align-items:center;
+      justify-content:center;font-size:14px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      box-shadow:0 2px 10px rgba(37,99,235,0.4),inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+    .nav-tabs { display:flex;gap:2px;flex:1; }
+    .nav-tab {
+      padding:5px 13px;border-radius:20px;cursor:pointer;font-size:12.5px;
+      font-weight:500;color:var(--t3);background:transparent;border:none;
+      font-family:'Inter',sans-serif;transition:all 0.18s;
+      display:inline-flex;align-items:center;gap:5px;
+    }
+    .nav-tab:hover { color:var(--t2);background:var(--g3); }
+    .nav-tab.active {
+      color:var(--t1);font-weight:600;background:var(--g1);
+      backdrop-filter:blur(20px) saturate(2);
+      -webkit-backdrop-filter:blur(20px) saturate(2);
+      border:1px solid var(--border-sm);
+      box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
+    }
+    .nav-tab .badge {
+      display:inline-flex;align-items:center;justify-content:center;
+      min-width:16px;height:16px;border-radius:8px;background:var(--red);
+      color:#fff;font-size:9px;font-weight:700;padding:0 3px;
+    }
+    .nav-sys {
+      display:flex;gap:3px;align-items:center;padding:0 10px;
+      border-left:1px solid var(--border-sm);border-right:1px solid var(--border-sm);
+      flex-shrink:0;
+    }
+    .nav-chip {
+      display:flex;align-items:center;gap:4px;padding:4px 10px;
+      background:var(--g2);border:1px solid var(--border-sm);border-radius:16px;
+      font-size:11.5px;
+    }
+    .nav-chip .lbl { color:var(--t3);font-size:10.5px; }
+    .nav-chip .val { color:var(--t1);font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11px; }
+    .nav-actions { display:flex;gap:6px;padding-left:10px;flex-shrink:0; }
+
+    /* ── Buttons ─────────────────────────────────── */
     .btn {
-      padding: 7px 16px;
-      border-radius: 8px;
-      border: 1px solid var(--glass-border);
-      background: var(--glass);
-      color: var(--text);
-      cursor: pointer;
-      font-family: 'Geist', sans-serif;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.15s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+      padding:6px 14px;border-radius:var(--r-xs);border:1px solid var(--border);
+      background:var(--g1);
+      backdrop-filter:blur(20px) saturate(2);-webkit-backdrop-filter:blur(20px) saturate(2);
+      color:var(--t1);cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;
+      font-weight:500;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px;
+      box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
     }
-    .btn:hover { background: var(--glass-hover); border-color: rgba(255,255,255,0.15); }
-    .btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
-    .btn.primary:hover { background: #6499ff; }
-    .btn.danger { color: var(--red); border-color: rgba(248,113,113,0.2); }
-    .btn.danger:hover { background: rgba(248,113,113,0.1); }
-    .btn.success { color: var(--green); border-color: rgba(52,211,153,0.2); }
-    .btn.sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+    .btn:hover { background:var(--g2);box-shadow:inset 0 1px 0 var(--spec), var(--shadow-md);transform:translateY(-1px); }
+    .btn:active { transform:translateY(0); }
+    .btn.primary {
+      background:linear-gradient(135deg,var(--accent),#1d4ed8);
+      border-color:rgba(37,99,235,0.35);color:#fff;
+      box-shadow:0 2px 14px rgba(37,99,235,0.38),inset 0 1px 0 rgba(255,255,255,0.22);
+    }
+    .btn.primary:hover { background:linear-gradient(135deg,#3b82f6,var(--accent));box-shadow:0 4px 22px rgba(37,99,235,0.48); }
+    .btn.danger  { color:var(--red);  border-color:rgba(220,38,38,0.25); }
+    .btn.danger:hover  { background:rgba(220,38,38,0.08); }
+    .btn.success { color:var(--green);border-color:rgba(5,150,105,0.25); }
+    .btn.success:hover { background:rgba(5,150,105,0.08); }
+    .btn.warn    { color:var(--yellow);border-color:rgba(217,119,6,0.25); }
+    .btn.warn:hover    { background:rgba(217,119,6,0.08); }
+    .btn.sm  { padding:4px 10px;font-size:11.5px;border-radius:6px; }
+    .btn.xs  { padding:2px 7px;font-size:11px;border-radius:5px; }
+    .btn.icon{ padding:6px 10px; }
 
-    /* Tabs */
-    .tabs {
-      display: flex;
-      gap: 2px;
-      padding: 12px 28px 0;
-      border-bottom: 1px solid var(--glass-border);
-      flex-shrink: 0;
-    }
-    .tab {
-      padding: 8px 18px;
-      border-radius: 8px 8px 0 0;
-      cursor: pointer;
-      color: var(--text2);
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.15s;
-      position: relative;
-      border: 1px solid transparent;
-      border-bottom: none;
-    }
-    .tab:hover { color: var(--text); background: var(--glass); }
-    .tab.active {
-      color: var(--text);
-      background: var(--glass);
-      border-color: var(--glass-border);
-      border-bottom: 1px solid var(--bg);
-    }
-    .tab .badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 18px; height: 18px;
-      border-radius: 9px;
-      background: var(--red);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      margin-left: 6px;
-      padding: 0 4px;
-    }
+    /* ── Content & Panels ────────────────────────── */
+    .content { flex:1;overflow:hidden;display:flex;flex-direction:column; }
+    .panel { display:none;flex:1;overflow:hidden;flex-direction:column;padding:10px 12px;gap:8px; }
+    .panel.active { display:flex; }
 
-    /* Content area */
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px 28px;
+    /* ── Glass Card ──────────────────────────────── */
+    .card {
+      background:var(--g1);
+      backdrop-filter:blur(44px) saturate(2.4) brightness(1.03);
+      -webkit-backdrop-filter:blur(44px) saturate(2.4) brightness(1.03);
+      border:1px solid var(--border);border-radius:var(--r);
+      box-shadow:inset 0 1.5px 0 var(--spec),inset 0 0 0 0.5px rgba(255,255,255,0.06), var(--shadow-md);
+      overflow:hidden;position:relative;flex-shrink:0;
     }
-    .content::-webkit-scrollbar { width: 6px; }
-    .content::-webkit-scrollbar-track { background: transparent; }
-    .content::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+    .card::before {
+      content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+      background:linear-gradient(90deg,transparent,var(--spec),transparent);
+      pointer-events:none;
+    }
+    .card.fill { flex:1;min-height:0;display:flex;flex-direction:column; }
+    .card-hdr {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:9px 14px;border-bottom:1px solid var(--border-sm);flex-shrink:0;
+    }
+    .card-title { font-size:12.5px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:6px; }
 
-    /* Panel */
-    .panel {
-      display: none;
+    /* ── Stat Pills ──────────────────────────────── */
+    .stats-strip { display:flex;gap:7px;flex-shrink:0; }
+    .stat-pill {
+      flex:1;padding:10px 14px;
+      background:var(--g1);
+      backdrop-filter:blur(44px) saturate(2.4) brightness(1.03);
+      -webkit-backdrop-filter:blur(44px) saturate(2.4) brightness(1.03);
+      border:1px solid var(--border);border-radius:var(--r-sm);
+      box-shadow:inset 0 1.5px 0 var(--spec), var(--shadow);
+      position:relative;overflow:hidden;
     }
-    .panel.active { display: block; }
+    .stat-pill::before {
+      content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
+      background:linear-gradient(90deg,transparent,var(--spec),transparent);
+    }
+    .sp-val   { font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.1; }
+    .sp-label { font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-top:3px; }
 
-    /* Stat cards row */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .stat-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.2s;
-    }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-    }
-    .stat-card .sc-label {
-      font-size: 11px;
-      color: var(--text3);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-      font-weight: 600;
-    }
-    .stat-card .sc-val {
-      font-size: 26px;
-      font-weight: 700;
-      font-family: 'Geist Mono', monospace;
-      line-height: 1;
-    }
-    .stat-card .sc-sub {
-      font-size: 11px;
-      color: var(--text3);
-      margin-top: 6px;
-    }
-
-    /* Progress bar */
-    .progress {
-      height: 3px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 2px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      border-radius: 2px;
-      transition: width 0.5s ease;
-    }
-
-    /* Process list */
-    .proc-table {
-      width: 100%;
-      border-collapse: collapse;
-      border-spacing: 0;
-    }
+    /* ── Process Table ───────────────────────────── */
+    .table-wrap { flex:1;overflow:auto;min-height:0; }
+    .table-wrap::-webkit-scrollbar { width:4px;height:4px; }
+    .table-wrap::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
+    .proc-table { width:100%;border-collapse:collapse; }
     .proc-table th {
-      text-align: left;
-      padding: 10px 16px;
-      font-size: 11px;
-      color: var(--text3);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-      border-bottom: 1px solid var(--glass-border);
+      text-align:left;padding:7px 12px;font-size:10.5px;color:var(--t3);
+      text-transform:uppercase;letter-spacing:0.5px;font-weight:600;
+      border-bottom:1px solid var(--border-sm);position:sticky;top:0;z-index:1;
+      background:var(--g2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
     }
-    .proc-row {
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      transition: background 0.1s;
-      cursor: pointer;
-    }
-    .proc-row:hover { background: var(--glass); }
-    .proc-row td {
-      padding: 12px 16px;
-      vertical-align: middle;
-    }
-    .proc-name { font-weight: 600; color: var(--text); }
-    .proc-script { font-size: 11px; color: var(--text3); font-family: 'Geist Mono', monospace; }
-    .mono { font-family: 'Geist Mono', monospace; font-size: 12px; }
+    .proc-row { border-bottom:1px solid rgba(255,255,255,0.25);transition:background 0.1s;cursor:pointer; }
+    .proc-row:hover { background:var(--g3); }
+    .proc-row td { padding:7px 12px;vertical-align:middle; }
+    .proc-name   { font-weight:600;color:var(--t1);font-size:12.5px; }
+    .proc-script { font-size:10.5px;color:var(--t4);font-family:'JetBrains Mono',monospace;margin-top:1px; }
+    .mono { font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t2); }
+    .proc-actions { display:flex;gap:4px;flex-wrap:nowrap;align-items:center; }
+    .proc-actions .sep { width:1px;height:18px;background:var(--border-sm);flex-shrink:0;margin:0 2px; }
 
-    /* Status pill */
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
+    /* ── Process action buttons ──────────────────── */
+    .pab {
+      padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;
+      border:1px solid;cursor:pointer;font-family:'Inter',sans-serif;
+      display:inline-flex;align-items:center;gap:5px;transition:all 0.15s;
+      white-space:nowrap;letter-spacing:0.1px;
     }
-    .status-pill::before {
-      content: '';
-      width: 6px; height: 6px;
-      border-radius: 50%;
-    }
-    .status-running { background: rgba(52,211,153,0.12); color: var(--green); }
-    .status-running::before { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-    .status-stopped { background: rgba(82,95,114,0.2); color: var(--text3); }
-    .status-stopped::before { background: var(--text3); }
-    .status-crashed { background: rgba(248,113,113,0.12); color: var(--red); }
-    .status-crashed::before { background: var(--red); }
-    .status-restarting { background: rgba(251,191,36,0.12); color: var(--yellow); }
-    .status-restarting::before { background: var(--yellow); animation: pulse 1s infinite; }
-    .status-starting { background: rgba(34,211,238,0.1); color: var(--cyan); }
-    .status-starting::before { background: var(--cyan); animation: pulse 1s infinite; }
+    .pab:hover { transform:translateY(-1px); }
+    .pab:active { transform:none; }
+    .pab-stop    { background:rgba(220,38,38,0.13); color:var(--red);    border-color:rgba(220,38,38,0.38); }
+    .pab-stop:hover    { background:rgba(220,38,38,0.24); }
+    .pab-start   { background:rgba(5,150,105,0.13); color:var(--green);  border-color:rgba(5,150,105,0.38); }
+    .pab-start:hover   { background:rgba(5,150,105,0.24); }
+    .pab-restart { background:rgba(37,99,235,0.11); color:var(--accent); border-color:rgba(37,99,235,0.35); }
+    .pab-restart:hover { background:rgba(37,99,235,0.22); }
+    .pab-logs    { background:rgba(8,145,178,0.11); color:var(--cyan);   border-color:rgba(8,145,178,0.35); }
+    .pab-logs:hover    { background:rgba(8,145,178,0.22); }
+    .pab-issues  { background:rgba(217,119,6,0.11); color:var(--yellow); border-color:rgba(217,119,6,0.35); }
+    .pab-issues:hover  { background:rgba(217,119,6,0.22); }
+    .pab-issues.has-issues { background:rgba(217,119,6,0.18); }
+    .pab-delete  { background:rgba(220,38,38,0.75); color:#fff;          border-color:rgba(220,38,38,0.5); }
+    .pab-delete:hover  { background:var(--red); }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
+    /* ── Status Pills ────────────────────────────── */
+    .status-pill { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:600; }
+    .status-pill::before { content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0; }
+    .status-running    { background:rgba(5,150,105,0.12);color:var(--green);border:1px solid rgba(5,150,105,0.25); }
+    .status-running::before { background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2s infinite; }
+    .status-stopped    { background:rgba(100,116,139,0.1);color:var(--t3);border:1px solid rgba(100,116,139,0.2); }
+    .status-stopped::before { background:var(--t4); }
+    .status-crashed    { background:rgba(220,38,38,0.1);color:var(--red);border:1px solid rgba(220,38,38,0.2); }
+    .status-crashed::before { background:var(--red); }
+    .status-restarting { background:rgba(217,119,6,0.1);color:var(--yellow);border:1px solid rgba(217,119,6,0.2); }
+    .status-restarting::before { background:var(--yellow);animation:pulse 1s infinite; }
+    .status-starting   { background:rgba(8,145,178,0.1);color:var(--cyan);border:1px solid rgba(8,145,178,0.2); }
+    .status-starting::before { background:var(--cyan);animation:pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.25} }
 
-    /* Process actions */
-    .proc-actions { display: flex; gap: 6px; }
-
-    /* Glass card container */
-    .glass-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      position: relative;
+    /* ── Log Terminal ────────────────────────────── */
+    .log-shell {
+      flex:1;min-height:0;display:flex;flex-direction:column;
+      background:var(--log-bg);
+      backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);
+      border:1px solid var(--log-border);border-radius:var(--r);
+      box-shadow:var(--shadow-lg);overflow:hidden;
     }
-    .glass-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    .log-hdr {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:9px 14px;border-bottom:1px solid var(--log-border);flex-shrink:0;
     }
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    .card-title {
-      font-weight: 600;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Log panel */
-    .log-container {
-      background: rgba(15,20,28,0.9);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .log-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 18px;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    .log-title {
-      font-size: 13px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .log-title { font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;color:rgba(255,255,255,0.85); }
     .log-body {
-      font-family: 'Geist Mono', monospace;
-      font-size: 12px;
-      line-height: 1.7;
-      padding: 16px 18px;
-      overflow-y: auto;
-      max-height: 400px;
-      color: #8892a4;
-      white-space: pre-wrap;
-      word-break: break-all;
+      font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.8;
+      padding:12px 16px;overflow-y:auto;flex:1;
+      white-space:pre-wrap;word-break:break-all;color:var(--log-text);
     }
-    .log-body::-webkit-scrollbar { width: 4px; }
-    .log-body::-webkit-scrollbar-thumb { background: var(--glass-border); }
-    .log-err { color: #f8716188; }
-    .log-out { color: var(--text2); }
-    .live-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: pulse 1.5s infinite;
-    }
+    .log-body::-webkit-scrollbar { width:4px; }
+    .log-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12);border-radius:2px; }
+    .log-err { color:var(--log-err); }
+    .log-out { color:var(--log-text); }
+    .live-dot { width:6px;height:6px;border-radius:50%;background:#34d399;animation:pulse 1.5s infinite; }
 
-    /* Issues */
+    /* ── Issues ──────────────────────────────────── */
+    .filter-chips { display:flex;gap:4px;flex-wrap:wrap; }
+    .filter-chip {
+      padding:4px 12px;border-radius:14px;font-size:11.5px;font-weight:500;cursor:pointer;
+      color:var(--t3);border:1px solid var(--border-sm);background:var(--g2);transition:all 0.15s;
+    }
+    .filter-chip:hover { color:var(--t2);background:var(--g1); }
+    .filter-chip.active { background:rgba(37,99,235,0.1);border-color:rgba(37,99,235,0.3);color:var(--accent);font-weight:600; }
+    .issues-scroll { flex:1;overflow-y:auto;min-height:0; }
+    .issues-scroll::-webkit-scrollbar { width:4px; }
+    .issues-scroll::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
     .issue-card {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      padding: 16px 18px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: all 0.15s;
-      position: relative;
+      display:flex;align-items:stretch;
+      background:var(--g1);backdrop-filter:blur(24px) saturate(2);-webkit-backdrop-filter:blur(24px) saturate(2);
+      border:1px solid var(--border);border-radius:var(--r-sm);
+      cursor:pointer;transition:all 0.15s;flex-shrink:0;overflow:hidden;
+      box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
     }
-    .issue-card:hover { border-color: rgba(255,255,255,0.15); background: var(--glass-hover); }
-    .issue-card.critical { border-left: 3px solid var(--red); }
-    .issue-card.error { border-left: 3px solid var(--yellow); }
-    .issue-card.warning { border-left: 3px solid var(--cyan); }
-    .issue-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
-    .issue-name { font-weight: 600; font-size: 13px; }
-    .issue-time { font-size: 11px; color: var(--text3); font-family: 'Geist Mono', monospace; }
-    .issue-msg { font-size: 12px; color: var(--text2); margin-bottom: 8px; font-family: 'Geist Mono', monospace; }
-    .severity-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-    .severity-critical { background: rgba(248,113,113,0.15); color: var(--red); }
-    .severity-error { background: rgba(251,191,36,0.15); color: var(--yellow); }
-    .severity-warning { background: rgba(34,211,238,0.1); color: var(--cyan); }
+    .issue-card:hover { background:var(--g2);transform:translateY(-1px);box-shadow:inset 0 1px 0 var(--spec), var(--shadow-md); }
+    .issue-card.critical { border-left:3px solid var(--red); }
+    .issue-card.error    { border-left:3px solid var(--yellow); }
+    .issue-card.warning  { border-left:3px solid var(--cyan); }
+    .issue-inner { flex:1;padding:10px 14px; }
+    .issue-top { display:flex;align-items:center;justify-content:space-between;margin-bottom:5px; }
+    .issue-left { display:flex;align-items:center;gap:7px; }
+    .issue-right { display:flex;align-items:center;gap:6px;flex-shrink:0; }
+    .issue-name { font-weight:600;font-size:12.5px;color:var(--t1); }
+    .issue-time { font-size:10.5px;color:var(--t4);font-family:'JetBrains Mono',monospace; }
+    .issue-msg  { font-size:11.5px;color:var(--t2);font-family:'JetBrains Mono',monospace;line-height:1.5;
+                  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+    .issue-meta { font-size:10.5px;color:var(--t4);margin-top:4px;display:flex;gap:10px; }
+    .severity-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase; }
+    .severity-critical { background:rgba(220,38,38,0.10);color:var(--red);border:1px solid rgba(220,38,38,0.2); }
+    .severity-error    { background:rgba(217,119,6,0.10);color:var(--yellow);border:1px solid rgba(217,119,6,0.2); }
+    .severity-warning  { background:rgba(8,145,178,0.10);color:var(--cyan);border:1px solid rgba(8,145,178,0.2); }
 
-    /* Modal */
+    /* ── System tab ──────────────────────────────── */
+    .sys-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:7px;flex-shrink:0; }
+    .sys-metric { padding:12px 14px; }
+    .sm-label { font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:6px; }
+    .sm-val   { font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1; }
+    .sm-sub   { font-size:10.5px;color:var(--t4);margin-top:5px; }
+    .progress { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;margin-top:9px;overflow:hidden; }
+    .progress-fill { height:100%;border-radius:2px;transition:width 0.6s ease; }
+    .disk-scroll { flex:1;overflow-y:auto;min-height:0; }
+    .disk-scroll::-webkit-scrollbar { width:4px; }
+    .disk-scroll::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
+
+    /* ── Config tab ──────────────────────────────── */
+    .cfg-scroll { flex:1;overflow-y:auto;min-height:0;padding:0; }
+    .cfg-scroll::-webkit-scrollbar { width:4px; }
+    .cfg-scroll::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
+    .cfg-row {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:13px 16px;border-bottom:1px solid var(--border-sm);gap:20px;
+    }
+    .cfg-row:last-child { border-bottom:none; }
+    .cfg-key { font-weight:600;font-size:12.5px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-bottom:3px; }
+    .cfg-desc { font-size:11.5px;color:var(--t3); }
+    .cfg-unit { font-size:10.5px;color:var(--t4);margin-left:5px; }
+    .cfg-input-wrap { flex-shrink:0; }
+    .cfg-input-wrap input[type="number"],
+    .cfg-input-wrap input[type="text"] {
+      width:150px;padding:7px 11px;background:var(--g2);border:1px solid var(--border-sm);
+      border-radius:var(--r-xs);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:12px;
+      outline:none;transition:all 0.15s;
+    }
+    .cfg-input-wrap input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+    .cfg-toggle { display:flex;align-items:center;gap:10px;cursor:pointer; }
+    .toggle-track {
+      width:38px;height:20px;border-radius:10px;background:rgba(0,0,0,0.1);
+      border:1px solid var(--border-sm);position:relative;transition:all 0.2s;cursor:pointer;
+    }
+    .toggle-track.on { background:var(--accent);border-color:var(--accent); }
+    .toggle-knob {
+      position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+      background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left 0.2s;
+    }
+    .toggle-track.on .toggle-knob { left:20px; }
+    .toggle-label { font-size:12px;color:var(--t2);min-width:52px; }
+
+    /* ── Modal ───────────────────────────────────── */
     .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(8px);
-      z-index: 100;
-      display: none;
-      align-items: center;
-      justify-content: center;
+      position:fixed;inset:0;background:rgba(10,20,40,0.3);
+      backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
+      z-index:100;display:none;align-items:center;justify-content:center;
     }
-    .modal-overlay.open { display: flex; }
+    .modal-overlay.open { display:flex; }
     .modal {
-      background: #1c2433;
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      width: 640px;
-      max-width: 95vw;
-      max-height: 80vh;
-      overflow-y: auto;
-      box-shadow: 0 40px 80px rgba(0,0,0,0.6);
-      animation: modalIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+      background:var(--g1);
+      backdrop-filter:blur(70px) saturate(3.2) brightness(1.06);
+      -webkit-backdrop-filter:blur(70px) saturate(3.2) brightness(1.06);
+      border:1px solid var(--border);border-radius:18px;
+      width:600px;max-width:95vw;max-height:86vh;overflow-y:auto;
+      box-shadow:inset 0 1.5px 0 var(--spec), var(--shadow-lg);
+      animation:modalIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
     }
-    .modal::-webkit-scrollbar { width: 4px; }
-    .modal::-webkit-scrollbar-thumb { background: var(--glass-border); }
-    @keyframes modalIn {
-      from { transform: scale(0.9) translateY(20px); opacity: 0; }
-      to { transform: scale(1) translateY(0); opacity: 1; }
-    }
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px 24px;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    .modal-title { font-size: 15px; font-weight: 700; }
+    .modal::-webkit-scrollbar { width:4px; }
+    .modal::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.25);border-radius:2px; }
+    @keyframes modalIn { from{transform:scale(0.88) translateY(24px);opacity:0}to{transform:scale(1) translateY(0);opacity:1} }
+    .modal-hdr { display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border-sm); }
+    .modal-title { font-size:14px;font-weight:700;color:var(--t1); }
     .modal-close {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      color: var(--text2);
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-      transition: all 0.15s;
+      width:24px;height:24px;border-radius:50%;background:var(--g2);border:1px solid var(--border-sm);
+      color:var(--t3);cursor:pointer;display:flex;align-items:center;justify-content:center;
+      font-size:14px;transition:all 0.15s;
     }
-    .modal-close:hover { background: var(--glass-hover); color: var(--text); }
-    .modal-body { padding: 20px 24px; }
+    .modal-close:hover { background:var(--g1);color:var(--t1); }
+    .modal-body { padding:16px 20px; }
 
-    /* Start process modal */
-    .form-group { margin-bottom: 14px; }
-    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+    /* ── Logs modal (wide, tall, terminal) ───────── */
+    .modal-logs {
+      width:920px;max-width:96vw;height:82vh;max-height:82vh;
+      display:flex;flex-direction:column;overflow:hidden;
+    }
+    .modal-logs .log-shell {
+      flex:1;min-height:0;border-radius:0 0 18px 18px;
+      border:none;border-top:1px solid var(--log-border);
+    }
+
+    /* ── Form ────────────────────────────────────── */
+    .form-group { margin-bottom:12px; }
+    .form-label { display:block;font-size:11.5px;font-weight:600;color:var(--t2);margin-bottom:5px; }
     .form-input {
-      width: 100%;
-      padding: 9px 14px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--glass-border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: 'Geist', sans-serif;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.15s;
+      width:100%;padding:8px 12px;background:var(--g2);border:1px solid var(--border-sm);
+      border-radius:var(--r-xs);color:var(--t1);font-family:'Inter',sans-serif;font-size:12.5px;
+      outline:none;transition:all 0.15s;
     }
-    .form-input:focus { border-color: var(--accent); }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+    .form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
 
-    /* Toast */
-    .toast-container {
-      position: fixed;
-      bottom: 24px; right: 24px;
-      z-index: 200;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      pointer-events: none;
-    }
+    /* ── Toast ───────────────────────────────────── */
+    .toast-container { position:fixed;bottom:18px;right:18px;z-index:200;display:flex;flex-direction:column;gap:6px;pointer-events:none; }
     .toast {
-      background: #1a1f2b;
-      border: 1px solid var(--glass-border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13px;
-      animation: toastIn 0.2s ease;
-      max-width: 320px;
-      pointer-events: all;
+      background:var(--g1);backdrop-filter:blur(44px) saturate(2.4);-webkit-backdrop-filter:blur(44px) saturate(2.4);
+      border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 14px;font-size:12.5px;
+      animation:toastIn 0.2s ease;max-width:280px;pointer-events:all;
+      box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow-md);color:var(--t1);
     }
-    @keyframes toastIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    .toast.success { border-left: 3px solid var(--green); }
-    .toast.error { border-left: 3px solid var(--red); }
-    .toast.info { border-left: 3px solid var(--accent); }
+    @keyframes toastIn { from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1} }
+    .toast.success { border-left:3px solid var(--green); }
+    .toast.error   { border-left:3px solid var(--red); }
+    .toast.info    { border-left:3px solid var(--accent); }
 
-    /* Empty state */
-    .empty {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text3);
-    }
-    .empty .empty-icon { font-size: 40px; margin-bottom: 16px; }
-    .empty .empty-title { font-size: 16px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
-    .empty .empty-desc { font-size: 13px; }
+    /* ── Empty state ─────────────────────────────── */
+    .empty { text-align:center;padding:44px 20px;color:var(--t3); }
+    .empty-icon  { font-size:34px;margin-bottom:10px; }
+    .empty-title { font-size:14px;font-weight:600;color:var(--t2);margin-bottom:6px; }
 
-    /* Detail row in modal */
-    .detail-row { display: flex; gap: 16px; margin-bottom: 10px; }
-    .detail-key { font-size: 12px; color: var(--text3); width: 100px; flex-shrink: 0; }
-    .detail-val { font-size: 12px; font-family: 'Geist Mono', monospace; color: var(--text); word-break: break-all; }
-
-    /* Stack trace */
+    /* ── Issue detail ────────────────────────────── */
+    .detail-row { display:flex;gap:12px;margin-bottom:8px; }
+    .detail-key { font-size:11.5px;color:var(--t3);width:90px;flex-shrink:0;font-weight:500; }
+    .detail-val { font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-all; }
     .stack-trace {
-      background: rgba(15,20,28,0.95);
-      border: 1px solid var(--glass-border);
-      border-radius: 8px;
-      padding: 12px;
-      font-family: 'Geist Mono', monospace;
-      font-size: 11px;
-      color: var(--text2);
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 250px;
-      overflow-y: auto;
-      margin-top: 10px;
+      background:rgba(10,15,30,0.07);border:1px solid rgba(10,15,30,0.1);border-radius:var(--r-xs);
+      padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--t2);
+      white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:6px;
     }
-    .stack-trace::-webkit-scrollbar { width: 4px; }
-    .stack-trace::-webkit-scrollbar-thumb { background: var(--glass-border); }
-
-    /* Section title */
+    .stack-trace::-webkit-scrollbar { width:4px; }
+    .stack-trace::-webkit-scrollbar-thumb { background:rgba(80,120,200,0.2); }
     .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text2);
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;
     }
-    .section-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--glass-border);
-    }
+    .section-title::after { content:'';flex:1;height:1px;background:rgba(0,0,0,0.07); }
   </style>
 </head>
 <body>
+
+<!-- Animated background blobs -->
+<div class="blob blob-a"></div>
+<div class="blob blob-b"></div>
+<div class="blob blob-c"></div>
+
 <div id="app">
-  <div class="topbar">
-    <div class="topbar-logo">
-      <div class="logo-icon">⚡</div>
-      <span>PM3</span>
-      <sub>Process Manager</sub>
+
+  <!-- ── Navbar ─────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-logo">
+      <div class="nav-logo-icon">⚡</div>
+      PM3
     </div>
-    <div class="topbar-sys" id="sys-metrics">
-      <div class="sys-metric"><span class="label">CPU</span><span class="val" id="sys-cpu">-</span></div>
-      <div class="sys-metric"><span class="label">RAM</span><span class="val" id="sys-ram">-</span></div>
-      <div class="sys-metric"><span class="label">Uptime</span><span class="val" id="sys-uptime">-</span></div>
-      <div class="sys-metric"><span class="label">Processes</span><span class="val" id="sys-procs">-</span></div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="processes" onclick="switchTab('processes')">⚙ Processes</button>
+      <button class="nav-tab" data-tab="issues" onclick="switchTab('issues')">
+        ⚠ Issues <span class="badge" id="issue-badge" style="display:none">0</span>
+      </button>
+      <button class="nav-tab" data-tab="system" onclick="switchTab('system')">📊 System</button>
+      <button class="nav-tab" data-tab="config" onclick="switchTab('config')">🔧 Config</button>
     </div>
-    <div class="topbar-actions">
+
+    <div class="nav-sys">
+      <div class="nav-chip"><span class="lbl">CPU</span><span class="val" id="sys-cpu">—</span></div>
+      <div class="nav-chip"><span class="lbl">RAM</span><span class="val" id="sys-ram">—</span></div>
+      <div class="nav-chip"><span class="lbl">Up</span><span class="val" id="sys-uptime">—</span></div>
+      <div class="nav-chip"><span class="lbl">Run</span><span class="val" id="sys-procs">0</span></div>
+    </div>
+
+    <div class="nav-actions">
+      <button class="btn icon" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
       <button class="btn primary" onclick="openStartModal()">＋ New Process</button>
     </div>
-  </div>
+  </nav>
 
-  <div class="tabs">
-    <div class="tab active" data-tab="processes" onclick="switchTab('processes')">Processes</div>
-    <div class="tab" data-tab="logs" onclick="switchTab('logs')">Logs</div>
-    <div class="tab" data-tab="issues" onclick="switchTab('issues')">
-      Issues <span class="badge" id="issue-badge" style="display:none">0</span>
-    </div>
-    <div class="tab" data-tab="system" onclick="switchTab('system')">System</div>
-  </div>
-
+  <!-- ── Content ────────────────────────────────── -->
   <div class="content">
-    <!-- PROCESSES TAB -->
+
+    <!-- PROCESSES -->
     <div class="panel active" id="tab-processes">
-      <div class="stats-row" id="proc-stats-row">
-        <div class="stat-card">
-          <div class="sc-label">Running</div>
-          <div class="sc-val" id="stat-running" style="color:var(--green)">0</div>
+      <div class="stats-strip">
+        <div class="stat-pill">
+          <div class="sp-val" id="stat-running" style="color:var(--green)">0</div>
+          <div class="sp-label">Running</div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Stopped</div>
-          <div class="sc-val" id="stat-stopped" style="color:var(--text3)">0</div>
+        <div class="stat-pill">
+          <div class="sp-val" id="stat-stopped" style="color:var(--t3)">0</div>
+          <div class="sp-label">Stopped</div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Crashed</div>
-          <div class="sc-val" id="stat-crashed" style="color:var(--red)">0</div>
+        <div class="stat-pill">
+          <div class="sp-val" id="stat-crashed" style="color:var(--red)">0</div>
+          <div class="sp-label">Crashed</div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Total Restarts</div>
-          <div class="sc-val" id="stat-restarts" style="color:var(--yellow)">0</div>
+        <div class="stat-pill">
+          <div class="sp-val" id="stat-restarts" style="color:var(--yellow)">0</div>
+          <div class="sp-label">Restarts</div>
         </div>
       </div>
 
-      <div class="glass-card">
-        <div class="card-header">
-          <div class="card-title">⚙️ Processes</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn sm" onclick="refreshProcesses()">⟳ Refresh</button>
-          </div>
+      <div class="card fill">
+        <div class="card-hdr">
+          <div class="card-title">⚙ Processes</div>
+          <button class="btn sm" onclick="refreshProcesses()">⟳ Refresh</button>
         </div>
-        <div id="proc-list-container">
-          <table class="proc-table" id="proc-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>CPU</th>
-                <th>Memory</th>
-                <th>Restarts</th>
-                <th>Uptime</th>
-                <th>PID</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+        <div class="table-wrap">
+          <table class="proc-table" id="proc-table" style="display:none">
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Status</th><th>CPU</th><th>RAM</th>
+              <th>Issues</th><th>Restarts</th><th>Uptime</th><th>PID</th><th>Actions</th>
+            </tr></thead>
             <tbody id="proc-tbody"></tbody>
           </table>
-          <div id="proc-empty" class="empty" style="display:none">
+          <div id="proc-empty" class="empty">
             <div class="empty-icon">🚀</div>
             <div class="empty-title">No processes yet</div>
-            <div class="empty-desc">Click <strong>+ New Process</strong> to get started</div>
+            <div style="font-size:12px;color:var(--t4)">Click <strong>+ New Process</strong> to get started</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- LOGS TAB -->
-    <div class="panel" id="tab-logs">
-      <div class="glass-card" style="margin-bottom:16px">
-        <div class="card-header">
-          <div class="card-title">📋 Live Logs</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select class="form-input" id="log-select" onchange="loadLogs()" style="width:200px;padding:5px 10px">
-              <option value="">Select process...</option>
-            </select>
-            <button class="btn sm" onclick="clearLogView()">Clear View</button>
-          </div>
-        </div>
-      </div>
-      <div class="log-container">
-        <div class="log-header">
-          <div class="log-title">
-            <div class="live-dot"></div>
-            <span id="log-proc-name">No process selected</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3)">Live · Auto-scroll</div>
-        </div>
-        <div class="log-body" id="log-body">Select a process to view logs...</div>
-      </div>
-    </div>
-
-    <!-- ISSUES TAB -->
+    <!-- ISSUES -->
     <div class="panel" id="tab-issues">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div class="section-title" style="flex:1;margin:0">🔴 Issues &amp; Errors</div>
-        <div style="display:flex;gap:8px;margin-left:16px">
+      <div class="stats-strip">
+        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('critical')">
+          <div class="sp-val" id="stat-iss-critical" style="color:var(--red)">0</div>
+          <div class="sp-label">Critical</div>
+        </div>
+        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('error')">
+          <div class="sp-val" id="stat-iss-error" style="color:var(--yellow)">0</div>
+          <div class="sp-label">Error</div>
+        </div>
+        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('warning')">
+          <div class="sp-val" id="stat-iss-warning" style="color:var(--cyan)">0</div>
+          <div class="sp-label">Warning</div>
+        </div>
+        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('all')">
+          <div class="sp-val" id="stat-iss-total" style="color:var(--t2)">0</div>
+          <div class="sp-label">Total (max 200)</div>
+        </div>
+      </div>
+
+      <div class="card" style="flex-shrink:0">
+        <div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div class="filter-chips">
+            <span class="filter-chip active" data-filter="all"      onclick="setIssueFilter('all')">All</span>
+            <span class="filter-chip"         data-filter="critical" onclick="setIssueFilter('critical')">Critical</span>
+            <span class="filter-chip"         data-filter="error"    onclick="setIssueFilter('error')">Error</span>
+            <span class="filter-chip"         data-filter="warning"  onclick="setIssueFilter('warning')">Warning</span>
+            <span id="proc-filter-chip" class="filter-chip" data-filter="proc" style="display:none" onclick="setIssueFilter('proc')">
+              📌 <span id="proc-filter-name"></span>
+            </span>
+          </div>
           <button class="btn sm danger" onclick="clearAllIssues()">Clear All</button>
         </div>
       </div>
-      <div id="issues-list"></div>
-      <div id="issues-empty" class="empty" style="display:none">
-        <div class="empty-icon">✅</div>
-        <div class="empty-title">No issues</div>
-        <div class="empty-desc">All processes running smoothly</div>
+
+      <div class="issues-scroll" id="issues-list">
+        <div id="issues-empty" class="empty" style="display:none">
+          <div class="empty-icon">✅</div>
+          <div class="empty-title">No issues</div>
+          <div style="font-size:12px;color:var(--t4)">All processes running smoothly</div>
+        </div>
       </div>
     </div>
 
-    <!-- SYSTEM TAB -->
+    <!-- SYSTEM -->
     <div class="panel" id="tab-system">
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="sc-label">CPU Load</div>
-          <div class="sc-val" id="sys-cpu-big">-</div>
+      <div class="sys-grid">
+        <div class="card sys-metric">
+          <div class="sm-label">CPU Load</div>
+          <div class="sm-val" id="sys-cpu-big" style="color:var(--accent)">—</div>
           <div class="progress"><div class="progress-fill" id="sys-cpu-bar" style="background:var(--accent);width:0%"></div></div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Memory Used</div>
-          <div class="sc-val" id="sys-mem-big">-</div>
+        <div class="card sys-metric">
+          <div class="sm-label">Memory</div>
+          <div class="sm-val" id="sys-mem-big" style="color:var(--accent2)">—</div>
           <div class="progress"><div class="progress-fill" id="sys-mem-bar" style="background:var(--accent2);width:0%"></div></div>
-          <div class="sc-sub" id="sys-mem-detail">-</div>
+          <div class="sm-sub" id="sys-mem-detail">—</div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Server Uptime</div>
-          <div class="sc-val" id="sys-up-big" style="font-size:18px">-</div>
+        <div class="card sys-metric">
+          <div class="sm-label">Server Uptime</div>
+          <div class="sm-val" id="sys-up-big" style="font-size:18px;color:var(--green)">—</div>
         </div>
-        <div class="stat-card">
-          <div class="sc-label">Running Procs</div>
-          <div class="sc-val" id="sys-procs-big">-</div>
+        <div class="card sys-metric">
+          <div class="sm-label">Running Procs</div>
+          <div class="sm-val" id="sys-procs-big" style="color:var(--cyan)">0</div>
         </div>
       </div>
-
-      <div class="glass-card">
-        <div class="card-header">
-          <div class="card-title">💾 Disk Usage</div>
-        </div>
-        <div id="disk-list" style="padding:8px 0"></div>
+      <div class="card fill">
+        <div class="card-hdr"><div class="card-title">💾 Disk Usage</div></div>
+        <div class="disk-scroll" id="disk-list"></div>
       </div>
     </div>
-  </div>
-</div>
+
+    <!-- CONFIG -->
+    <div class="panel" id="tab-config">
+      <div class="card fill">
+        <div class="card-hdr">
+          <div class="card-title">🔧 Configuration</div>
+          <div style="display:flex;gap:7px;align-items:center">
+            <span style="font-size:11px;color:var(--t3)">~/.pm3/config.json</span>
+            <button class="btn sm danger" onclick="resetConfig()">↺ Reset</button>
+            <button class="btn sm primary" onclick="saveConfig()">💾 Save</button>
+          </div>
+        </div>
+        <div class="cfg-scroll" id="config-list">
+          <div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Loading config…</div><div style="font-size:11.5px;color:var(--t4);margin-top:4px">If this persists, run <code style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3 kill</code> then <code style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3 list</code> to restart the daemon.</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- .content -->
+</div><!-- #app -->
 
 <!-- START MODAL -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal">
-    <div class="modal-header">
+    <div class="modal-hdr">
       <div class="modal-title">＋ Start New Process</div>
       <div class="modal-close" onclick="closeStartModal()">×</div>
     </div>
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Script / Command *</label>
-        <input class="form-input" id="f-script" placeholder="e.g. bot.js, npm run start, node server.js" />
+        <input class="form-input" id="f-script" placeholder="bot.js  |  npm run start  |  node server.js" />
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Name</label>
-          <input class="form-input" id="f-name" placeholder="my-app" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Working Directory</label>
-          <input class="form-input" id="f-cwd" placeholder="/home/user/app" />
-        </div>
+        <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="f-name" placeholder="my-app" /></div>
+        <div class="form-group"><label class="form-label">Working Directory</label><input class="form-input" id="f-cwd" placeholder="/home/user/app" /></div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Max Restarts</label>
-          <input class="form-input" id="f-max-restarts" type="number" placeholder="15" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Memory Limit (MB)</label>
-          <input class="form-input" id="f-memory" type="number" placeholder="512" />
-        </div>
+        <div class="form-group"><label class="form-label">Max Restarts</label><input class="form-input" id="f-max-restarts" type="number" placeholder="15" /></div>
+        <div class="form-group"><label class="form-label">Memory Limit (MB)</label><input class="form-input" id="f-memory" type="number" placeholder="512" /></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Environment Variables (KEY=VAL,KEY2=VAL2)</label>
-        <input class="form-input" id="f-env" placeholder="NODE_ENV=production,PORT=3000" />
-      </div>
-      <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+      <div class="form-group"><label class="form-label">Environment Variables</label><input class="form-input" id="f-env" placeholder="NODE_ENV=production,PORT=3000" /></div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
         <button class="btn" onclick="closeStartModal()">Cancel</button>
-        <button class="btn primary" onclick="submitStart()">Start Process</button>
+        <button class="btn primary" onclick="submitStart()">▶ Start Process</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ISSUE DETAIL MODAL -->
+<!-- ISSUE MODAL -->
 <div class="modal-overlay" id="issue-modal">
   <div class="modal">
-    <div class="modal-header">
+    <div class="modal-hdr">
       <div class="modal-title" id="issue-modal-title">Issue Detail</div>
       <div class="modal-close" onclick="closeIssueModal()">×</div>
     </div>
@@ -787,455 +685,480 @@
   </div>
 </div>
 
-<!-- TOAST CONTAINER -->
+<!-- LOGS MODAL -->
+<div class="modal-overlay" id="logs-modal">
+  <div class="modal modal-logs">
+    <div class="modal-hdr" style="flex-shrink:0">
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <div class="live-dot" id="logs-modal-dot"></div>
+        📋 <span id="logs-modal-title-name">Logs</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="form-input" id="logs-modal-select" onchange="loadModalLogs()" style="width:180px;padding:5px 10px">
+          <option value="">Select process…</option>
+        </select>
+        <button class="btn sm" onclick="clearModalLogView()">Clear</button>
+        <div class="modal-close" onclick="closeLogsModal()">×</div>
+      </div>
+    </div>
+    <div class="log-shell">
+      <div class="log-hdr">
+        <div class="log-title">
+          <span id="logs-modal-proc-name" style="color:rgba(255,255,255,0.6);font-size:11px">No process selected</span>
+        </div>
+        <span style="font-size:10.5px;color:rgba(255,255,255,0.35)">Live · Auto-scroll</span>
+      </div>
+      <div class="log-body" id="logs-modal-body">Select a process above to view logs…</div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script>
 const socket = io();
 let processes = {};
 let issues = [];
-let currentLogProcess = null;
+let modalLogProcess = null;
+let issueFilter = 'all';
+let issueFilterProc = null;
+let configSchema = {};
+let configValues = {};
 
-// ─── Socket events ────────────────────────────────────────────
 socket.on('init', data => {
   processes = data.processes || {};
   issues = data.issues || [];
-  renderProcesses();
-  renderIssues();
-  updateProcStats();
+  renderProcesses(); renderIssues(); updateProcStats(); updateIssueStats();
 });
-
 socket.on('process:update', proc => {
   processes[proc.name] = proc;
-  renderProcessRow(proc);
-  updateProcStats();
-  updateLogSelect();
+  renderProcessRow(proc); updateProcStats();
 });
-
 socket.on('process:delete', data => {
   delete processes[data.name];
-  renderProcesses();
-  updateProcStats();
-  updateLogSelect();
+  renderProcesses(); updateProcStats();
 });
-
 socket.on('stats:update', procs => {
   processes = procs;
   Object.values(procs).forEach(p => renderProcessRow(p));
   updateProcStats();
 });
-
-socket.on('system:update', data => {
-  updateSysMetrics(data);
-});
-
-socket.on('issue:new', issue => {
-  issues.unshift(issue);
-  renderIssues();
-});
-
+socket.on('system:update', data => updateSysMetrics(data));
+socket.on('issue:new', issue => { issues.unshift(issue); if (issues.length > 200) issues = issues.slice(0, 200); renderIssues(); });
 socket.on('log', data => {
-  if (data.name !== currentLogProcess) return;
-  appendLog(data.line, data.type);
+  if (data.name !== modalLogProcess) return;
+  const modal = document.getElementById('logs-modal');
+  if (!modal.classList.contains('open')) return;
+  appendModalLog(data.line, data.type);
 });
 
-// ─── Fetch initial system data ─────────────────────────────────
 async function fetchSystem() {
-  try {
-    const r = await fetch('/api/system');
-    const data = await r.json();
-    updateSysMetrics(data);
-    updateSysTab(data);
-  } catch {}
+  try { const r = await fetch('/api/system'); const d = await r.json(); updateSysMetrics(d); updateSysTab(d); } catch {}
 }
-fetchSystem();
-setInterval(fetchSystem, 5000);
+fetchSystem(); setInterval(fetchSystem, 5000);
 
 function updateSysMetrics(data) {
-  document.getElementById('sys-cpu').textContent = data.cpu + '%';
-  document.getElementById('sys-ram').textContent = data.memory ? (data.memory.used ? Math.round(data.memory.used/1024/1024) + ' MB' : data.memory.percent + '%') : '-';
+  document.getElementById('sys-cpu').textContent = (data.cpu || 0) + '%';
+  document.getElementById('sys-ram').textContent = data.memory ? Math.round(data.memory.used/1024/1024) + ' MB' : '—';
   if (data.uptime) document.getElementById('sys-uptime').textContent = formatUptime(data.uptime);
-  if (data.processCount !== undefined) document.getElementById('sys-procs').textContent = data.processCount;
-
-  // system tab
+  const running = Object.values(processes).filter(p => p.status === 'running').length;
+  document.getElementById('sys-procs').textContent = running;
   document.getElementById('sys-cpu-big').textContent = (data.cpu || 0) + '%';
   document.getElementById('sys-cpu-bar').style.width = (data.cpu || 0) + '%';
   if (data.memory) {
     document.getElementById('sys-mem-big').textContent = data.memory.percent + '%';
     document.getElementById('sys-mem-bar').style.width = data.memory.percent + '%';
-    document.getElementById('sys-mem-detail').textContent =
-      `${fmt(data.memory.used)} / ${fmt(data.memory.total)}`;
+    document.getElementById('sys-mem-detail').textContent = fmt(data.memory.used) + ' used · ' + fmt(data.memory.available ?? (data.memory.total - data.memory.used)) + ' available';
   }
-  if (data.processCount !== undefined) document.getElementById('sys-procs-big').textContent = data.processCount;
+  document.getElementById('sys-procs-big').textContent = running;
 }
-
 function updateSysTab(data) {
   if (data.uptime) document.getElementById('sys-up-big').textContent = formatUptime(data.uptime);
-  if (data.disk) {
-    const diskList = document.getElementById('disk-list');
-    diskList.innerHTML = data.disk.map(d => `
-      <div style="padding:10px 20px;border-bottom:1px solid var(--glass-border)">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-          <span style="font-family:'Geist Mono',monospace;font-size:12px">${d.mount}</span>
-          <span style="font-size:12px;color:var(--text2)">${fmt(d.used)} / ${fmt(d.size)} (${d.percent || 0}%)</span>
-        </div>
-        <div class="progress">
-          <div class="progress-fill" style="width:${d.percent||0}%;background:${d.percent>80?'var(--red)':d.percent>60?'var(--yellow)':'var(--accent)'}"></div>
-        </div>
+  if (data.disk) document.getElementById('disk-list').innerHTML = data.disk.map(d => `
+    <div style="padding:9px 14px;border-bottom:1px solid var(--border-sm)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t2)">${d.mount}</span>
+        <span style="font-size:11.5px;color:var(--t3)">${fmt(d.used)} / ${fmt(d.size)} · ${d.percent||0}%</span>
       </div>
-    `).join('');
-  }
+      <div class="progress"><div class="progress-fill" style="width:${d.percent||0}%;background:${d.percent>85?'var(--red)':d.percent>65?'var(--yellow)':'var(--accent)'}"></div></div>
+    </div>`).join('');
 }
 
-// ─── Process rendering ─────────────────────────────────────────
 function renderProcesses() {
   const list = Object.values(processes);
   const tbody = document.getElementById('proc-tbody');
   const empty = document.getElementById('proc-empty');
-
-  if (!list.length) {
-    tbody.innerHTML = '';
-    empty.style.display = '';
-    document.getElementById('proc-table').style.display = 'none';
-    return;
-  }
-
-  document.getElementById('proc-table').style.display = '';
-  empty.style.display = 'none';
-  tbody.innerHTML = '';
+  const table = document.getElementById('proc-table');
+  if (!list.length) { tbody.innerHTML=''; table.style.display='none'; empty.style.display=''; return; }
+  table.style.display=''; empty.style.display='none'; tbody.innerHTML='';
   list.forEach(p => {
     const tr = document.createElement('tr');
-    tr.className = 'proc-row';
-    tr.id = `proc-row-${p.name}`;
-    tr.onclick = () => openProcDetail(p.name);
-    tr.innerHTML = procRowHTML(p);
-    tbody.appendChild(tr);
+    tr.className = 'proc-row'; tr.id = `proc-row-${p.name}`;
+    tr.innerHTML = procRowHTML(p); tbody.appendChild(tr);
   });
 }
-
 function renderProcessRow(proc) {
-  let row = document.getElementById(`proc-row-${proc.name}`);
-  const list = Object.values(processes);
+  const table = document.getElementById('proc-table');
   const empty = document.getElementById('proc-empty');
-
-  if (!list.length) {
-    renderProcesses();
-    return;
-  }
-
-  document.getElementById('proc-table').style.display = '';
-  empty.style.display = 'none';
-
-  if (!row) {
-    const tbody = document.getElementById('proc-tbody');
-    row = document.createElement('tr');
-    row.className = 'proc-row';
-    row.id = `proc-row-${proc.name}`;
-    row.onclick = () => openProcDetail(proc.name);
-    tbody.appendChild(row);
-  }
+  if (!Object.keys(processes).length) { renderProcesses(); return; }
+  table.style.display=''; empty.style.display='none';
+  let row = document.getElementById(`proc-row-${proc.name}`);
+  if (!row) { row = document.createElement('tr'); row.className='proc-row'; row.id=`proc-row-${proc.name}`; document.getElementById('proc-tbody').appendChild(row); }
   row.innerHTML = procRowHTML(proc);
 }
-
+function issueCountForProc(name) { return issues.filter(i => i.processName === name).length; }
+function issueIndicatorCell(name) {
+  const procIssues = issues.filter(i => i.processName === name);
+  if (!procIssues.length) return `<td class="mono" style="color:var(--t4)">—</td>`;
+  const hasCritical = procIssues.some(i => i.severity === 'critical');
+  const hasError    = procIssues.some(i => i.severity === 'error');
+  const color  = hasCritical ? 'var(--red)'    : hasError ? 'var(--yellow)'    : 'var(--cyan)';
+  const bg     = hasCritical ? 'rgba(220,38,38,0.13)' : hasError ? 'rgba(217,119,6,0.13)' : 'rgba(8,145,178,0.13)';
+  const border = hasCritical ? 'rgba(220,38,38,0.35)' : hasError ? 'rgba(217,119,6,0.35)' : 'rgba(8,145,178,0.35)';
+  return `<td onclick="event.stopPropagation();openIssuesFor('${name}')" style="cursor:pointer">
+    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;
+      border-radius:11px;background:${bg};border:1px solid ${border};color:${color};
+      font-weight:700;font-size:11px;padding:0 6px;font-family:'JetBrains Mono',monospace;
+      transition:opacity 0.15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">${procIssues.length}</span>
+  </td>`;
+}
 function procRowHTML(p) {
   return `
-    <td class="mono">${p.id}</td>
-    <td>
-      <div class="proc-name">${p.name}</div>
-      <div class="proc-script">${p.script || ''}</div>
-    </td>
+    <td class="mono" style="color:var(--t3)">${p.id}</td>
+    <td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>
     <td><span class="status-pill status-${p.status}">${p.status}</span></td>
-    <td class="mono">${p.cpu != null ? p.cpu + '%' : '-'}</td>
-    <td class="mono">${p.memory ? p.memory + ' MB' : '-'}</td>
+    <td class="mono">${p.cpu!=null?p.cpu+'%':'—'}</td>
+    <td class="mono">${p.memory?p.memory+' MB':'—'}</td>
+    ${issueIndicatorCell(p.name)}
     <td class="mono">${p.restartCount}</td>
     <td class="mono">${formatUptime(p.uptime)}</td>
-    <td class="mono">${p.pid || '-'}</td>
+    <td class="mono" style="color:var(--t4)">${p.pid||'—'}</td>
     <td onclick="event.stopPropagation()">
       <div class="proc-actions">
-        ${p.status === 'running' || p.status === 'starting'
-          ? `<button class="btn sm" onclick="procAction('stop','${p.name}')">■ Stop</button>`
-          : `<button class="btn sm success" onclick="procAction('start','${p.name}')">▶ Start</button>`}
-        <button class="btn sm" onclick="procAction('restart','${p.name}')">↺ Restart</button>
-        <button class="btn sm" onclick="openLogsFor('${p.name}')">📋 Logs</button>
-        <button class="btn sm danger" onclick="procAction('delete','${p.name}')">✕</button>
+        ${p.status==='running'||p.status==='starting'
+          ? `<button class="pab pab-stop"    onclick="procAction('stop','${p.name}')">■ Stop</button>`
+          : `<button class="pab pab-start"   onclick="procAction('start','${p.name}')">▶ Start</button>`}
+        <button class="pab pab-restart" onclick="procAction('restart','${p.name}')">↺ Restart</button>
+        <button class="pab pab-logs"    onclick="openLogsFor('${p.name}')">📋 Logs</button>
+        <button class="pab pab-issues"  onclick="openIssuesFor('${p.name}')">⚠ Issues</button>
+        <div class="sep"></div>
+        <button class="pab pab-delete"  onclick="procAction('delete','${p.name}')">✕ Delete</button>
       </div>
-    </td>
-  `;
+    </td>`;
 }
-
 async function procAction(action, name) {
-  let method = 'POST', url;
-  if (action === 'stop') url = `/api/processes/${name}/stop`;
-  else if (action === 'restart') url = `/api/processes/${name}/restart`;
-  else if (action === 'delete') { method = 'DELETE'; url = `/api/processes/${name}`; }
-  else if (action === 'start') url = `/api/processes/${name}/restart`;
-
+  const methods = {stop:'POST',restart:'POST',delete:'DELETE',start:'POST'};
+  const urls = {stop:`/api/processes/${name}/stop`,restart:`/api/processes/${name}/restart`,delete:`/api/processes/${name}`,start:`/api/processes/${name}/restart`};
   try {
-    const r = await fetch(url, { method });
+    const r = await fetch(urls[action],{method:methods[action]});
     const d = await r.json();
-    if (d.error) toast(d.error, 'error');
-    else toast(`Process "${name}" → ${action}`, 'success');
-    if (action === 'delete') { delete processes[name]; renderProcesses(); updateProcStats(); }
-  } catch (e) { toast(e.message, 'error'); }
+    if (d.error) { toast(d.error,'error'); return; }
+    toast(`"${name}" → ${action}`,'success');
+    if (action==='delete') { delete processes[name]; renderProcesses(); updateProcStats(); }
+  } catch(e) { toast(e.message,'error'); }
 }
-
 function updateProcStats() {
   const list = Object.values(processes);
-  document.getElementById('stat-running').textContent = list.filter(p => p.status === 'running').length;
-  document.getElementById('stat-stopped').textContent = list.filter(p => p.status === 'stopped').length;
-  document.getElementById('stat-crashed').textContent = list.filter(p => p.status === 'crashed').length;
-  document.getElementById('stat-restarts').textContent = list.reduce((s, p) => s + (p.restartCount || 0), 0);
-  document.getElementById('sys-procs').textContent = list.filter(p => p.status === 'running').length;
-  document.getElementById('sys-procs-big').textContent = list.filter(p => p.status === 'running').length;
+  document.getElementById('stat-running').textContent  = list.filter(p=>p.status==='running').length;
+  document.getElementById('stat-stopped').textContent  = list.filter(p=>p.status==='stopped').length;
+  document.getElementById('stat-crashed').textContent  = list.filter(p=>p.status==='crashed').length;
+  document.getElementById('stat-restarts').textContent = list.reduce((s,p)=>s+(p.restartCount||0),0);
+  const running = list.filter(p=>p.status==='running').length;
+  document.getElementById('sys-procs').textContent = running;
+  document.getElementById('sys-procs-big').textContent = running;
+}
+async function refreshProcesses() {
+  try { const r=await fetch('/api/processes'); processes=await r.json(); renderProcesses(); updateProcStats(); } catch {}
 }
 
-async function openProcDetail(name) {
-  // Just open logs for now
-  openLogsFor(name);
-}
-
-// ─── Logs ─────────────────────────────────────────────────────
-function updateLogSelect() {
-  const sel = document.getElementById('log-select');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">Select process...</option>' +
-    Object.keys(processes).map(n => `<option value="${n}"${n===prev?' selected':''}>${n}</option>`).join('');
-}
-
+// ── Logs modal ────────────────────────────────────
 function openLogsFor(name) {
-  switchTab('logs');
-  document.getElementById('log-select').value = name;
-  loadLogs();
+  const modal = document.getElementById('logs-modal');
+  modal.classList.add('open');
+  const sel = document.getElementById('logs-modal-select');
+  sel.innerHTML = '<option value="">Select process…</option>' +
+    Object.keys(processes).map(n => `<option value="${n}"${n===name?' selected':''}>${n}</option>`).join('');
+  if (name) {
+    sel.value = name;
+    loadModalLogs();
+  }
 }
-
-async function loadLogs() {
-  const name = document.getElementById('log-select').value;
-  if (!name) return;
-  currentLogProcess = name;
-  document.getElementById('log-proc-name').textContent = name;
-  const body = document.getElementById('log-body');
-  body.textContent = 'Loading...';
+function closeLogsModal() {
+  document.getElementById('logs-modal').classList.remove('open');
+  modalLogProcess = null;
+  document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
+  document.getElementById('logs-modal-title-name').textContent = 'Logs';
+}
+async function loadModalLogs() {
+  const name = document.getElementById('logs-modal-select').value;
+  if (!name) { modalLogProcess = null; return; }
+  modalLogProcess = name;
+  document.getElementById('logs-modal-proc-name').textContent = name;
+  document.getElementById('logs-modal-title-name').textContent = name;
+  const body = document.getElementById('logs-modal-body');
+  body.textContent = 'Loading…';
   try {
     const r = await fetch(`/api/logs/${name}?lines=200`);
     const d = await r.json();
     body.innerHTML = '';
-    const lines = (d.out + '\n' + d.err).split('\n').filter(Boolean).sort();
-    lines.forEach(line => appendLog(line, line.includes('[ERR]') ? 'err' : 'out'));
+    const lines = (d.out+'\n'+d.err).split('\n').filter(Boolean).sort();
+    lines.forEach(line => appendModalLog(line, line.includes('[ERR]')?'err':'out'));
     body.scrollTop = body.scrollHeight;
-  } catch (e) { body.textContent = 'Error loading logs: ' + e.message; }
+  } catch(e) { body.textContent = 'Error: ' + e.message; }
 }
-
-function appendLog(line, type) {
-  const body = document.getElementById('log-body');
+function appendModalLog(line, type) {
+  const body = document.getElementById('logs-modal-body');
   const span = document.createElement('span');
   span.className = type === 'err' ? 'log-err' : 'log-out';
   span.textContent = line + '\n';
   body.appendChild(span);
-  // Keep max 500 lines
-  while (body.children.length > 500) body.removeChild(body.firstChild);
+  while(body.children.length > 500) body.removeChild(body.firstChild);
   body.scrollTop = body.scrollHeight;
 }
+function clearModalLogView() { document.getElementById('logs-modal-body').innerHTML = ''; }
 
-function clearLogView() {
-  document.getElementById('log-body').innerHTML = '';
+// ── Issues ────────────────────────────────────────
+function openIssuesFor(name) { issueFilterProc=name; setIssueFilter('proc'); switchTab('issues'); }
+function setIssueFilter(filter) {
+  issueFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter===filter));
+  if (filter!=='proc') { issueFilterProc=null; document.getElementById('proc-filter-chip').style.display='none'; }
+  else { document.getElementById('proc-filter-chip').style.display=''; document.getElementById('proc-filter-name').textContent=issueFilterProc; }
+  renderIssues();
 }
-
-async function refreshProcesses() {
-  try {
-    const r = await fetch('/api/processes');
-    processes = await r.json();
-    renderProcesses();
-    updateProcStats();
-    updateLogSelect();
-  } catch {}
+function getFilteredIssues() {
+  if (issueFilter==='all')  return issues;
+  if (issueFilter==='proc') return issues.filter(i=>i.processName===issueFilterProc);
+  return issues.filter(i=>i.severity===issueFilter);
 }
-
-// ─── Issues ────────────────────────────────────────────────────
+function updateIssueStats() {
+  const badge = document.getElementById('issue-badge');
+  badge.style.display = issues.length ? '' : 'none';
+  badge.textContent = issues.length;
+  document.getElementById('stat-iss-critical').textContent = issues.filter(i=>i.severity==='critical').length;
+  document.getElementById('stat-iss-error').textContent    = issues.filter(i=>i.severity==='error').length;
+  document.getElementById('stat-iss-warning').textContent  = issues.filter(i=>i.severity==='warning').length;
+  document.getElementById('stat-iss-total').textContent    = issues.length;
+}
+function relativeTime(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60)  return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
 function renderIssues() {
+  updateIssueStats();
   const list = document.getElementById('issues-list');
   const empty = document.getElementById('issues-empty');
-  const badge = document.getElementById('issue-badge');
-
-  if (!issues.length) {
+  const filtered = getFilteredIssues();
+  if (!filtered.length) {
     list.innerHTML = '';
+    list.appendChild(empty);
     empty.style.display = '';
-    badge.style.display = 'none';
     return;
   }
-
   empty.style.display = 'none';
-  badge.style.display = '';
-  badge.textContent = issues.length;
-
-  list.innerHTML = issues.map(iss => `
-    <div class="issue-card ${iss.severity}" onclick='openIssue(${JSON.stringify(iss).replace(/'/g,"&apos;")})'>
-      <div class="issue-header">
-        <div>
-          <div class="issue-name">${iss.processName}</div>
-          <div class="issue-time">${formatDate(iss.timestamp)}</div>
+  list.innerHTML = filtered.map(iss => `
+    <div class="issue-card ${iss.severity}" onclick='openIssue(${JSON.stringify(iss).replace(/'/g,"&apos;")})' style="margin-bottom:5px">
+      <div class="issue-inner">
+        <div class="issue-top">
+          <div class="issue-left">
+            <span class="severity-badge severity-${iss.severity}">${iss.severity}</span>
+            <span class="issue-name">${escapeHtml(iss.processName)}</span>
+          </div>
+          <div class="issue-right">
+            <span class="issue-time" title="${formatDate(iss.timestamp)}">${relativeTime(iss.timestamp)}</span>
+            <button class="btn xs danger" onclick='event.stopPropagation();deleteIssue("${iss.id}")'>✕</button>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="severity-badge severity-${iss.severity}">${iss.severity}</span>
-          <button class="btn sm danger" onclick='event.stopPropagation();deleteIssue("${iss.id}")'>✕</button>
+        <div class="issue-msg">${escapeHtml(iss.message)}</div>
+        <div class="issue-meta">
+          ${iss.exitCode!==null ? `<span>exit ${iss.exitCode}</span>` : ''}
+          ${iss.reason ? `<span>${escapeHtml(iss.reason)}</span>` : ''}
         </div>
       </div>
-      <div class="issue-msg">${escapeHtml(iss.message.substring(0, 120))}${iss.message.length > 120 ? '...' : ''}</div>
-      ${iss.exitCode !== null ? `<div style="font-size:11px;color:var(--text3)">Exit code: ${iss.exitCode}</div>` : ''}
-    </div>
-  `).join('');
+    </div>`).join('');
+  Object.values(processes).forEach(p => renderProcessRow(p));
 }
-
 function openIssue(iss) {
-  document.getElementById('issue-modal-title').textContent = `Issue: ${iss.processName}`;
+  document.getElementById('issue-modal-title').textContent = `Issue — ${iss.processName}`;
   document.getElementById('issue-modal-body').innerHTML = `
-    <div class="detail-row"><div class="detail-key">Time</div><div class="detail-val">${formatDate(iss.timestamp)}</div></div>
-    <div class="detail-row"><div class="detail-key">Process</div><div class="detail-val">${iss.processName}</div></div>
-    <div class="detail-row"><div class="detail-key">Severity</div><div class="detail-val"><span class="severity-badge severity-${iss.severity}">${iss.severity}</span></div></div>
-    <div class="detail-row"><div class="detail-key">Exit Code</div><div class="detail-val">${iss.exitCode ?? '-'}</div></div>
-    <div class="detail-row"><div class="detail-key">Reason</div><div class="detail-val">${iss.reason || '-'}</div></div>
-    <div style="margin-top:16px">
-      <div class="section-title">Error Message</div>
-      <div class="stack-trace">${escapeHtml(iss.message)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <span class="severity-badge severity-${iss.severity}" style="font-size:11px;padding:3px 10px">${iss.severity}</span>
+      <span style="font-size:11.5px;color:var(--t3)">${formatDate(iss.timestamp)}</span>
     </div>
-    ${iss.stack ? `
-    <div style="margin-top:16px">
-      <div class="section-title">Stack Trace / Logs</div>
-      <div class="stack-trace">${escapeHtml(iss.stack)}</div>
-    </div>` : ''}
-    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-      <button class="btn sm danger" onclick='deleteIssue("${iss.id}");closeIssueModal()'>Delete Issue</button>
+    <div class="detail-row"><div class="detail-key">Process</div><div class="detail-val">${escapeHtml(iss.processName)}</div></div>
+    <div class="detail-row"><div class="detail-key">Exit Code</div><div class="detail-val">${iss.exitCode??'—'}</div></div>
+    <div class="detail-row"><div class="detail-key">Reason</div><div class="detail-val">${escapeHtml(iss.reason||'—')}</div></div>
+    <div style="margin-top:14px"><div class="section-title">Error Message</div><div class="stack-trace">${escapeHtml(iss.message)}</div></div>
+    ${iss.stack?`<div style="margin-top:12px"><div class="section-title">Stack Trace</div><div class="stack-trace">${escapeHtml(iss.stack)}</div></div>`:''}
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
+      <button class="btn sm danger" onclick='deleteIssue("${iss.id}");closeIssueModal()'>Delete</button>
       <button class="btn sm" onclick="closeIssueModal()">Close</button>
-    </div>
-  `;
+    </div>`;
   document.getElementById('issue-modal').classList.add('open');
 }
-
-function closeIssueModal() {
-  document.getElementById('issue-modal').classList.remove('open');
-}
-
+function closeIssueModal() { document.getElementById('issue-modal').classList.remove('open'); }
 async function deleteIssue(id) {
-  await fetch(`/api/issues/${id}`, { method: 'DELETE' });
-  issues = issues.filter(i => i.id !== id);
-  renderIssues();
-  toast('Issue deleted', 'info');
+  await fetch(`/api/issues/${id}`,{method:'DELETE'}); issues=issues.filter(i=>i.id!==id); renderIssues(); toast('Issue deleted','info');
 }
-
 async function clearAllIssues() {
-  if (!confirm('Delete all issues?')) return;
-  await fetch('/api/issues', { method: 'DELETE' });
-  issues = [];
-  renderIssues();
-  toast('All issues cleared', 'info');
+  if(!confirm('Delete all issues?')) return;
+  await fetch('/api/issues',{method:'DELETE'}); issues=[]; renderIssues(); toast('All issues cleared','info');
 }
 
-// ─── Start modal ───────────────────────────────────────────────
-function openStartModal() {
-  document.getElementById('start-modal').classList.add('open');
-  setTimeout(() => document.getElementById('f-script').focus(), 100);
-}
-function closeStartModal() {
-  document.getElementById('start-modal').classList.remove('open');
-}
-
+// ── Start modal ───────────────────────────────────
+function openStartModal() { document.getElementById('start-modal').classList.add('open'); setTimeout(()=>document.getElementById('f-script').focus(),100); }
+function closeStartModal() { document.getElementById('start-modal').classList.remove('open'); }
 async function submitStart() {
   const script = document.getElementById('f-script').value.trim();
-  if (!script) { toast('Script is required', 'error'); return; }
-
-  const envRaw = document.getElementById('f-env').value.trim();
-  const env = {};
-  if (envRaw) envRaw.split(',').forEach(pair => {
-    const [k, v] = pair.split('=');
-    if (k) env[k.trim()] = (v || '').trim();
-  });
-
-  const config = {
-    script,
-    name: document.getElementById('f-name').value.trim() || undefined,
-    cwd: document.getElementById('f-cwd').value.trim() || undefined,
-    maxRestarts: parseInt(document.getElementById('f-max-restarts').value) || 15,
-    memoryLimit: parseInt(document.getElementById('f-memory').value) || undefined,
-    env,
-  };
-
+  if (!script) { toast('Script is required','error'); return; }
+  const envRaw = document.getElementById('f-env').value.trim(); const env={};
+  if (envRaw) envRaw.split(',').forEach(pair=>{ const [k,v]=pair.split('='); if(k) env[k.trim()]=(v||'').trim(); });
+  const config = { script, name:document.getElementById('f-name').value.trim()||undefined, cwd:document.getElementById('f-cwd').value.trim()||undefined, maxRestarts:parseInt(document.getElementById('f-max-restarts').value)||15, memoryLimit:parseInt(document.getElementById('f-memory').value)||undefined, env };
   try {
-    const r = await fetch('/api/processes/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    });
+    const r = await fetch('/api/processes/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)});
     const d = await r.json();
-    if (d.error) { toast(d.error, 'error'); return; }
-    toast(`Started "${d.name}"`, 'success');
-    closeStartModal();
-    processes[d.name] = d;
-    renderProcesses();
-    updateProcStats();
-    updateLogSelect();
-    // Clear fields
-    ['f-script','f-name','f-cwd','f-env','f-max-restarts','f-memory'].forEach(id => document.getElementById(id).value = '');
-  } catch (e) { toast(e.message, 'error'); }
+    if (d.error) { toast(d.error,'error'); return; }
+    toast(`Started "${d.name}"`,'success'); closeStartModal();
+    processes[d.name]=d; renderProcesses(); updateProcStats();
+    ['f-script','f-name','f-cwd','f-env','f-max-restarts','f-memory'].forEach(id=>document.getElementById(id).value='');
+  } catch(e) { toast(e.message,'error'); }
 }
 
-// ─── Tabs ─────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    configValues = d.config;
+    configSchema = d.schema;
+    renderConfig();
+  } catch(e) {
+    const hint = e.message.includes('JSON') ? ' — restart the daemon: pm3 kill && pm3 list' : '';
+    document.getElementById('config-list').innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-title">Failed to load config</div><div style="font-size:11.5px;color:var(--t4);margin-top:4px">${escapeHtml(e.message)}${hint}</div></div>`;
+  }
+}
+
+function renderConfig() {
+  const container = document.getElementById('config-list');
+  if (!Object.keys(configSchema).length) return;
+  container.innerHTML = Object.entries(configSchema).map(([key, schema]) => {
+    const val = configValues[key];
+    const unitHtml = schema.unit ? `<span class="cfg-unit">(${schema.unit})</span>` : '';
+    let inputHtml = '';
+    if (typeof schema.default === 'boolean') {
+      const on = val === true;
+      inputHtml = `<div class="cfg-toggle" onclick="toggleCfgBool('${key}')">
+        <div class="toggle-track ${on?'on':''}" id="cfg-track-${key}">
+          <div class="toggle-knob"></div>
+        </div>
+        <span class="toggle-label" id="cfg-label-${key}">${on?'Enabled':'Disabled'}</span>
+      </div>`;
+    } else if (schema.default === null || typeof schema.default === 'number') {
+      inputHtml = `<div class="cfg-input-wrap">
+        <input type="number" id="cfg-${key}" value="${val ?? ''}" placeholder="${val===null?'null (unlimited)':schema.default}">
+      </div>`;
+    } else {
+      inputHtml = `<div class="cfg-input-wrap">
+        <input type="text" id="cfg-${key}" value="${val ?? ''}">
+      </div>`;
+    }
+    return `<div class="cfg-row">
+      <div>
+        <div class="cfg-key">${key}${unitHtml}</div>
+        <div class="cfg-desc">${schema.desc}</div>
+      </div>
+      ${inputHtml}
+    </div>`;
+  }).join('');
+}
+
+function toggleCfgBool(key) {
+  const track = document.getElementById(`cfg-track-${key}`);
+  const label = document.getElementById(`cfg-label-${key}`);
+  const on = !track.classList.contains('on');
+  track.classList.toggle('on', on);
+  label.textContent = on ? 'Enabled' : 'Disabled';
+}
+
+async function saveConfig() {
+  const saves = Object.entries(configSchema).map(async ([key, schema]) => {
+    let value;
+    if (typeof schema.default === 'boolean') {
+      const track = document.getElementById(`cfg-track-${key}`);
+      value = track && track.classList.contains('on') ? 'true' : 'false';
+    } else {
+      const el = document.getElementById(`cfg-${key}`);
+      value = el ? (el.value.trim() === '' ? 'null' : el.value.trim()) : null;
+    }
+    if (value === null) return;
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ key, value })
+    }).then(r => r.json()).then(d => { if (d.error) throw new Error(`${key}: ${d.error}`); });
+  });
+  try {
+    await Promise.all(saves);
+    toast('Config saved', 'success');
+    await loadConfig();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function resetConfig() {
+  if (!confirm('Reset all settings to defaults?')) return;
+  try {
+    await fetch('/api/config/reset', { method: 'POST' });
+    toast('Config reset to defaults', 'info');
+    await loadConfig();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ── Navigation ────────────────────────────────────
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
-  if (name === 'logs') updateLogSelect();
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`tab-${name}`));
+  if (name === 'config' && !Object.keys(configSchema).length) loadConfig();
 }
 
-// ─── Toast ────────────────────────────────────────────────────
-function toast(msg, type = 'info') {
-  const container = document.getElementById('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  container.appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+// ── Helpers ───────────────────────────────────────
+function toast(msg,type='info') {
+  const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg;
+  document.getElementById('toast-container').appendChild(el); setTimeout(()=>el.remove(),3200);
 }
-
-// ─── Helpers ─────────────────────────────────────────────────
 function formatUptime(s) {
-  if (!s) return '-';
-  s = Math.floor(s);
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
-    m = Math.floor((s % 3600) / 60), sec = s % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${sec}s`;
-  return `${sec}s`;
+  if (!s) return '—'; s=Math.floor(s);
+  const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if (d>0) return `${d}d ${h}h`; if (h>0) return `${h}h ${m}m`; if (m>0) return `${m}m ${sec}s`; return `${sec}s`;
 }
+function formatDate(iso) { return new Date(iso).toLocaleString(); }
+function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
+function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString();
+// ── Backdrop close ────────────────────────────────
+document.getElementById('start-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStartModal();});
+document.getElementById('issue-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeIssueModal();});
+document.getElementById('logs-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLogsModal();});
+document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
+
+// ── Theme ─────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+  document.getElementById('theme-btn').title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
 }
-
-function fmt(bytes) {
-  if (!bytes) return '0 B';
-  const gb = bytes / 1024 / 1024 / 1024;
-  if (gb >= 1) return gb.toFixed(1) + ' GB';
-  const mb = bytes / 1024 / 1024;
-  if (mb >= 1) return mb.toFixed(0) + ' MB';
-  return (bytes / 1024).toFixed(0) + ' KB';
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('pm3-theme', next);
+  applyTheme(next);
 }
-
-function escapeHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// Close modal on overlay click
-document.getElementById('start-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeStartModal();
-});
-document.getElementById('issue-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeIssueModal();
-});
-
-// Enter key in start form
-document.getElementById('f-script').addEventListener('keydown', e => {
-  if (e.key === 'Enter') submitStart();
-});
+(function() {
+  const saved = localStorage.getItem('pm3-theme') || 'light';
+  applyTheme(saved);
+})();
 </script>
 </body>
 </html>

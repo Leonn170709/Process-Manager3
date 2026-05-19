@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { PATHS } = require('../config/constants');
 
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB per log file
+const _appendCount = {};
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -54,6 +57,18 @@ function getLogPath(name, type = 'out') {
 function appendLog(name, type, line) {
   const logPath = getLogPath(name, type);
   fs.appendFileSync(logPath, line + '\n', 'utf8');
+
+  // Check size every 100 appends; trim to last half when over limit
+  const key = `${name}:${type}`;
+  _appendCount[key] = (_appendCount[key] || 0) + 1;
+  if (_appendCount[key] % 100 === 0) {
+    try {
+      if (fs.statSync(logPath).size > MAX_LOG_SIZE) {
+        const lines = fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean);
+        fs.writeFileSync(logPath, lines.slice(Math.floor(lines.length / 2)).join('\n') + '\n', 'utf8');
+      }
+    } catch {}
+  }
 }
 
 function readLog(name, type = 'out', lines = 200) {

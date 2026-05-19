@@ -1,20 +1,30 @@
-# PM3 — Modern Node.js Process Manager
+# ⚡ PM3 — Process Manager
 
-A production-grade process manager for Node.js applications, inspired by PM2. Features a daemon-based architecture, persistent process management, real-time web dashboard with Liquid Glass UI, and automatic issue/error tracking.
+> A lightweight, modern Node.js process manager with a real-time Liquid Glass web dashboard and persistent issue tracking.
+
+![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
+
+---
+
+## Features
+
+- **Auto-restart** — configurable restart limits, crash detection, and memory-limit enforcement
+- **Liquid Glass dashboard** — real-time web UI at `localhost:4926/dashboard`
+- **Persistent issue tracking** — every crash is logged with full stack traces, survives restarts
+- **Live log streaming** — WebSocket-based log tail in the dashboard and via `pm3 logs --follow`
+- **Terminal monitor** — `pm3 monit` for a live process overview in the terminal
+- **Process persistence** — `pm3 save` / `pm3 resurrect` to survive reboots
+- **System boot integration** — systemd, launchd, and Windows Task Scheduler via `pm3 startup`
+- **Zero-config daemon** — starts automatically on first use, runs detached in the background
 
 ---
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourorg/pm3.git
-cd pm3
-
-# Install dependencies
+git clone https://github.com/Leonn170709/Process-Manager3.git
+cd Process-Manager3
 npm install
-
-# Install globally (makes pm3 CLI available system-wide)
 npm install -g .
 ```
 
@@ -26,19 +36,16 @@ npm install -g .
 # Start a process
 pm3 start app.js
 
-# Start with a name
+# Give it a name
 pm3 start server.js --name api
 
-# Start npm script
-pm3 start npm --name website -- run start
-
-# List all processes
+# Check what's running
 pm3 list
 
-# View logs
-pm3 logs api
+# Stream logs live
+pm3 logs api --follow
 
-# Open web dashboard
+# Open the web dashboard
 pm3 dashboard
 ```
 
@@ -46,7 +53,9 @@ The PM3 daemon starts automatically on first use and runs in the background.
 
 ---
 
-## CLI Commands
+## CLI Reference
+
+### Commands
 
 | Command | Description |
 |---|---|
@@ -54,57 +63,62 @@ The PM3 daemon starts automatically on first use and runs in the background.
 | `pm3 stop <id\|name>` | Stop a process |
 | `pm3 restart <id\|name>` | Restart a process |
 | `pm3 delete <id\|name>` | Delete a process |
-| `pm3 logs <id\|name>` | View process logs |
-| `pm3 list` | List all processes |
-| `pm3 monit` | Terminal live monitor |
-| `pm3 status <id\|name>` | Show process status |
-| `pm3 info <id\|name>` | Full process info (JSON) |
-| `pm3 save` | Save process list for resurrect |
+| `pm3 list` / `pm3 ls` | List all processes |
+| `pm3 logs <id\|name>` | View logs |
+| `pm3 monit` | Live terminal monitor |
+| `pm3 status <id\|name>` | Process status detail |
+| `pm3 info <id\|name>` | Full JSON info |
+| `pm3 save` | Save process list |
 | `pm3 resurrect` | Restore saved processes |
 | `pm3 dashboard` | Open web dashboard |
+| `pm3 startup` | Configure system boot |
+| `pm3 unstartup` | Remove boot config |
 | `pm3 kill` | Stop the PM3 daemon |
-| `pm3 help` | Show help |
 
-### Start Options
+### `pm3 start` options
 
-```bash
-pm3 start <script> [options]
+```
+--name <name>           Process name  (default: script filename)
+--cwd <path>            Working directory
+--env <KEY=VAL,...>     Environment variables
+--watch                 Watch files, auto-restart on change
+--no-autorestart        Disable crash auto-restart
+--max-restarts <n>      Max restart attempts  (default: 15)
+--memory-limit <mb>     Auto-restart if RAM exceeds this limit
+```
 
-Options:
-  --name <name>         Process name (default: pm3-<id>)
-  --cwd <path>          Working directory
-  --env <vars>          Env vars: KEY=VAL,KEY2=VAL2
-  --watch               Watch files for changes, auto-restart
-  --no-autorestart      Disable crash auto-restart
-  --max-restarts <n>    Maximum restart attempts (default: 15)
-  --memory-limit <mb>   Restart if RAM exceeds this limit
+### `pm3 logs` options
+
+```
+-n, --lines <n>         Number of lines to show  (default: 100)
+-f, --follow            Follow output live
 ```
 
 ### Examples
 
 ```bash
-# Simple node script
+# Simple script
 pm3 start bot.js
 
-# Named process
-pm3 start server.js --name api
-
-# With env vars and cwd
-pm3 start index.js --name backend --cwd /var/www/app --env NODE_ENV=production,PORT=8080
+# Named process with env vars
+pm3 start index.js --name backend --env NODE_ENV=production,PORT=8080
 
 # npm script
-pm3 start npm --name website -- run start
+pm3 start npm --name web -- run start
 
-# With file watching
+# With working directory
+pm3 start server.js --name api --cwd /var/www/app
+
+# File watching for development
 pm3 start dev.js --name dev --watch
 
-# With memory limit
+# Memory-limited worker
 pm3 start worker.js --name worker --memory-limit 256
 
-# Follow logs live
+# Follow logs
 pm3 logs api --follow
 
-# Last 500 lines
+# Show last 500 lines
 pm3 logs api -n 500
 ```
 
@@ -112,116 +126,81 @@ pm3 logs api -n 500
 
 ## Web Dashboard
 
-```
-http://localhost:4926/dashboard
-```
+Open at `http://localhost:4926/dashboard` or run `pm3 dashboard`.
 
-### Features
+### Tabs
 
-- **Processes tab** — live status, CPU/RAM, restart count, uptime, start/stop/restart/delete buttons
-- **Logs tab** — real-time log streaming via WebSocket with process selector
-- **Issues tab** — persistent crash/error tracking with full stack traces
-- **System tab** — CPU load, memory usage, disk usage, server uptime
-
-### Starting the dashboard
-
-```bash
-pm3 dashboard
-```
-
-Or open `http://localhost:4926/dashboard` directly in a browser.
+| Tab | What you get |
+|---|---|
+| **Processes** | Live status, CPU/RAM usage, restart count, uptime · per-process Start/Stop/Restart/Logs/Delete |
+| **Logs** | Real-time log streaming via WebSocket with process selector |
+| **Issues** | Crash history with severity levels, full error messages, and stack traces |
+| **System** | CPU load, memory usage with progress bars, disk usage, server uptime |
 
 ---
 
-## Issue / Error Tracking
+## Issue Tracking
 
-PM3 automatically captures and stores issues when:
-- A process crashes (non-zero exit code)
-- Errors are detected in stderr (Error:, Exception, FATAL)
-- A process exceeds its restart limit
+PM3 automatically records issues when:
 
-Issues are **persistent** — they survive daemon restarts and are stored in `~/.pm3/issues.json`.
+- A process exits with a non-zero code
+- `Error:`, `Exception`, or `FATAL` appears in stderr
+- A process exceeds its max restart limit
 
-### Issue fields
-- Timestamp
-- Process name & ID
-- Error message
-- Full stack trace / stderr logs
-- Exit code
-- Severity (warning / error / critical)
-- Crash reason
+Issues are **persistent** — stored in `~/.pm3/issues.json` and survive daemon restarts. They are never auto-deleted.
 
-### Managing issues
-- View all in the **Issues** tab of the dashboard
-- Click an issue to see full details and stack trace
-- Delete individual issues with ✕
-- **Clear All** button to wipe the list
-- Issues are never auto-deleted
+Each issue captures:
+- Timestamp, process name & ID
+- Severity (`warning` / `error` / `critical`)
+- Error message and full stack trace
+- Exit code and crash reason
 
 ---
 
-## Persistence
+## Persistence & Startup
 
 ```bash
-# Save current process list
+# Save all currently running processes
 pm3 save
 
-# Restore on next daemon start
+# Restore them (e.g. after a reboot)
 pm3 resurrect
+
+# Wire up system boot integration automatically
+pm3 startup
+
+# Remove it
+pm3 unstartup
 ```
 
-Processes marked as `running` at save time will be automatically restarted by `resurrect`.
+`pm3 startup` handles the right method per platform:
 
-For **auto-start on system boot**, add to your system's startup (systemd/crontab):
-
-```bash
-# crontab -e
-@reboot /usr/bin/pm3 resurrect
-```
-
-Or create a systemd service:
-
-```ini
-# /etc/systemd/system/pm3.service
-[Unit]
-Description=PM3 Process Manager
-After=network.target
-
-[Service]
-Type=forking
-User=youruser
-ExecStart=/usr/bin/pm3 resurrect
-ExecStop=/usr/bin/pm3 kill
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable pm3
-sudo systemctl start pm3
-```
+| Platform | Method |
+|---|---|
+| Linux (systemd) | Creates and enables `/etc/systemd/system/pm3.service` |
+| Linux (no systemd) | Adds `@reboot` entry to crontab |
+| macOS | Installs a launchd agent in `~/Library/LaunchAgents/` |
+| Windows | Creates a Task Scheduler entry (run as Admin) |
 
 ---
 
 ## Configuration
 
-PM3 stores all data in `~/.pm3/`:
+PM3 stores all state in `~/.pm3/`:
 
 ```
 ~/.pm3/
-├── processes.json    # Persistent process list
-├── issues.json       # Persistent issue log
-├── daemon.pid        # Daemon PID
-├── daemon.log        # Daemon stdout
-├── daemon-error.log  # Daemon stderr
+├── processes.json        # Saved process list  (pm3 save)
+├── issues.json           # Persistent issue log
+├── daemon.pid            # Daemon PID file
+├── daemon.log            # Daemon stdout
+├── daemon-error.log      # Daemon stderr
 └── logs/
-    ├── <name>-out.log
-    └── <name>-err.log
+    ├── <name>-out.log    # Process stdout
+    └── <name>-err.log    # Process stderr
 ```
 
-### Environment Variables
+### Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
@@ -234,31 +213,22 @@ PM3 stores all data in `~/.pm3/`:
 
 ```
 pm3/
-├── cli/              # Commander.js CLI entry point
-│   └── index.js
+├── cli/index.js                  # CLI entry point (Commander.js)
 ├── daemon/
-│   ├── index.js      # Express + Socket.IO daemon server
-│   └── launcher.js   # Detached daemon spawner
-├── core/
-│   └── processManager.js  # Process lifecycle (spawn/stop/restart)
-├── issues/
-│   └── index.js      # Persistent issue tracker
-├── storage/
-│   └── index.js      # JSON file persistence layer
-├── config/
-│   └── constants.js  # Ports, paths, status constants
-├── dashboard/
-│   └── public/
-│       └── index.html  # Liquid Glass web UI
-└── package.json
+│   ├── index.js                  # Express + Socket.IO server
+│   └── launcher.js               # Detached daemon spawner
+├── core/processManager.js        # Process lifecycle (spawn/stop/restart)
+├── issues/index.js               # Persistent error tracker
+├── storage/index.js              # JSON file persistence layer
+├── config/constants.js           # Ports, paths, status constants
+└── dashboard/public/index.html   # Liquid Glass web UI
 ```
 
-**Architecture overview:**
-- CLI connects to daemon via HTTP REST API
-- Daemon manages all processes as child_process spawns
-- Socket.IO pushes real-time updates to dashboard
-- All state persisted as JSON in `~/.pm3/`
-- Issues stored separately and never auto-cleared
+**Data flow:**
+- CLI → HTTP REST API → Daemon
+- Daemon → `child_process.spawn` → Managed processes
+- Daemon → Socket.IO → Dashboard (real-time updates)
+- All state → JSON files in `~/.pm3/`
 
 ---
 
@@ -266,77 +236,56 @@ pm3/
 
 **Daemon won't start**
 ```bash
-# Check daemon log
+# Check the error log
 cat ~/.pm3/daemon-error.log
 
-# Kill stale PID and retry
+# Remove a stale PID file and retry
 rm ~/.pm3/daemon.pid
 pm3 list
 ```
 
 **Port already in use**
 ```bash
-# Use a different port
 PM3_DAEMON_PORT=5000 pm3 start app.js
 ```
 
 **Process won't stop**
 ```bash
-# Force stop by name
-pm3 stop myapp
-
-# Or delete it entirely
-pm3 delete myapp
+pm3 delete myapp   # Force-removes the process entirely
 ```
 
-**Lost process list after restart**
+**Lost processes after reboot**
 ```bash
-# Always save before shutting down
-pm3 save
-
-# Restore
-pm3 resurrect
+pm3 save           # Always save before shutting down
+pm3 resurrect      # Restore on next start
 ```
 
 **Dashboard not loading**
-Make sure the daemon is running:
 ```bash
-pm3 list  # auto-starts daemon
-# Then visit http://localhost:4926/dashboard
+pm3 list           # Ensures daemon is running
+# Then open http://localhost:4926/dashboard
 ```
 
----
-
-## Development Setup
-
+**`pm3 startup` says "Root required"** (Linux)
 ```bash
-git clone https://github.com/yourorg/pm3.git
-cd pm3
-npm install
-
-# Run daemon directly (foreground, with logs)
-node daemon/index.js
-
-# In another terminal, test CLI
-node cli/index.js list
-node cli/index.js start test/app.js --name test
+sudo pm3 startup
 ```
 
 ---
 
 ## FAQ
 
-**Q: Is PM3 compatible with Windows?**  
-A: Yes. `child_process.spawn` and all Node.js APIs used are cross-platform. File paths use `path.join`.
+**How is PM3 different from PM2?**  
+PM3 is a simpler, dependency-light alternative. It has a built-in Liquid Glass dashboard, persistent per-process issue tracking, and a single-file daemon that's easy to understand and modify.
 
-**Q: Can I run multiple node versions?**  
-A: Yes — `pm3 start npm -- run start` uses the system npm; you can specify full paths.
+**Does PM3 support clustering?**  
+Not in v1.0 — single-process mode only. Cluster support is planned for a future release.
 
-**Q: How is PM3 different from PM2?**  
-A: PM3 is a modern, dependency-light alternative with a built-in Liquid Glass dashboard, persistent issue tracking, and simpler architecture (single-file daemon).
+**Can I run npm scripts?**  
+Yes: `pm3 start npm --name myapp -- run start`
 
-**Q: Does PM3 support clustering?**  
-A: Not in v1.0. Single-process mode only. Cluster support is planned.
+**Where are logs stored?**  
+`~/.pm3/logs/<name>-out.log` (stdout) and `~/.pm3/logs/<name>-err.log` (stderr).
 
-**Q: Where are logs stored?**  
-A: `~/.pm3/logs/<name>-out.log` and `~/.pm3/logs/<name>-err.log`.
+**Is PM3 cross-platform?**  
+Yes. All APIs used (`child_process`, `path`, `fs`) are cross-platform. Tested on Linux, macOS, and Windows.

@@ -11,6 +11,7 @@ const { DAEMON_PORT, DASHBOARD_PORT, PATHS, STATUS } = require('../config/consta
 const storage = require('../storage');
 const pm = require('../core/processManager');
 const issueTracker = require('../issues');
+const userConfig = require('../config/userConfig');
 
 storage.ensureHome();
 
@@ -122,6 +123,26 @@ app.post('/api/issues/:id/resolve', (req, res) => {
   res.json({ ok: true });
 });
 
+// Config
+app.get('/api/config', (req, res) => {
+  res.json({ config: userConfig.getAll(), schema: userConfig.SCHEMA });
+});
+
+app.post('/api/config', (req, res) => {
+  const { key, value } = req.body;
+  try {
+    const result = userConfig.set(key, String(value));
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/config/reset', (req, res) => {
+  const defaults = userConfig.reset();
+  res.json({ ok: true, config: defaults });
+});
+
 // System metrics
 app.get('/api/system', async (req, res) => {
   try {
@@ -136,9 +157,9 @@ app.get('/api/system', async (req, res) => {
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
       memory: {
         total: mem.total,
-        used: mem.used,
-        free: mem.free,
-        percent: parseFloat(((mem.used / mem.total) * 100).toFixed(1)),
+        used: mem.active,
+        available: mem.available,
+        percent: parseFloat(((mem.active / mem.total) * 100).toFixed(1)),
       },
       disk: disk.map(d => ({
         fs: d.fs,
@@ -190,8 +211,9 @@ setInterval(async () => {
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
       memory: {
         total: mem.total,
-        used: mem.used,
-        percent: parseFloat(((mem.used / mem.total) * 100).toFixed(1)),
+        used: mem.active,
+        available: mem.available,
+        percent: parseFloat(((mem.active / mem.total) * 100).toFixed(1)),
       },
     });
   } catch {}
