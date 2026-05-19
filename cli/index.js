@@ -687,12 +687,23 @@ program
       let hasSystemd = false;
       try { execSync('systemctl --version', { stdio:'ignore' }); execSync('systemctl list-units --no-pager', { stdio:'ignore', timeout:2000 }); hasSystemd = true; } catch {}
       if (hasSystemd) {
-        const svc = `[Unit]\nDescription=PM3 Process Manager\nAfter=network.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=${user}\nExecStart=${nodeBin} ${pm3Bin} resurrect\nExecStop=${nodeBin} ${pm3Bin} kill\n\n[Install]\nWantedBy=multi-user.target\n`;
+        const svcPath = '/etc/systemd/system/pm3.service';
+        if (fs.existsSync(svcPath)) {
+          let enabled = false;
+          try { execSync('systemctl is-enabled pm3', { stdio:'ignore' }); enabled = true; } catch {}
+          if (enabled) {
+            warn('PM3 is already configured to start on boot  ' + chalk.dim('(systemd)'));
+            hint('Service: ' + svcPath);
+            hint('Run  pm3 unstartup  to remove it.');
+            return;
+          }
+        }
+        const svc = `[Unit]\nDescription=PM3 Process Manager\nAfter=network.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=${user}\nExecStart=${nodeBin} ${pm3Bin} list\nExecStop=${nodeBin} ${pm3Bin} kill\n\n[Install]\nWantedBy=multi-user.target\n`;
         try {
-          fs.writeFileSync('/etc/systemd/system/pm3.service', svc, 'utf8');
+          fs.writeFileSync(svcPath, svc, 'utf8');
           execSync('systemctl daemon-reload'); execSync('systemctl enable pm3');
           ok('systemd service installed and enabled');
-          hint('Service: /etc/systemd/system/pm3.service');
+          hint('Service: ' + svcPath);
           hint('Run  pm3 save  to persist your current processes.');
         } catch (err) {
           if (err.message.includes('Permission denied') || err.message.includes('EACCES')) {
@@ -703,25 +714,46 @@ program
       } else {
         try {
           let crontab = ''; try { crontab = execSync('crontab -l 2>/dev/null', { encoding:'utf8' }); } catch {}
-          const entry = `@reboot ${nodeBin} ${pm3Bin} resurrect`;
-          if (crontab.includes(entry)) { warn('PM3 startup entry already in crontab'); }
-          else { execSync(`(crontab -l 2>/dev/null; echo "${entry}") | crontab -`); ok('Added PM3 to crontab (@reboot)'); hint('Run  pm3 save  to persist your current processes.'); }
+          const entry = `@reboot ${nodeBin} ${pm3Bin} list`;
+          const legacyEntry = `@reboot ${nodeBin} ${pm3Bin} resurrect`;
+          if (crontab.includes(entry) || crontab.includes(legacyEntry)) {
+            warn('PM3 is already configured to start on boot  ' + chalk.dim('(crontab)'));
+            hint('Run  pm3 unstartup  to remove it.');
+          } else {
+            execSync(`(crontab -l 2>/dev/null; echo "${entry}") | crontab -`);
+            ok('Added PM3 to crontab (@reboot)');
+            hint('Run  pm3 save  to persist your current processes.');
+          }
         } catch (err) { fail('Failed to update crontab: ' + err.message); }
       }
     } else if (process.platform === 'darwin') {
       const plistName = 'com.pm3.daemon';
       const plistPath = path.join(os.homedir(), 'Library/LaunchAgents', `${plistName}.plist`);
-      const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n  <key>Label</key><string>${plistName}</string>\n  <key>ProgramArguments</key><array><string>${nodeBin}</string><string>${pm3Bin}</string><string>resurrect</string></array>\n  <key>RunAtLoad</key><true/><key>KeepAlive</key><false/>\n  <key>StandardOutPath</key><string>${path.join(os.homedir(),'.pm3','launchd.log')}</string>\n  <key>StandardErrorPath</key><string>${path.join(os.homedir(),'.pm3','launchd-error.log')}</string>\n</dict></plist>\n`;
+      if (fs.existsSync(plistPath)) {
+        warn('PM3 is already configured to start on boot  ' + chalk.dim('(launchd)'));
+        hint('Plist: ' + plistPath);
+        hint('Run  pm3 unstartup  to remove it.');
+        return;
+      }
+      const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n  <key>Label</key><string>${plistName}</string>\n  <key>ProgramArguments</key><array><string>${nodeBin}</string><string>${pm3Bin}</string><string>list</string></array>\n  <key>RunAtLoad</key><true/><key>KeepAlive</key><false/>\n  <key>StandardOutPath</key><string>${path.join(os.homedir(),'.pm3','launchd.log')}</string>\n  <key>StandardErrorPath</key><string>${path.join(os.homedir(),'.pm3','launchd-error.log')}</string>\n</dict></plist>\n`;
       try { fs.mkdirSync(path.dirname(plistPath), { recursive:true }); fs.writeFileSync(plistPath, plist, 'utf8'); execSync(`launchctl load ${plistPath}`); ok('launchd agent installed'); hint(`Plist: ${plistPath}`); hint('Run  pm3 save  to persist your current processes.'); } catch (err) { fail(err.message); }
     } else if (process.platform === 'win32') {
       const taskName = 'PM3ProcessManager';
-      const cmd = `schtasks /create /tn "${taskName}" /tr "${nodeBin} ${pm3Bin} resurrect" /sc onlogon /rl highest /f`;
+      let taskExists = false;
+      try { execSync(`schtasks /query /tn "${taskName}"`, { stdio:'ignore' }); taskExists = true; } catch {}
+      if (taskExists) {
+        warn('PM3 is already configured to start on boot  ' + chalk.dim('(Task Scheduler)'));
+        hint(`Task: ${taskName}`);
+        hint('Run  pm3 unstartup  to remove it.');
+        return;
+      }
+      const cmd = `schtasks /create /tn "${taskName}" /tr "${nodeBin} ${pm3Bin} list" /sc onlogon /rl highest /f`;
       try { execSync(cmd, { stdio:'ignore' }); ok('Windows Task Scheduler entry created'); hint(`Task: ${taskName}  (triggers on logon)`); hint('Run  pm3 save  to persist your current processes.'); }
       catch { warn('Run as Administrator, or create the task manually:'); nl(); console.log(`      ${chalk.cyan(cmd)}`); nl(); }
     } else {
       warn(`Unsupported platform: ${process.platform}`);
       hint('Add this to your init system manually:');
-      hint(chalk.cyan(`${nodeBin} ${pm3Bin} resurrect`));
+      hint(chalk.cyan(`${nodeBin} ${pm3Bin} list`));
     }
   });
 
@@ -738,7 +770,13 @@ program
         try { execSync('systemctl disable pm3', { stdio:'ignore' }); try { fs.unlinkSync('/etc/systemd/system/pm3.service'); } catch {} execSync('systemctl daemon-reload', { stdio:'ignore' }); ok('systemd service removed'); }
         catch { warn('May need sudo:  sudo pm3 unstartup'); }
       } else {
-        try { const entry = `@reboot ${process.execPath} ${process.argv[1]} resurrect`; const ct = execSync('crontab -l 2>/dev/null', { encoding:'utf8' }); execSync(`echo "${ct.split('\n').filter(l=>l.trim()!==entry).join('\n')}" | crontab -`); ok('Removed PM3 from crontab'); } catch {}
+        try {
+          const entryNew = `@reboot ${process.execPath} ${process.argv[1]} list`;
+          const entryOld = `@reboot ${process.execPath} ${process.argv[1]} resurrect`;
+          const ct = execSync('crontab -l 2>/dev/null', { encoding:'utf8' });
+          execSync(`echo "${ct.split('\n').filter(l=>{ const t=l.trim(); return t!==entryNew && t!==entryOld; }).join('\n')}" | crontab -`);
+          ok('Removed PM3 from crontab');
+        } catch {}
       }
     } else if (process.platform === 'darwin') {
       const pp = path.join(os.homedir(), 'Library/LaunchAgents/com.pm3.daemon.plist');

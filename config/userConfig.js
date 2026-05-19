@@ -8,6 +8,11 @@ const { PATHS } = require('./constants');
 // Each entry defines the default value, display unit, and description.
 
 const SCHEMA = {
+  autoResurrect: {
+    default: true,
+    unit: '',
+    desc: 'Automatically resurrect saved processes when daemon starts',
+  },
   autoSave: {
     default: true,
     unit: '',

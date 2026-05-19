@@ -173,6 +173,9 @@ pm3 startup
 pm3 unstartup
 ```
 
+With startup integration enabled, PM3 starts the daemon on boot and auto-resurrects saved processes by default.
+You can disable this with `pm3 config set autoResurrect false`.
+
 `pm3 startup` handles the right method per platform:
 
 | Platform | Method |
@@ -206,6 +209,12 @@ PM3 stores all state in `~/.pm3/`:
 |---|---|---|
 | `PM3_HOME` | `~/.pm3` | Data directory |
 | `PM3_DAEMON_PORT` | `4926` | Daemon/dashboard port |
+
+### Config keys
+
+| Key | Default | Description |
+|---|---|---|
+| `autoResurrect` | `true` | Automatically resurrect saved processes when the daemon starts |
 
 ---
 
@@ -257,7 +266,8 @@ pm3 delete myapp   # Force-removes the process entirely
 **Lost processes after reboot**
 ```bash
 pm3 save           # Always save before shutting down
-pm3 resurrect      # Restore on next start
+pm3 config get autoResurrect   # Should be true
+pm3 resurrect                  # Restore immediately
 ```
 
 **Dashboard not loading**

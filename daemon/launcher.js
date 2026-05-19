@@ -40,13 +40,28 @@ async function startDaemon() {
 }
 
 async function stopDaemon() {
-  if (!fs.existsSync(PATHS.pid)) return { error: 'Daemon PID file not found' };
-  const pid = parseInt(fs.readFileSync(PATHS.pid, 'utf8'), 10);
+  let pid = null;
+
+  if (fs.existsSync(PATHS.pid)) {
+    const parsed = parseInt(fs.readFileSync(PATHS.pid, 'utf8'), 10);
+    if (!Number.isNaN(parsed)) pid = parsed;
+  }
+
+  // Fallback: daemon may be running even when PID file is missing/stale.
+  if (!pid) {
+    try {
+      const res = await axios.get(`${DAEMON_BASE_URL}/api/ping`, { timeout: 1000 });
+      if (res && res.data && Number.isInteger(res.data.pid)) pid = res.data.pid;
+    } catch {}
+  }
+
+  if (!pid) return { error: 'Daemon PID file not found' };
+
   try {
     process.kill(pid, 'SIGTERM');
     return { ok: true };
   } catch {
-    return { error: `Could not kill PID ${pid}` };
+    return { error: `Could not kill PID ${pid}. Retry with sudo` };
   }
 }
 

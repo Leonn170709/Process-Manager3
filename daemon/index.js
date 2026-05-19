@@ -32,8 +32,10 @@ emitter.on('log', data => io.emit('log', data));
 
 app.use(express.json());
 
-// Resurrect processes on startup
-pm.resurrect();
+// Resurrect processes on startup (configurable)
+if (userConfig.get('autoResurrect') !== false) {
+  pm.resurrect();
+}
 
 // --- API Routes ---
 
