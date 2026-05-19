@@ -26,9 +26,15 @@ function generateId() {
   return ids.length ? Math.max(...ids) + 1 : 0;
 }
 
-function isNodeScript(s) {
-  return s.endsWith('.js') || s.endsWith('.mjs') || s.endsWith('.cjs');
-}
+const INTERPRETERS = {
+  js:  () => ({ cmd: process.execPath, args: [] }),
+  mjs: () => ({ cmd: process.execPath, args: [] }),
+  cjs: () => ({ cmd: process.execPath, args: [] }),
+  sh:  () => ({ cmd: 'bash',    args: [] }),
+  py:  () => ({ cmd: 'python3', args: [] }),
+  rb:  () => ({ cmd: 'ruby',    args: [] }),
+  pl:  () => ({ cmd: 'perl',    args: [] }),
+};
 
 function resolveCwd(cwd, script) {
   if (cwd) return path.resolve(cwd);
@@ -41,10 +47,11 @@ function resolveCwd(cwd, script) {
 function parseCommand(script) {
   const parts = script.trim().split(/\s+/);
   if (parts.length > 1) return { cmd: parts[0], args: parts.slice(1) };
-  if (isNodeScript(script)) {
-    // Always resolve to absolute path to avoid cwd double-nesting
-    const abs = require('path').resolve(script);
-    return { cmd: process.execPath, args: [abs] };
+  const ext = script.split('.').pop().toLowerCase();
+  const interp = INTERPRETERS[ext];
+  if (interp) {
+    const { cmd, args } = interp();
+    return { cmd, args: [...args, path.resolve(script)] };
   }
   return { cmd: parts[0], args: [] };
 }
@@ -365,9 +372,43 @@ function resurrect() {
 function resolveProcess(nameOrId) {
   const procs = storage.loadProcesses();
   if (procs[nameOrId]) return nameOrId;
-  // try by id
   const found = Object.values(procs).find(p => String(p.id) === String(nameOrId));
   return found ? found.name : null;
+}
+
+// --- Update process settings (name, maxRestarts, memoryLimit, autorestart) ---
+function updateProcess(name, updates) {
+  const procs = storage.loadProcesses();
+  if (!procs[name]) return { error: `Process "${name}" not found` };
+
+  // Simple field updates (take effect on next restart)
+  for (const key of ['maxRestarts', 'memoryLimit', 'autorestart']) {
+    if (updates[key] !== undefined) procs[name][key] = updates[key];
+  }
+
+  // Rename
+  const newName = (updates.name || '').trim();
+  if (newName && newName !== name) {
+    if (procs[newName]) return { error: `Name "${newName}" is already taken` };
+    procs[newName] = { ...procs[name], name: newName };
+    delete procs[name];
+    if (runtime[name]) { runtime[newName] = runtime[name]; delete runtime[name]; }
+    // Best-effort log file rename
+    try {
+      const oldOut = storage.getLogPath(name, 'out');
+      const oldErr = storage.getLogPath(name, 'err');
+      if (fs.existsSync(oldOut)) fs.renameSync(oldOut, storage.getLogPath(newName, 'out'));
+      if (fs.existsSync(oldErr)) fs.renameSync(oldErr, storage.getLogPath(newName, 'err'));
+    } catch {}
+    storage.saveProcesses(procs);
+    emit('process:delete', { name });
+    emit('process:update', procs[newName]);
+    return procs[newName];
+  }
+
+  storage.saveProcesses(procs);
+  emit('process:update', procs[name]);
+  return procs[name];
 }
 
 module.exports = {
@@ -381,4 +422,5 @@ module.exports = {
   updateStats,
   resurrect,
   resolveProcess,
+  updateProcess,
 };

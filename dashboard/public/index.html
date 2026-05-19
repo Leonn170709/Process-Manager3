@@ -467,6 +467,20 @@
       letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;
     }
     .section-title::after { content:'';flex:1;height:1px;background:rgba(0,0,0,0.07); }
+
+    /* ── Proc stats / edit ───────────────────────────── */
+    .pab-gear { background:rgba(100,116,139,0.10);color:var(--t3);border-color:rgba(100,116,139,0.25); }
+    .pab-gear:hover { background:rgba(100,116,139,0.22);color:var(--t2); }
+    .stat-cell { cursor:pointer;transition:color 0.15s; }
+    .stat-cell:hover { color:var(--accent) !important; }
+    .chart-block { margin-bottom:16px; }
+    .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px; }
+    .chart-label .cur { font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
+    .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:10px 10px 4px;overflow:hidden; }
+    .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
+    .stat-kv-label { font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600; }
+    .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-top:1px;word-break:break-all; }
+    .modal-wide { width:740px; }
   </style>
   </head>
   <body>
@@ -785,6 +799,28 @@
       </div>
     </div>
 
+    <!-- STATS MODAL -->
+    <div class="modal-overlay" id="stats-modal">
+      <div class="modal modal-wide">
+        <div class="modal-hdr">
+          <div class="modal-title" id="stats-modal-title">Process Stats</div>
+          <div class="modal-close" onclick="closeStatsModal()">×</div>
+        </div>
+        <div class="modal-body" id="stats-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div class="modal-overlay" id="edit-modal">
+      <div class="modal">
+        <div class="modal-hdr">
+          <div class="modal-title" id="edit-modal-title">Edit Process</div>
+          <div class="modal-close" onclick="closeEditModal()">×</div>
+        </div>
+        <div class="modal-body" id="edit-modal-body"></div>
+      </div>
+    </div>
+
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -796,6 +832,10 @@ let issueFilter = 'all';
 let issueFilterProc = null;
 let configSchema = {};
 let configValues = {};
+const procHistory = {};       // { name: { cpu: [], mem: [] } }
+const HISTORY_MAX = 90;       // 90 × 2 s = 3 minutes of data
+let statsModalName = null;
+let statsModalTimer = null;
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -804,6 +844,7 @@ socket.on('init', data => {
 });
 socket.on('process:update', proc => {
   processes[proc.name] = proc;
+  recordHistory(proc);
   renderProcessRow(proc); updateProcStats();
 });
 socket.on('process:delete', data => {
@@ -812,7 +853,7 @@ socket.on('process:delete', data => {
 });
 socket.on('stats:update', procs => {
   processes = procs;
-  Object.values(procs).forEach(p => renderProcessRow(p));
+  Object.values(procs).forEach(p => { recordHistory(p); renderProcessRow(p); });
   updateProcStats();
 });
 socket.on('system:update', data => updateSysMetrics(data));
@@ -944,8 +985,8 @@ function procRowHTML(p) {
     <td class="mono" style="color:var(--t3)">${p.id}</td>
     <td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>
     <td><span class="status-pill status-${p.status}">${p.status}</span></td>
-    <td class="mono">${p.cpu!=null?p.cpu+'%':'—'}</td>
-    <td class="mono">${p.memory?p.memory+' MB':'—'}</td>
+    <td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.cpu!=null?p.cpu+'%':'—'}</td>
+    <td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.memory?p.memory+' MB':'—'}</td>
     ${issueIndicatorCell(p.name)}
     <td class="mono">${p.restartCount}</td>
     <td class="mono">${formatUptime(p.uptime)}</td>
@@ -959,6 +1000,7 @@ function procRowHTML(p) {
         <button class="pab pab-logs"    onclick="openLogsFor('${p.name}')">📋 Logs</button>
         <button class="pab pab-issues"  onclick="openIssuesFor('${p.name}')">⚠ Issues</button>
         <div class="sep"></div>
+        <button class="pab pab-gear"    onclick="openEditModal('${p.name}')" title="Edit settings">⚙</button>
         <button class="pab pab-delete"  onclick="procAction('delete','${p.name}')">✕ Delete</button>
       </div>
     </td>`;
@@ -1271,6 +1313,155 @@ function formatDate(iso) { return new Date(iso).toLocaleString(); }
 function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
 function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── History recording ─────────────────────────────
+function recordHistory(proc) {
+  if (!procHistory[proc.name]) procHistory[proc.name] = { cpu: [], mem: [] };
+  const h = procHistory[proc.name];
+  if (proc.cpu != null)    { h.cpu.push(proc.cpu);    if (h.cpu.length > HISTORY_MAX) h.cpu.shift(); }
+  if (proc.memory != null) { h.mem.push(proc.memory); if (h.mem.length > HISTORY_MAX) h.mem.shift(); }
+}
+
+// ── SVG sparkline chart ───────────────────────────
+function renderChart(values, color) {
+  const W = 680, H = 72;
+  if (!values.length) return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block"><text x="${W/2}" y="${H/2+4}" text-anchor="middle" fill="var(--t4)" font-size="12" font-family="Inter,sans-serif">No data yet — waiting for stats…</text></svg>`;
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => {
+    const x = Math.round((i / Math.max(values.length - 1, 1)) * W);
+    const y = Math.round(H - (v / max) * (H - 6) - 3);
+    return `${x},${y}`;
+  });
+  const line = pts.join(' ');
+  const area = `0,${H} ${line} ${W},${H}`;
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">
+    <polygon points="${area}" fill="${color}" opacity="0.14"/>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ── Stats modal ───────────────────────────────────
+function openStatsModal(name) {
+  statsModalName = name;
+  document.getElementById('stats-modal-title').textContent = `Stats — ${name}`;
+  refreshStatsModal();
+  document.getElementById('stats-modal').classList.add('open');
+  statsModalTimer = setInterval(refreshStatsModal, 2000);
+}
+function closeStatsModal() {
+  document.getElementById('stats-modal').classList.remove('open');
+  clearInterval(statsModalTimer);
+  statsModalTimer = null;
+  statsModalName = null;
+}
+function refreshStatsModal() {
+  const name = statsModalName;
+  if (!name) return;
+  const proc = processes[name];
+  const h = procHistory[name] || { cpu: [], mem: [] };
+  const body = document.getElementById('stats-modal-body');
+  if (!proc) { body.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-title">Process not found</div></div>`; return; }
+  const cpuCur = proc.cpu != null ? proc.cpu + '%' : '—';
+  const memCur = proc.memory ? proc.memory + ' MB' : '—';
+  const cpuMax = h.cpu.length ? Math.max(...h.cpu).toFixed(1) + '%' : '—';
+  const memMax = h.mem.length ? Math.max(...h.mem) + ' MB' : '—';
+  body.innerHTML = `
+    <div class="chart-block">
+      <div class="chart-label">CPU <span class="cur">${cpuCur}</span><span style="font-size:10.5px;color:var(--t3);margin-left:8px">peak ${cpuMax} · 3 min window</span></div>
+      <div class="chart-wrap">${renderChart(h.cpu, 'var(--accent)')}</div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-label">RAM <span class="cur">${memCur}</span><span style="font-size:10.5px;color:var(--t3);margin-left:8px">peak ${memMax} · 3 min window</span></div>
+      <div class="chart-wrap">${renderChart(h.mem, 'var(--accent2)')}</div>
+    </div>
+    <div class="stat-grid">
+      <div><div class="stat-kv-label">Status</div><div class="stat-kv-val"><span class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span></div></div>
+      <div><div class="stat-kv-label">PID</div><div class="stat-kv-val">${proc.pid || '—'}</div></div>
+      <div><div class="stat-kv-label">Uptime</div><div class="stat-kv-val">${formatUptime(proc.uptime)}</div></div>
+      <div><div class="stat-kv-label">Restarts</div><div class="stat-kv-val">${proc.restartCount}</div></div>
+      <div><div class="stat-kv-label">Auto-restart</div><div class="stat-kv-val">${proc.autorestart ? 'Yes' : 'No'}</div></div>
+      <div><div class="stat-kv-label">Max Restarts</div><div class="stat-kv-val">${proc.maxRestarts}</div></div>
+      <div><div class="stat-kv-label">Memory Limit</div><div class="stat-kv-val">${proc.memoryLimit ? proc.memoryLimit + ' MB' : '—'}</div></div>
+      <div><div class="stat-kv-label">Issues</div><div class="stat-kv-val">${issueCountForProc(name)}</div></div>
+      <div style="grid-column:1/-1"><div class="stat-kv-label">Script</div><div class="stat-kv-val">${escapeHtml(proc.script || '—')}</div></div>
+      <div style="grid-column:1/-1"><div class="stat-kv-label">Working Dir</div><div class="stat-kv-val">${escapeHtml(proc.cwd || '—')}</div></div>
+      <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>
+    </div>`;
+}
+
+// ── Edit modal ────────────────────────────────────
+function openEditModal(name) {
+  const proc = processes[name];
+  if (!proc) return;
+  document.getElementById('edit-modal-title').textContent = `Edit — ${name}`;
+  const body = document.getElementById('edit-modal-body');
+  const arOn = proc.autorestart !== false;
+  body.innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="edit-name" value="${escapeHtml(proc.name)}" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Max Restarts</label>
+        <input class="form-input" id="edit-max-restarts" type="number" value="${proc.maxRestarts ?? 15}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Memory Limit (MB)</label>
+        <input class="form-input" id="edit-memory" type="number" value="${proc.memoryLimit || ''}" placeholder="unlimited" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" style="margin-bottom:8px">Auto-restart</label>
+      <div class="cfg-toggle" onclick="toggleEditAr()">
+        <input type="checkbox" id="edit-autorestart" ${arOn?'checked':''} style="display:none">
+        <div class="toggle-track ${arOn?'on':''}" id="edit-ar-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label" id="edit-ar-label">${arOn?'Enabled':'Disabled'}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn primary" id="edit-save-btn">💾 Save</button>
+    </div>`;
+  body.querySelector('#edit-save-btn').addEventListener('click', () => saveEdit(name));
+  document.getElementById('edit-modal').classList.add('open');
+  document.getElementById('edit-name').focus();
+}
+function toggleEditAr() {
+  const cb = document.getElementById('edit-autorestart');
+  cb.checked = !cb.checked;
+  document.getElementById('edit-ar-track').classList.toggle('on', cb.checked);
+  document.getElementById('edit-ar-label').textContent = cb.checked ? 'Enabled' : 'Disabled';
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+async function saveEdit(originalName) {
+  const newName     = document.getElementById('edit-name').value.trim();
+  const maxRestarts = parseInt(document.getElementById('edit-max-restarts').value) || 15;
+  const memRaw      = parseInt(document.getElementById('edit-memory').value);
+  const memoryLimit = isNaN(memRaw) || !memRaw ? null : memRaw;
+  const autorestart = document.getElementById('edit-autorestart').checked;
+  if (!newName) { toast('Name is required', 'error'); return; }
+  try {
+    const r = await fetch(`/api/processes/${encodeURIComponent(originalName)}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name: newName, maxRestarts, memoryLimit, autorestart }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    if (originalName !== d.name) {
+      delete processes[originalName];
+      const oldRow = document.getElementById(`proc-row-${originalName}`);
+      if (oldRow) oldRow.remove();
+    }
+    processes[d.name] = d;
+    renderProcessRow(d);
+    toast('Saved', 'success');
+    closeEditModal();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ── Issue list delegation ─────────────────────────
 document.getElementById('issues-list').addEventListener('click', e => {
   const deleteBtn = e.target.closest('.issue-delete-btn');
@@ -1283,6 +1474,8 @@ document.getElementById('issues-list').addEventListener('click', e => {
 document.getElementById('start-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStartModal();});
 document.getElementById('issue-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeIssueModal();});
 document.getElementById('logs-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLogsModal();});
+document.getElementById('stats-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStatsModal();});
+document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
 document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
 
 // ── Theme ─────────────────────────────────────────

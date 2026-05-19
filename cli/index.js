@@ -564,7 +564,7 @@ program
     });
     const path = require('path');
     const fs   = require('fs');
-    const isScript    = /\.(js|mjs|cjs)$/.test(script);
+    const isScript    = /\.(js|mjs|cjs|sh|py|rb|pl)$/.test(script);
     const resSrc      = isScript ? path.resolve(script) : script;
     const resCwd      = opts.cwd ? path.resolve(opts.cwd)
                       : isScript ? path.dirname(path.resolve(script)) : process.cwd();
@@ -776,20 +776,29 @@ program
   .action(() => {
     const { execSync } = require('child_process');
     const path = require('path'), os = require('os'), fs = require('fs');
+    const pm3Bin = process.argv[1], nodeBin = process.execPath;
     if (process.platform === 'linux') {
       let hasSystemd = false;
       try { execSync('systemctl --version', { stdio:'ignore' }); hasSystemd = true; } catch {}
       if (hasSystemd) {
-        try { execSync('systemctl disable pm3', { stdio:'ignore' }); try { fs.unlinkSync('/etc/systemd/system/pm3.service'); } catch {} execSync('systemctl daemon-reload', { stdio:'ignore' }); ok('systemd service removed'); }
-        catch { warn('May need sudo:  sudo pm3 unstartup'); }
+        if (process.getuid && process.getuid() !== 0) {
+          warn('Root required. Run:'); nl();
+          console.log(`      ${chalk.cyan(`sudo ${nodeBin} ${pm3Bin} unstartup`)}`); nl();
+          return;
+        }
+        try { execSync('systemctl disable pm3', { stdio:'ignore' }); } catch {}
+        try { fs.unlinkSync('/etc/systemd/system/pm3.service'); } catch {}
+        try { execSync('systemctl daemon-reload', { stdio:'ignore' }); } catch {}
+        ok('systemd service removed');
       } else {
         try {
-          const entryNew = `@reboot ${process.execPath} ${process.argv[1]} list`;
-          const entryOld = `@reboot ${process.execPath} ${process.argv[1]} resurrect`;
+          const entryNew = `@reboot ${nodeBin} ${pm3Bin} list`;
+          const entryOld = `@reboot ${nodeBin} ${pm3Bin} resurrect`;
           const ct = execSync('crontab -l 2>/dev/null', { encoding:'utf8' });
-          execSync(`echo "${ct.split('\n').filter(l=>{ const t=l.trim(); return t!==entryNew && t!==entryOld; }).join('\n')}" | crontab -`);
+          const filtered = ct.split('\n').filter(l => { const t = l.trim(); return t !== entryNew && t !== entryOld; }).join('\n');
+          execSync(`printf '%s\n' ${JSON.stringify(filtered)} | crontab -`);
           ok('Removed PM3 from crontab');
-        } catch {}
+        } catch (err) { fail('Failed to update crontab: ' + err.message); }
       }
     } else if (process.platform === 'darwin') {
       const pp = path.join(os.homedir(), 'Library/LaunchAgents/com.pm3.daemon.plist');

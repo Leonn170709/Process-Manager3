@@ -77,6 +77,15 @@ app.post('/api/processes/:name/restart', (req, res) => {
   res.json(pm.restartProcess(name));
 });
 
+// Update process (rename, settings)
+app.patch('/api/processes/:name', (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  const result = pm.updateProcess(name, req.body);
+  if (result.error) return res.status(400).json(result);
+  res.json(result);
+});
+
 // Delete process
 app.delete('/api/processes/:name', (req, res) => {
   const name = pm.resolveProcess(req.params.name);
