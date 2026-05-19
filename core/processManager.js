@@ -112,7 +112,7 @@ function _spawnProcess(procRecord) {
       cwd,
       env,
       detached: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (err) {
     _handleCrash(procRecord, null, `Spawn failed: ${err.message}`, SEVERITY.CRITICAL);
@@ -431,6 +431,22 @@ function updateProcess(name, updates) {
   return procs[name];
 }
 
+// --- Send data to process stdin ---
+function sendStdin(name, data) {
+  const r = runtime[name];
+  if (!r || !r.proc) return { error: `Process "${name}" is not running` };
+  const stdin = r.proc.stdin;
+  if (!stdin || stdin.destroyed || stdin.writableEnded) return { error: 'stdin is closed' };
+  try {
+    stdin.write(data + '\n');
+    storage.appendLog(name, 'out', `[${new Date().toISOString()}] [STDIN] ${data}`);
+    emit('log', { name, line: `[${new Date().toISOString()}] [STDIN] ${data}`, type: 'stdin' });
+    return { ok: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 module.exports = {
   setEmitter,
   startProcess,
@@ -443,4 +459,5 @@ module.exports = {
   resurrect,
   resolveProcess,
   updateProcess,
+  sendStdin,
 };

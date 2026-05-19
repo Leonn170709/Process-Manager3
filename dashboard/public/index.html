@@ -468,6 +468,28 @@
     }
     .section-title::after { content:'';flex:1;height:1px;background:rgba(0,0,0,0.07); }
 
+    /* ── Stdin bar ───────────────────────────────────── */
+    .stdin-bar {
+      display:flex;align-items:center;gap:8px;padding:8px 12px;
+      border-top:1px solid var(--log-border);flex-shrink:0;
+      background:rgba(0,0,0,0.18);
+    }
+    .stdin-prompt { color:#34d399;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0;user-select:none; }
+    .stdin-input {
+      flex:1;padding:6px 10px;background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);border-radius:6px;
+      color:rgba(200,220,255,0.88);font-family:'JetBrains Mono',monospace;font-size:12px;
+      outline:none;transition:all 0.15s;
+    }
+    .stdin-input:focus { border-color:rgba(255,255,255,0.24);background:rgba(255,255,255,0.09); }
+    .stdin-input::placeholder { color:rgba(255,255,255,0.2); }
+    .stdin-badge {
+      display:inline-flex;align-items:center;gap:4px;
+      padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;
+      background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.25);color:#34d399;
+    }
+    .stdin-badge::before { content:'';width:5px;height:5px;border-radius:50%;background:#34d399;animation:pulse 2s infinite; }
+
     /* ── Proc stats / edit ───────────────────────────── */
     .pab-gear { background:rgba(100,116,139,0.10);color:var(--t3);border-color:rgba(100,116,139,0.25); }
     .pab-gear:hover { background:rgba(100,116,139,0.22);color:var(--t2); }
@@ -789,12 +811,19 @@
               <span id="logs-modal-proc-name"
                 style="color:rgba(255,255,255,0.6);font-size:11px">No process
                 selected</span>
+              <span class="stdin-badge" id="stdin-badge" style="display:none">stdin</span>
             </div>
             <span style="font-size:10.5px;color:rgba(255,255,255,0.35)">Live ·
               Auto-scroll</span>
           </div>
           <div class="log-body" id="logs-modal-body">Select a process above to
             view logs…</div>
+          <div class="stdin-bar" id="stdin-bar" style="display:none">
+            <span class="stdin-prompt">›</span>
+            <input class="stdin-input" id="stdin-input"
+              placeholder="Send command to process stdin…" autocomplete="off" spellcheck="false" />
+            <button class="btn xs" id="stdin-send-btn" onclick="sendStdinCmd()">↵ Send</button>
+          </div>
         </div>
       </div>
     </div>
@@ -846,6 +875,8 @@ socket.on('process:update', proc => {
   processes[proc.name] = proc;
   recordHistory(proc);
   renderProcessRow(proc); updateProcStats();
+  if (proc.name === modalLogProcess) updateStdinBar();
+  if (proc.name === statsModalName) refreshStatsModal();
 });
 socket.on('process:delete', data => {
   delete processes[data.name];
@@ -871,7 +902,7 @@ socket.on('log', data => {
   if (data.name !== modalLogProcess) return;
   const modal = document.getElementById('logs-modal');
   if (!modal.classList.contains('open')) return;
-  appendModalLog(data.line, data.type);
+  appendModalLog(data.line, data.type || (data.line.includes('[ERR]') ? 'err' : 'out'));
 });
 
 async function fetchSystem() {
@@ -1030,6 +1061,37 @@ async function refreshProcesses() {
   try { const r=await fetch('/api/processes'); processes=await r.json(); renderProcesses(); updateProcStats(); } catch {}
 }
 
+// ── Stdin bar ─────────────────────────────────────
+const stdinHistory = [];
+let stdinHistoryIdx = -1;
+
+function updateStdinBar() {
+  const bar   = document.getElementById('stdin-bar');
+  const badge = document.getElementById('stdin-badge');
+  const proc  = modalLogProcess && processes[modalLogProcess];
+  const canWrite = proc && proc.status === 'running';
+  bar.style.display   = canWrite ? '' : 'none';
+  badge.style.display = canWrite ? '' : 'none';
+}
+
+async function sendStdinCmd() {
+  const input = document.getElementById('stdin-input');
+  const data  = input.value;
+  if (!modalLogProcess) return;
+  try {
+    const r = await fetch(`/api/processes/${encodeURIComponent(modalLogProcess)}/stdin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    if (data.trim()) { stdinHistory.unshift(data); if (stdinHistory.length > 50) stdinHistory.pop(); }
+    stdinHistoryIdx = -1;
+    input.value = '';
+  } catch(e) { toast('stdin error: ' + e.message, 'error'); }
+}
+
 // ── Logs modal ────────────────────────────────────
 function openLogsFor(name) {
   const modal = document.getElementById('logs-modal');
@@ -1047,13 +1109,17 @@ function closeLogsModal() {
   modalLogProcess = null;
   document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
   document.getElementById('logs-modal-title-name').textContent = 'Logs';
+  document.getElementById('stdin-bar').style.display   = 'none';
+  document.getElementById('stdin-badge').style.display = 'none';
+  document.getElementById('stdin-input').value = '';
 }
 async function loadModalLogs() {
   const name = document.getElementById('logs-modal-select').value;
-  if (!name) { modalLogProcess = null; return; }
+  if (!name) { modalLogProcess = null; updateStdinBar(); return; }
   modalLogProcess = name;
   document.getElementById('logs-modal-proc-name').textContent = name;
   document.getElementById('logs-modal-title-name').textContent = name;
+  updateStdinBar();
   const body = document.getElementById('logs-modal-body');
   body.textContent = 'Loading…';
   try {
@@ -1069,6 +1135,7 @@ function appendModalLog(line, type) {
   const body = document.getElementById('logs-modal-body');
   const span = document.createElement('span');
   span.className = type === 'err' ? 'log-err' : 'log-out';
+  if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
   span.textContent = line + '\n';
   body.appendChild(span);
   while(body.children.length > 500) body.removeChild(body.firstChild);
@@ -1477,6 +1544,22 @@ document.getElementById('logs-modal').addEventListener('click',e=>{if(e.target==
 document.getElementById('stats-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStatsModal();});
 document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
 document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
+document.getElementById('stdin-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); sendStdinCmd(); return; }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (stdinHistoryIdx < stdinHistory.length - 1) {
+      stdinHistoryIdx++;
+      document.getElementById('stdin-input').value = stdinHistory[stdinHistoryIdx] || '';
+    }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (stdinHistoryIdx > 0) { stdinHistoryIdx--; document.getElementById('stdin-input').value = stdinHistory[stdinHistoryIdx] || ''; }
+    else { stdinHistoryIdx = -1; document.getElementById('stdin-input').value = ''; }
+  }
+});
 
 // ── Theme ─────────────────────────────────────────
 function applyTheme(theme) {

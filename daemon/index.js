@@ -90,6 +90,17 @@ app.patch('/api/processes/:name', (req, res) => {
   res.json(result);
 });
 
+// Send to stdin
+app.post('/api/processes/:name/stdin', (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  const { data } = req.body;
+  if (data === undefined || data === null) return res.status(400).json({ error: 'data is required' });
+  const result = pm.sendStdin(name, String(data));
+  if (result.error) return res.status(400).json(result);
+  res.json(result);
+});
+
 // Delete process
 app.delete('/api/processes/:name', (req, res) => {
   const name = pm.resolveProcess(req.params.name);
