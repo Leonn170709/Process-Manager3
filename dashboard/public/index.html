@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PM3 Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-  <style>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PM3 Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet" />
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
     /* ── Reset ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; }
@@ -329,7 +331,7 @@
     .issue-name { font-weight:600;font-size:12.5px;color:var(--t1); }
     .issue-time { font-size:10.5px;color:var(--t4);font-family:'JetBrains Mono',monospace; }
     .issue-msg  { font-size:11.5px;color:var(--t2);font-family:'JetBrains Mono',monospace;line-height:1.5;
-                  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+                  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
     .issue-meta { font-size:10.5px;color:var(--t4);margin-top:4px;display:flex;gap:10px; }
     .severity-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase; }
     .severity-critical { background:rgba(220,38,38,0.10);color:var(--red);border:1px solid rgba(220,38,38,0.2); }
@@ -466,256 +468,325 @@
     }
     .section-title::after { content:'';flex:1;height:1px;background:rgba(0,0,0,0.07); }
   </style>
-</head>
-<body>
+  </head>
+  <body>
 
-<!-- Animated background blobs -->
-<div class="blob blob-a"></div>
-<div class="blob blob-b"></div>
-<div class="blob blob-c"></div>
+    <!-- Animated background blobs -->
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
 
-<div id="app">
+    <div id="app">
 
-  <!-- ── Navbar ─────────────────────────────────── -->
-  <nav class="navbar">
-    <div class="nav-logo">
-      <div class="nav-logo-icon">⚡</div>
-      PM3
-    </div>
-
-    <div class="nav-tabs">
-      <button class="nav-tab active" data-tab="processes" onclick="switchTab('processes')">⚙ Processes</button>
-      <button class="nav-tab" data-tab="issues" onclick="switchTab('issues')">
-        ⚠ Issues <span class="badge" id="issue-badge" style="display:none">0</span>
-      </button>
-      <button class="nav-tab" data-tab="system" onclick="switchTab('system')">📊 System</button>
-      <button class="nav-tab" data-tab="config" onclick="switchTab('config')">🔧 Config</button>
-    </div>
-
-    <div class="nav-sys">
-      <div class="nav-chip"><span class="lbl">CPU</span><span class="val" id="sys-cpu">—</span></div>
-      <div class="nav-chip"><span class="lbl">RAM</span><span class="val" id="sys-ram">—</span></div>
-      <div class="nav-chip"><span class="lbl">Up</span><span class="val" id="sys-uptime">—</span></div>
-      <div class="nav-chip"><span class="lbl">Run</span><span class="val" id="sys-procs">0</span></div>
-    </div>
-
-    <div class="nav-actions">
-      <button class="btn icon" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-      <button class="btn primary" onclick="openStartModal()">＋ New Process</button>
-    </div>
-  </nav>
-
-  <!-- ── Content ────────────────────────────────── -->
-  <div class="content">
-
-    <!-- PROCESSES -->
-    <div class="panel active" id="tab-processes">
-      <div class="stats-strip">
-        <div class="stat-pill">
-          <div class="sp-val" id="stat-running" style="color:var(--green)">0</div>
-          <div class="sp-label">Running</div>
+      <!-- ── Navbar ─────────────────────────────────── -->
+      <nav class="navbar">
+        <div class="nav-logo">
+          <div class="nav-logo-icon">⚡</div>
+          PM3
         </div>
-        <div class="stat-pill">
-          <div class="sp-val" id="stat-stopped" style="color:var(--t3)">0</div>
-          <div class="sp-label">Stopped</div>
-        </div>
-        <div class="stat-pill">
-          <div class="sp-val" id="stat-crashed" style="color:var(--red)">0</div>
-          <div class="sp-label">Crashed</div>
-        </div>
-        <div class="stat-pill">
-          <div class="sp-val" id="stat-restarts" style="color:var(--yellow)">0</div>
-          <div class="sp-label">Restarts</div>
-        </div>
-      </div>
 
-      <div class="card fill">
-        <div class="card-hdr">
-          <div class="card-title">⚙ Processes</div>
-          <button class="btn sm" onclick="refreshProcesses()">⟳ Refresh</button>
+        <div class="nav-tabs">
+          <button class="nav-tab active" data-tab="processes"
+            onclick="switchTab('processes')">⚙ Processes</button>
+          <button class="nav-tab" data-tab="issues"
+            onclick="switchTab('issues')">
+            ⚠ Issues <span class="badge" id="issue-badge"
+              style="display:none">0</span>
+          </button>
+          <button class="nav-tab" data-tab="system"
+            onclick="switchTab('system')">📊 System</button>
+          <button class="nav-tab" data-tab="config"
+            onclick="switchTab('config')">🔧 Config</button>
         </div>
-        <div class="table-wrap">
-          <table class="proc-table" id="proc-table" style="display:none">
-            <thead><tr>
-              <th>ID</th><th>Name</th><th>Status</th><th>CPU</th><th>RAM</th>
-              <th>Issues</th><th>Restarts</th><th>Uptime</th><th>PID</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="proc-tbody"></tbody>
-          </table>
-          <div id="proc-empty" class="empty">
-            <div class="empty-icon">🚀</div>
-            <div class="empty-title">No processes yet</div>
-            <div style="font-size:12px;color:var(--t4)">Click <strong>+ New Process</strong> to get started</div>
+
+        <div class="nav-sys">
+          <div class="nav-chip"><span class="lbl">CPU</span><span class="val"
+              id="sys-cpu">—</span></div>
+          <div class="nav-chip"><span class="lbl">RAM</span><span class="val"
+              id="sys-ram">—</span></div>
+          <div class="nav-chip"><span class="lbl">Up</span><span class="val"
+              id="sys-uptime">—</span></div>
+          <div class="nav-chip"><span class="lbl">Run</span><span class="val"
+              id="sys-procs">0</span></div>
+        </div>
+
+        <div class="nav-actions">
+          <button class="btn icon" id="theme-btn" onclick="toggleTheme()"
+            title="Toggle theme">🌙</button>
+          <button class="btn primary" onclick="openStartModal()">＋ New
+            Process</button>
+        </div>
+      </nav>
+
+      <!-- ── Content ────────────────────────────────── -->
+      <div class="content">
+
+        <!-- PROCESSES -->
+        <div class="panel active" id="tab-processes">
+          <div class="stats-strip">
+            <div class="stat-pill">
+              <div class="sp-val" id="stat-running"
+                style="color:var(--green)">0</div>
+              <div class="sp-label">Running</div>
+            </div>
+            <div class="stat-pill">
+              <div class="sp-val" id="stat-stopped"
+                style="color:var(--t3)">0</div>
+              <div class="sp-label">Stopped</div>
+            </div>
+            <div class="stat-pill">
+              <div class="sp-val" id="stat-crashed"
+                style="color:var(--red)">0</div>
+              <div class="sp-label">Crashed</div>
+            </div>
+            <div class="stat-pill">
+              <div class="sp-val" id="stat-restarts"
+                style="color:var(--yellow)">0</div>
+              <div class="sp-label">Restarts</div>
+            </div>
+          </div>
+
+          <div class="card fill">
+            <div class="card-hdr">
+              <div class="card-title">⚙ Processes</div>
+              <button class="btn sm" onclick="refreshProcesses()">⟳
+                Refresh</button>
+            </div>
+            <div class="table-wrap">
+              <table class="proc-table" id="proc-table" style="display:none">
+                <thead><tr>
+                    <th>ID</th><th>Name</th><th>Status</th><th>CPU</th><th>RAM</th>
+                    <th>Issues</th><th>Restarts</th><th>Uptime</th><th>PID</th><th>Actions</th>
+                  </tr></thead>
+                <tbody id="proc-tbody"></tbody>
+              </table>
+              <div id="proc-empty" class="empty">
+                <div class="empty-icon">🚀</div>
+                <div class="empty-title">No processes yet</div>
+                <div style="font-size:12px;color:var(--t4)">Click <strong>+ New
+                    Process</strong> to get started</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ISSUES -->
+        <div class="panel" id="tab-issues">
+          <div class="stats-strip">
+            <div class="stat-pill" style="cursor:pointer"
+              onclick="setIssueFilter('critical')">
+              <div class="sp-val" id="stat-iss-critical"
+                style="color:var(--red)">0</div>
+              <div class="sp-label">Critical</div>
+            </div>
+            <div class="stat-pill" style="cursor:pointer"
+              onclick="setIssueFilter('error')">
+              <div class="sp-val" id="stat-iss-error"
+                style="color:var(--yellow)">0</div>
+              <div class="sp-label">Error</div>
+            </div>
+            <div class="stat-pill" style="cursor:pointer"
+              onclick="setIssueFilter('warning')">
+              <div class="sp-val" id="stat-iss-warning"
+                style="color:var(--cyan)">0</div>
+              <div class="sp-label">Warning</div>
+            </div>
+            <div class="stat-pill" style="cursor:pointer"
+              onclick="setIssueFilter('all')">
+              <div class="sp-val" id="stat-iss-total"
+                style="color:var(--t2)">0</div>
+              <div class="sp-label">Total (max 200)</div>
+            </div>
+          </div>
+
+          <div class="card" style="flex-shrink:0">
+            <div
+              style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div class="filter-chips">
+                <span class="filter-chip active" data-filter="all"
+                  onclick="setIssueFilter('all')">All</span>
+                <span class="filter-chip" data-filter="critical"
+                  onclick="setIssueFilter('critical')">Critical</span>
+                <span class="filter-chip" data-filter="error"
+                  onclick="setIssueFilter('error')">Error</span>
+                <span class="filter-chip" data-filter="warning"
+                  onclick="setIssueFilter('warning')">Warning</span>
+                <span id="proc-filter-chip" class="filter-chip"
+                  data-filter="proc" style="display:none"
+                  onclick="setIssueFilter('proc')">
+                  📌 <span id="proc-filter-name"></span>
+                </span>
+              </div>
+              <button class="btn sm danger" onclick="clearAllIssues()">Clear
+                All</button>
+            </div>
+          </div>
+
+          <div class="issues-scroll" id="issues-list">
+            <div id="issues-empty" class="empty" style="display:none">
+              <div class="empty-icon">✅</div>
+              <div class="empty-title">No issues</div>
+              <div style="font-size:12px;color:var(--t4)">All processes running
+                smoothly</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SYSTEM -->
+        <div class="panel" id="tab-system">
+          <div class="sys-grid">
+            <div class="card sys-metric">
+              <div class="sm-label">CPU Load</div>
+              <div class="sm-val" id="sys-cpu-big"
+                style="color:var(--accent)">—</div>
+              <div class="progress"><div class="progress-fill" id="sys-cpu-bar"
+                  style="background:var(--accent);width:0%"></div></div>
+            </div>
+            <div class="card sys-metric">
+              <div class="sm-label">Memory</div>
+              <div class="sm-val" id="sys-mem-big"
+                style="color:var(--accent2)">—</div>
+              <div class="progress"><div class="progress-fill" id="sys-mem-bar"
+                  style="background:var(--accent2);width:0%"></div></div>
+              <div class="sm-sub" id="sys-mem-detail">—</div>
+            </div>
+            <div class="card sys-metric">
+              <div class="sm-label">Server Uptime</div>
+              <div class="sm-val" id="sys-up-big"
+                style="font-size:18px;color:var(--green)">—</div>
+            </div>
+            <div class="card sys-metric">
+              <div class="sm-label">Running Procs</div>
+              <div class="sm-val" id="sys-procs-big"
+                style="color:var(--cyan)">0</div>
+            </div>
+          </div>
+          <div class="card fill">
+            <div class="card-hdr"><div class="card-title">💾 Disk
+                Usage</div></div>
+            <div class="disk-scroll" id="disk-list"></div>
+          </div>
+        </div>
+
+        <!-- CONFIG -->
+        <div class="panel" id="tab-config">
+          <div class="card fill">
+            <div class="card-hdr">
+              <div class="card-title">🔧 Configuration</div>
+              <div style="display:flex;gap:7px;align-items:center">
+                <span
+                  style="font-size:11px;color:var(--t3)">~/.pm3/config.json</span>
+                <button class="btn sm danger" onclick="resetConfig()">↺
+                  Reset</button>
+                <button class="btn sm primary" onclick="saveConfig()">💾
+                  Save</button>
+              </div>
+            </div>
+            <div class="cfg-scroll" id="config-list">
+              <div class="empty"><div class="empty-icon">⚙</div><div
+                  class="empty-title">Loading config…</div><div
+                  style="font-size:11.5px;color:var(--t4);margin-top:4px">If
+                  this persists, run <code
+                    style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    kill</code> then <code
+                    style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    list</code> to restart the daemon.</div></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- .content -->
+    </div><!-- #app -->
+
+    <!-- START MODAL -->
+    <div class="modal-overlay" id="start-modal">
+      <div class="modal">
+        <div class="modal-hdr">
+          <div class="modal-title">＋ Start New Process</div>
+          <div class="modal-close" onclick="closeStartModal()">×</div>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Script / Command *</label>
+            <input class="form-input" id="f-script"
+              placeholder="bot.js  |  npm run start  |  node server.js" />
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Name</label><input
+                class="form-input" id="f-name" placeholder="my-app" /></div>
+            <div class="form-group"><label class="form-label">Working
+                Directory</label><input class="form-input" id="f-cwd"
+                placeholder="/home/user/app" /></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Max
+                Restarts</label><input class="form-input" id="f-max-restarts"
+                type="number" placeholder="15" /></div>
+            <div class="form-group"><label class="form-label">Memory Limit
+                (MB)</label><input class="form-input" id="f-memory"
+                type="number" placeholder="512" /></div>
+          </div>
+          <div class="form-group"><label class="form-label">Environment
+              Variables</label><input class="form-input" id="f-env"
+              placeholder="NODE_ENV=production,PORT=3000" /></div>
+          <div
+            style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+            <button class="btn" onclick="closeStartModal()">Cancel</button>
+            <button class="btn primary" onclick="submitStart()">▶ Start
+              Process</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ISSUES -->
-    <div class="panel" id="tab-issues">
-      <div class="stats-strip">
-        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('critical')">
-          <div class="sp-val" id="stat-iss-critical" style="color:var(--red)">0</div>
-          <div class="sp-label">Critical</div>
+    <!-- ISSUE MODAL -->
+    <div class="modal-overlay" id="issue-modal">
+      <div class="modal">
+        <div class="modal-hdr">
+          <div class="modal-title" id="issue-modal-title">Issue Detail</div>
+          <div class="modal-close" onclick="closeIssueModal()">×</div>
         </div>
-        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('error')">
-          <div class="sp-val" id="stat-iss-error" style="color:var(--yellow)">0</div>
-          <div class="sp-label">Error</div>
-        </div>
-        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('warning')">
-          <div class="sp-val" id="stat-iss-warning" style="color:var(--cyan)">0</div>
-          <div class="sp-label">Warning</div>
-        </div>
-        <div class="stat-pill" style="cursor:pointer" onclick="setIssueFilter('all')">
-          <div class="sp-val" id="stat-iss-total" style="color:var(--t2)">0</div>
-          <div class="sp-label">Total (max 200)</div>
-        </div>
+        <div class="modal-body" id="issue-modal-body"></div>
       </div>
+    </div>
 
-      <div class="card" style="flex-shrink:0">
-        <div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-          <div class="filter-chips">
-            <span class="filter-chip active" data-filter="all"      onclick="setIssueFilter('all')">All</span>
-            <span class="filter-chip"         data-filter="critical" onclick="setIssueFilter('critical')">Critical</span>
-            <span class="filter-chip"         data-filter="error"    onclick="setIssueFilter('error')">Error</span>
-            <span class="filter-chip"         data-filter="warning"  onclick="setIssueFilter('warning')">Warning</span>
-            <span id="proc-filter-chip" class="filter-chip" data-filter="proc" style="display:none" onclick="setIssueFilter('proc')">
-              📌 <span id="proc-filter-name"></span>
-            </span>
+    <!-- LOGS MODAL -->
+    <div class="modal-overlay" id="logs-modal">
+      <div class="modal modal-logs">
+        <div class="modal-hdr" style="flex-shrink:0">
+          <div class="modal-title"
+            style="display:flex;align-items:center;gap:8px">
+            <div class="live-dot" id="logs-modal-dot"></div>
+            📋 <span id="logs-modal-title-name">Logs</span>
           </div>
-          <button class="btn sm danger" onclick="clearAllIssues()">Clear All</button>
-        </div>
-      </div>
-
-      <div class="issues-scroll" id="issues-list">
-        <div id="issues-empty" class="empty" style="display:none">
-          <div class="empty-icon">✅</div>
-          <div class="empty-title">No issues</div>
-          <div style="font-size:12px;color:var(--t4)">All processes running smoothly</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SYSTEM -->
-    <div class="panel" id="tab-system">
-      <div class="sys-grid">
-        <div class="card sys-metric">
-          <div class="sm-label">CPU Load</div>
-          <div class="sm-val" id="sys-cpu-big" style="color:var(--accent)">—</div>
-          <div class="progress"><div class="progress-fill" id="sys-cpu-bar" style="background:var(--accent);width:0%"></div></div>
-        </div>
-        <div class="card sys-metric">
-          <div class="sm-label">Memory</div>
-          <div class="sm-val" id="sys-mem-big" style="color:var(--accent2)">—</div>
-          <div class="progress"><div class="progress-fill" id="sys-mem-bar" style="background:var(--accent2);width:0%"></div></div>
-          <div class="sm-sub" id="sys-mem-detail">—</div>
-        </div>
-        <div class="card sys-metric">
-          <div class="sm-label">Server Uptime</div>
-          <div class="sm-val" id="sys-up-big" style="font-size:18px;color:var(--green)">—</div>
-        </div>
-        <div class="card sys-metric">
-          <div class="sm-label">Running Procs</div>
-          <div class="sm-val" id="sys-procs-big" style="color:var(--cyan)">0</div>
-        </div>
-      </div>
-      <div class="card fill">
-        <div class="card-hdr"><div class="card-title">💾 Disk Usage</div></div>
-        <div class="disk-scroll" id="disk-list"></div>
-      </div>
-    </div>
-
-    <!-- CONFIG -->
-    <div class="panel" id="tab-config">
-      <div class="card fill">
-        <div class="card-hdr">
-          <div class="card-title">🔧 Configuration</div>
-          <div style="display:flex;gap:7px;align-items:center">
-            <span style="font-size:11px;color:var(--t3)">~/.pm3/config.json</span>
-            <button class="btn sm danger" onclick="resetConfig()">↺ Reset</button>
-            <button class="btn sm primary" onclick="saveConfig()">💾 Save</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="form-input" id="logs-modal-select"
+              onchange="loadModalLogs()" style="width:180px;padding:5px 10px">
+              <option value>Select process…</option>
+            </select>
+            <button class="btn sm" onclick="clearModalLogView()">Clear</button>
+            <div class="modal-close" onclick="closeLogsModal()">×</div>
           </div>
         </div>
-        <div class="cfg-scroll" id="config-list">
-          <div class="empty"><div class="empty-icon">⚙</div><div class="empty-title">Loading config…</div><div style="font-size:11.5px;color:var(--t4);margin-top:4px">If this persists, run <code style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3 kill</code> then <code style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3 list</code> to restart the daemon.</div></div>
+        <div class="log-shell">
+          <div class="log-hdr">
+            <div class="log-title">
+              <span id="logs-modal-proc-name"
+                style="color:rgba(255,255,255,0.6);font-size:11px">No process
+                selected</span>
+            </div>
+            <span style="font-size:10.5px;color:rgba(255,255,255,0.35)">Live ·
+              Auto-scroll</span>
+          </div>
+          <div class="log-body" id="logs-modal-body">Select a process above to
+            view logs…</div>
         </div>
       </div>
     </div>
 
-  </div><!-- .content -->
-</div><!-- #app -->
+    <div class="toast-container" id="toast-container"></div>
 
-<!-- START MODAL -->
-<div class="modal-overlay" id="start-modal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <div class="modal-title">＋ Start New Process</div>
-      <div class="modal-close" onclick="closeStartModal()">×</div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Script / Command *</label>
-        <input class="form-input" id="f-script" placeholder="bot.js  |  npm run start  |  node server.js" />
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="f-name" placeholder="my-app" /></div>
-        <div class="form-group"><label class="form-label">Working Directory</label><input class="form-input" id="f-cwd" placeholder="/home/user/app" /></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Max Restarts</label><input class="form-input" id="f-max-restarts" type="number" placeholder="15" /></div>
-        <div class="form-group"><label class="form-label">Memory Limit (MB)</label><input class="form-input" id="f-memory" type="number" placeholder="512" /></div>
-      </div>
-      <div class="form-group"><label class="form-label">Environment Variables</label><input class="form-input" id="f-env" placeholder="NODE_ENV=production,PORT=3000" /></div>
-      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
-        <button class="btn" onclick="closeStartModal()">Cancel</button>
-        <button class="btn primary" onclick="submitStart()">▶ Start Process</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ISSUE MODAL -->
-<div class="modal-overlay" id="issue-modal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <div class="modal-title" id="issue-modal-title">Issue Detail</div>
-      <div class="modal-close" onclick="closeIssueModal()">×</div>
-    </div>
-    <div class="modal-body" id="issue-modal-body"></div>
-  </div>
-</div>
-
-<!-- LOGS MODAL -->
-<div class="modal-overlay" id="logs-modal">
-  <div class="modal modal-logs">
-    <div class="modal-hdr" style="flex-shrink:0">
-      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
-        <div class="live-dot" id="logs-modal-dot"></div>
-        📋 <span id="logs-modal-title-name">Logs</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <select class="form-input" id="logs-modal-select" onchange="loadModalLogs()" style="width:180px;padding:5px 10px">
-          <option value="">Select process…</option>
-        </select>
-        <button class="btn sm" onclick="clearModalLogView()">Clear</button>
-        <div class="modal-close" onclick="closeLogsModal()">×</div>
-      </div>
-    </div>
-    <div class="log-shell">
-      <div class="log-hdr">
-        <div class="log-title">
-          <span id="logs-modal-proc-name" style="color:rgba(255,255,255,0.6);font-size:11px">No process selected</span>
-        </div>
-        <span style="font-size:10.5px;color:rgba(255,255,255,0.35)">Live · Auto-scroll</span>
-      </div>
-      <div class="log-body" id="logs-modal-body">Select a process above to view logs…</div>
-    </div>
-  </div>
-</div>
-
-<div class="toast-container" id="toast-container"></div>
-
-<script>
+    <script>
 const socket = io();
 let processes = {};
 let issues = [];
@@ -1160,5 +1231,5 @@ function toggleTheme() {
   applyTheme(saved);
 })();
 </script>
-</body>
+  </body>
 </html>
