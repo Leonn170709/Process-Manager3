@@ -563,10 +563,23 @@ program
       if (k) env[k.trim()] = (v || '').trim();
     });
     const path = require('path');
+    const fs   = require('fs');
     const isScript    = /\.(js|mjs|cjs)$/.test(script);
     const resSrc      = isScript ? path.resolve(script) : script;
     const resCwd      = opts.cwd ? path.resolve(opts.cwd)
                       : isScript ? path.dirname(path.resolve(script)) : process.cwd();
+
+    if (isScript && !fs.existsSync(resSrc)) {
+      fail(`File not found: ${resSrc}`);
+      // Look for a case-insensitive match in the same directory
+      const dir   = path.dirname(resSrc);
+      const base  = path.basename(resSrc).toLowerCase();
+      try {
+        const match = fs.readdirSync(dir).find(f => f.toLowerCase() === base);
+        if (match) hint(`Did you mean: ${path.join(dir, match)}`);
+      } catch {}
+      process.exit(1);
+    }
     const config = {
       script: resSrc, name: opts.name, cwd: resCwd, env, args,
       watch: opts.watch, autorestart: opts.autorestart !== false,

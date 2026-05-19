@@ -629,6 +629,7 @@
               <div style="font-size:12px;color:var(--t4)">All processes running
                 smoothly</div>
             </div>
+            <div id="issues-cards"></div>
           </div>
         </div>
 
@@ -815,7 +816,16 @@ socket.on('stats:update', procs => {
   updateProcStats();
 });
 socket.on('system:update', data => updateSysMetrics(data));
-socket.on('issue:new', issue => { issues.unshift(issue); if (issues.length > 200) issues = issues.slice(0, 200); renderIssues(); });
+socket.on('issue:new', issue => {
+  issues.unshift(issue);
+  if (issues.length > 200) issues = issues.slice(0, 200);
+  renderIssues();
+  const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
+  if (activeTab !== 'issues') {
+    const color = issue.severity === 'critical' ? 'error' : issue.severity === 'error' ? 'error' : 'info';
+    toast(`⚠ [${issue.severity}] ${issue.processName}: ${issue.message.slice(0, 60)}`, color);
+  }
+});
 socket.on('log', data => {
   if (data.name !== modalLogProcess) return;
   const modal = document.getElementById('logs-modal');
@@ -827,6 +837,42 @@ async function fetchSystem() {
   try { const r = await fetch('/api/system'); const d = await r.json(); updateSysMetrics(d); updateSysTab(d); } catch {}
 }
 fetchSystem(); setInterval(fetchSystem, 5000);
+
+// Load initial data via HTTP — works even if Socket.IO can't connect
+async function loadInitialData() {
+  try {
+    const [procsRes, issuesRes] = await Promise.all([
+      fetch('/api/processes'),
+      fetch('/api/issues'),
+    ]);
+    processes = await procsRes.json();
+    issues    = await issuesRes.json();
+    renderProcesses(); renderIssues(); updateProcStats(); updateIssueStats();
+  } catch {}
+}
+loadInitialData();
+
+// Poll for new issues every 5 s as fallback when Socket.IO isn't delivering events
+setInterval(async () => {
+  try {
+    const r = await fetch('/api/issues');
+    const fresh = await r.json();
+    const changed = fresh.length !== issues.length || fresh[0]?.id !== issues[0]?.id;
+    if (changed) {
+      const isNew = fresh.length > issues.length && fresh[0]?.id !== issues[0]?.id;
+      issues = fresh;
+      renderIssues();
+      if (isNew) {
+        const iss = fresh[0];
+        const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
+        if (activeTab !== 'issues') {
+          const color = iss.severity === 'warning' ? 'info' : 'error';
+          toast(`⚠ [${iss.severity}] ${iss.processName}: ${iss.message.slice(0, 60)}`, color);
+        }
+      }
+    }
+  } catch {}
+}, 5000);
 
 function updateSysMetrics(data) {
   document.getElementById('sys-cpu').textContent = (data.cpu || 0) + '%';
@@ -1020,18 +1066,17 @@ function relativeTime(iso) {
 }
 function renderIssues() {
   updateIssueStats();
-  const list = document.getElementById('issues-list');
   const empty = document.getElementById('issues-empty');
+  const cards = document.getElementById('issues-cards');
   const filtered = getFilteredIssues();
   if (!filtered.length) {
-    list.innerHTML = '';
-    list.appendChild(empty);
     empty.style.display = '';
+    cards.innerHTML = '';
     return;
   }
   empty.style.display = 'none';
-  list.innerHTML = filtered.map(iss => `
-    <div class="issue-card ${iss.severity}" onclick='openIssue(${JSON.stringify(iss).replace(/'/g,"&apos;")})' style="margin-bottom:5px">
+  cards.innerHTML = filtered.map(iss => `
+    <div class="issue-card ${iss.severity}" data-id="${iss.id}" style="margin-bottom:5px">
       <div class="issue-inner">
         <div class="issue-top">
           <div class="issue-left">
@@ -1040,7 +1085,7 @@ function renderIssues() {
           </div>
           <div class="issue-right">
             <span class="issue-time" title="${formatDate(iss.timestamp)}">${relativeTime(iss.timestamp)}</span>
-            <button class="btn xs danger" onclick='event.stopPropagation();deleteIssue("${iss.id}")'>✕</button>
+            <button class="btn xs danger issue-delete-btn" data-id="${iss.id}">✕</button>
           </div>
         </div>
         <div class="issue-msg">${escapeHtml(iss.message)}</div>
@@ -1052,9 +1097,15 @@ function renderIssues() {
     </div>`).join('');
   Object.values(processes).forEach(p => renderProcessRow(p));
 }
+function openIssueById(id) {
+  const iss = issues.find(i => i.id === id);
+  if (!iss) return;
+  openIssue(iss);
+}
 function openIssue(iss) {
   document.getElementById('issue-modal-title').textContent = `Issue — ${iss.processName}`;
-  document.getElementById('issue-modal-body').innerHTML = `
+  const body = document.getElementById('issue-modal-body');
+  body.innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       <span class="severity-badge severity-${iss.severity}" style="font-size:11px;padding:3px 10px">${iss.severity}</span>
       <span style="font-size:11.5px;color:var(--t3)">${formatDate(iss.timestamp)}</span>
@@ -1065,14 +1116,26 @@ function openIssue(iss) {
     <div style="margin-top:14px"><div class="section-title">Error Message</div><div class="stack-trace">${escapeHtml(iss.message)}</div></div>
     ${iss.stack?`<div style="margin-top:12px"><div class="section-title">Stack Trace</div><div class="stack-trace">${escapeHtml(iss.stack)}</div></div>`:''}
     <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end">
-      <button class="btn sm danger" onclick='deleteIssue("${iss.id}");closeIssueModal()'>Delete</button>
+      <button class="btn sm danger" id="issue-modal-delete">Delete</button>
       <button class="btn sm" onclick="closeIssueModal()">Close</button>
     </div>`;
+  body.querySelector('#issue-modal-delete').addEventListener('click', async () => {
+    await deleteIssue(iss.id);
+    closeIssueModal();
+  });
   document.getElementById('issue-modal').classList.add('open');
 }
 function closeIssueModal() { document.getElementById('issue-modal').classList.remove('open'); }
 async function deleteIssue(id) {
-  await fetch(`/api/issues/${id}`,{method:'DELETE'}); issues=issues.filter(i=>i.id!==id); renderIssues(); toast('Issue deleted','info');
+  try {
+    const r = await fetch(`/api/issues/${id}`, {method:'DELETE'});
+    if (!r.ok) { toast(`Delete failed (${r.status})`, 'error'); return; }
+    issues = issues.filter(i => i.id !== id);
+    renderIssues();
+    toast('Issue deleted', 'info');
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'error');
+  }
 }
 async function clearAllIssues() {
   if(!confirm('Delete all issues?')) return;
@@ -1207,6 +1270,14 @@ function formatUptime(s) {
 function formatDate(iso) { return new Date(iso).toLocaleString(); }
 function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
 function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Issue list delegation ─────────────────────────
+document.getElementById('issues-list').addEventListener('click', e => {
+  const deleteBtn = e.target.closest('.issue-delete-btn');
+  if (deleteBtn) { e.stopPropagation(); deleteIssue(deleteBtn.dataset.id); return; }
+  const card = e.target.closest('.issue-card[data-id]');
+  if (card) openIssueById(card.dataset.id);
+});
 
 // ── Backdrop close ────────────────────────────────
 document.getElementById('start-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStartModal();});

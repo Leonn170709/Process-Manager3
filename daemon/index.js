@@ -229,7 +229,7 @@ app.get('/dashboard', (req, res) => {
 });
 app.get('/', (req, res) => res.redirect('/dashboard'));
 
-server.listen(DAEMON_PORT, '127.0.0.1', () => {
+server.listen(DAEMON_PORT, '0.0.0.0', () => {
   console.log(`PM3 Daemon running on port ${DAEMON_PORT}`);
   console.log(`PM3 Dashboard: http://localhost:${DAEMON_PORT}/dashboard`);
 });
