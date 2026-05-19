@@ -47,12 +47,14 @@ function resolveCwd(cwd, script) {
 function parseCommand(script) {
   const parts = script.trim().split(/\s+/);
   if (parts.length > 1) return { cmd: parts[0], args: parts.slice(1) };
-  const ext = script.split('.').pop().toLowerCase();
+  // Use only the basename's extension so absolute paths without dots don't confuse the lookup
+  const ext = path.extname(script).slice(1).toLowerCase();
   const interp = INTERPRETERS[ext];
   if (interp) {
     const { cmd, args } = interp();
     return { cmd, args: [...args, path.resolve(script)] };
   }
+  // Treat as a direct executable (absolute path or command in PATH)
   return { cmd: parts[0], args: [] };
 }
 
@@ -128,6 +130,24 @@ function _spawnProcess(procRecord) {
 
   runtime[name] = { proc: child, config: procRecord, watcher: null };
   emit('process:update', getProcessInfo(name));
+
+  // Handle spawn errors (e.g. command not found) — without this handler
+  // Node.js throws an uncaught exception and crashes the daemon.
+  child.on('error', err => {
+    const procs2 = storage.loadProcesses();
+    if (procs2[name]) {
+      procs2[name].pid = null;
+      procs2[name].status = STATUS.CRASHED;
+      storage.saveProcesses(procs2);
+      emit('process:update', procs2[name]);
+    }
+    if (runtime[name]) {
+      if (runtime[name].watcher)  runtime[name].watcher.close();
+      if (runtime[name].memCheck) clearInterval(runtime[name].memCheck);
+      delete runtime[name];
+    }
+    _handleCrash(procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
+  });
 
   // Log stdout
   child.stdout.on('data', data => {

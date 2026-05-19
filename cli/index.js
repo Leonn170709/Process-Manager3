@@ -564,16 +564,21 @@ program
     });
     const path = require('path');
     const fs   = require('fs');
-    const isScript    = /\.(js|mjs|cjs|sh|py|rb|pl)$/.test(script);
-    const resSrc      = isScript ? path.resolve(script) : script;
-    const resCwd      = opts.cwd ? path.resolve(opts.cwd)
-                      : isScript ? path.dirname(path.resolve(script)) : process.cwd();
+    // A script is a known-extension file OR any single-word arg that exists
+    // as a file on disk (e.g. an extensionless executable like `./launch`).
+    const hasKnownExt  = /\.(js|mjs|cjs|sh|py|rb|pl)$/.test(script);
+    const resolvedPath = path.resolve(script);
+    const isLocalFile  = !script.includes(' ') && fs.existsSync(resolvedPath) &&
+                         fs.statSync(resolvedPath).isFile();
+    const isScript     = hasKnownExt || isLocalFile;
+    const resSrc       = isScript ? resolvedPath : script;
+    const resCwd       = opts.cwd ? path.resolve(opts.cwd)
+                       : isScript ? path.dirname(resolvedPath) : process.cwd();
 
     if (isScript && !fs.existsSync(resSrc)) {
       fail(`File not found: ${resSrc}`);
-      // Look for a case-insensitive match in the same directory
-      const dir   = path.dirname(resSrc);
-      const base  = path.basename(resSrc).toLowerCase();
+      const dir  = path.dirname(resSrc);
+      const base = path.basename(resSrc).toLowerCase();
       try {
         const match = fs.readdirSync(dir).find(f => f.toLowerCase() === base);
         if (match) hint(`Did you mean: ${path.join(dir, match)}`);
@@ -593,7 +598,7 @@ program
     hint(`id=${r.id}   pid=${r.pid}   script=${r.script}`);
     if (cfg.get('autoSave')) {
       await api('post', '/api/save');
-      hint('Auto-saved  ' + chalk.dim('(autoSave is on — pm3 config set autoSave false to disable)'));
+      hint(`Auto-saved  ${chalk.dim(PATHS.processes)}  ${chalk.dim('(pm3 config set autoSave false to disable)')}`);
     }
     nl();
   });
@@ -606,7 +611,7 @@ program
     const r = await api('post', `/api/processes/${id}/stop`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.gray('stopped'));
-    if (cfg.get('autoSave')) await api('post', '/api/save');
+    if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
   });
 
 program
@@ -617,7 +622,7 @@ program
     const r = await api('post', `/api/processes/${id}/restart`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.cyan('restarting…'));
-    if (cfg.get('autoSave')) await api('post', '/api/save');
+    if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
   });
 
 program
@@ -628,7 +633,7 @@ program
     const r = await api('delete', `/api/processes/${id}`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.red('deleted'));
-    if (cfg.get('autoSave')) await api('post', '/api/save');
+    if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
   });
 
 // ══════════════════════════════════════════════════════════════
@@ -651,7 +656,7 @@ program
   .action(async () => {
     await ensureDaemon();
     const r = await api('post', '/api/save');
-    ok(`Saved ${chalk.bold(r.saved)} processes`);
+    ok(`Saved ${chalk.bold(r.saved)} processes  →  ${chalk.dim(PATHS.processes)}`);
     hint('Run  pm3 resurrect  to restore them after a reboot.');
   });
 
@@ -694,7 +699,9 @@ program
     const path = require('path');
     const os   = require('os');
     const { execSync } = require('child_process');
-    const pm3Bin = process.argv[1], nodeBin = process.execPath, user = os.userInfo().username;
+    const pm3Bin = process.argv[1], nodeBin = process.execPath;
+    // When run via sudo, use the original user's name so the service runs as them
+    const user = process.env.SUDO_USER || os.userInfo().username;
 
     if (process.platform === 'linux') {
       let hasSystemd = false;

@@ -1,5 +1,9 @@
 'use strict';
 
+// Keep the daemon alive on unexpected errors — log them but never crash.
+process.on('uncaughtException',  err  => console.error('[PM3] Uncaught exception:',  err));
+process.on('unhandledRejection', reason => console.error('[PM3] Unhandled rejection:', reason));
+
 const http = require('http');
 const express = require('express');
 const { Server: SocketIOServer } = require('socket.io');
