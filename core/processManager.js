@@ -188,6 +188,9 @@ function _spawnProcess(procRecord) {
     procs2[name].exitCode = code;
     procs2[name].cpu = 0;
     procs2[name].memory = 0;
+    procs2[name].connections = 0;
+    procs2[name].netRx = 0;
+    procs2[name].netTx = 0;
 
     const isCrash = code !== 0 && code !== null;
     const wasKilled = signal === 'SIGTERM' || signal === 'SIGKILL';
@@ -302,6 +305,11 @@ function stopProcess(name) {
   if (!procs[name]) return { error: `Process "${name}" not found` };
 
   procs[name].status = STATUS.STOPPED;
+  procs[name].cpu = 0;
+  procs[name].memory = 0;
+  procs[name].connections = 0;
+  procs[name].netRx = 0;
+  procs[name].netTx = 0;
   storage.saveProcesses(procs);
 
   if (runtime[name]) {
@@ -382,16 +390,32 @@ async function updateStats() {
 
     // Per-process metrics from /proc/<pid>/ (Linux only)
     if (process.platform === 'linux') {
+      // Build set of TCP/UDP socket inodes once for the whole update cycle.
+      // Unix-domain sockets (used internally by Node.js) are excluded because
+      // they don't appear in these tables — so internal libuv sockets don't inflate the count.
+      const tcpInodes = new Set();
+      for (const f of ['/proc/net/tcp', '/proc/net/tcp6', '/proc/net/udp', '/proc/net/udp6']) {
+        try {
+          fs.readFileSync(f, 'utf8').split('\n').slice(1).forEach(line => {
+            const inode = line.trim().split(/\s+/)[9];
+            if (inode && inode !== '0') tcpInodes.add(inode);
+          });
+        } catch {}
+      }
+
       for (const [name, r] of Object.entries(runtime)) {
         if (!r.proc?.pid || !procs[name]) continue;
         const pid = r.proc.pid;
 
-        // Socket count
+        // Count only real TCP/UDP sockets by cross-referencing fd symlinks with tcpInodes
         try {
           const fds = fs.readdirSync(`/proc/${pid}/fd`);
           let sockets = 0;
           for (const fd of fds) {
-            try { if (fs.readlinkSync(`/proc/${pid}/fd/${fd}`).startsWith('socket:')) sockets++; } catch {}
+            try {
+              const m = fs.readlinkSync(`/proc/${pid}/fd/${fd}`).match(/^socket:\[(\d+)\]$/);
+              if (m && tcpInodes.has(m[1])) sockets++;
+            } catch {}
           }
           procs[name].connections = sockets;
           changed = true;
