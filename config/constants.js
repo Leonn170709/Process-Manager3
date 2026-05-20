@@ -34,6 +34,7 @@ const PATHS = {
   issues: path.join(PM3_HOME, 'issues.json'),
   logs: path.join(PM3_HOME, 'logs'),
   config: path.join(PM3_HOME, 'config.json'),
+  prefs:  path.join(PM3_HOME, 'dashboard.json'),
   pid: path.join(PM3_HOME, 'daemon.pid'),
   sock: path.join(PM3_HOME, 'daemon.sock'),
 };

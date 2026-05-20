@@ -23,6 +23,30 @@ const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: '*' } });
 
+// Network speed tracking
+let _prevNetBytes = {};
+let _netSpeed = { rxSec: 0, txSec: 0 };
+async function _pollNetSpeed() {
+  try {
+    const ifaces = await si.networkStats();
+    const now = Date.now();
+    let rx = 0, tx = 0;
+    for (const i of ifaces) {
+      if (i.iface === 'lo') continue;
+      const p = _prevNetBytes[i.iface];
+      if (p) {
+        const dt = (now - p.ts) / 1000;
+        if (dt > 0 && dt < 15) {
+          rx += Math.max(0, (i.rx_bytes - p.rx) / dt);
+          tx += Math.max(0, (i.tx_bytes - p.tx) / dt);
+        }
+      }
+      _prevNetBytes[i.iface] = { rx: i.rx_bytes, tx: i.tx_bytes, ts: now };
+    }
+    _netSpeed = { rxSec: Math.round(rx), txSec: Math.round(tx) };
+  } catch {}
+}
+
 // Internal event bus
 const emitter = new EventEmitter();
 pm.setEmitter(emitter);
@@ -88,6 +112,13 @@ app.patch('/api/processes/:name', (req, res) => {
   const result = pm.updateProcess(name, req.body);
   if (result.error) return res.status(400).json(result);
   res.json(result);
+});
+
+// Reset restart count
+app.post('/api/processes/:name/reset-restarts', (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  res.json(pm.resetRestartCount(name));
 });
 
 // Send to stdin
@@ -172,13 +203,13 @@ app.post('/api/config/reset', (req, res) => {
 // System metrics
 app.get('/api/system', async (req, res) => {
   try {
-    const [cpu, mem, disk, load, uptime] = await Promise.all([
+    const [cpu, mem, disk, load] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       si.fsSize(),
       si.currentLoad(),
-      Promise.resolve(si.time().uptime),
     ]);
+    await _pollNetSpeed();
     res.json({
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
       memory: {
@@ -196,6 +227,7 @@ app.get('/api/system', async (req, res) => {
       })),
       loadAverage: load.avgLoad,
       uptime: si.time().uptime,
+      network: _netSpeed,
       processCount: Object.values(pm.getAllProcesses()).filter(p => p.status === STATUS.RUNNING).length,
     });
   } catch (err) {
@@ -215,12 +247,25 @@ app.get('/api/ping', (req, res) => {
   res.json({ ok: true, pid: process.pid, version: '1.0.0' });
 });
 
+// Dashboard preferences
+app.get('/api/prefs', (req, res) => {
+  res.json(storage.loadPrefs());
+});
+
+app.put('/api/prefs', (req, res) => {
+  const prefs = req.body;
+  storage.savePrefs(prefs);
+  io.emit('prefs:update', prefs);
+  res.json({ ok: true });
+});
+
 // --- Socket.IO ---
 io.on('connection', socket => {
   // Send current state on connect
   socket.emit('init', {
     processes: pm.getAllProcesses(),
     issues: issueTracker.getIssues(),
+    prefs: storage.loadPrefs(),
   });
 });
 
@@ -233,6 +278,7 @@ setInterval(() => {
 setInterval(async () => {
   try {
     const [cpu, mem] = await Promise.all([si.currentLoad(), si.mem()]);
+    await _pollNetSpeed();
     io.emit('system:update', {
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
       memory: {
@@ -241,6 +287,7 @@ setInterval(async () => {
         available: mem.available,
         percent: parseFloat(((mem.active / mem.total) * 100).toFixed(1)),
       },
+      network: _netSpeed,
     });
   } catch {}
 }, 3000);

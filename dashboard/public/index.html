@@ -496,16 +496,18 @@
     .stat-cell { cursor:pointer;transition:color 0.15s; }
     .stat-cell:hover { color:var(--accent) !important; }
     .chart-block { margin-bottom:16px; }
-    .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px; }
+    .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
     .chart-label .cur { font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
-    .chart-hover-area { position:relative;cursor:crosshair; }
-    .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:10px 10px 4px;overflow:hidden; }
+    .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:0.2px; }
+    .chart-hover-area { position:relative;cursor:crosshair;touch-action:none; }
+    .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:8px 8px 4px;overflow:hidden; }
     .chart-xhair {
       position:absolute;top:0;bottom:0;width:1px;pointer-events:none;display:none;
-      opacity:0.45;z-index:10;
+      opacity:0.45;z-index:10;transition:opacity 0.1s;
     }
+    .chart-xhair.locked { opacity:0.85;width:2px;border-radius:1px; }
     .chart-tip {
-      position:absolute;top:8px;pointer-events:none;display:none;
+      position:absolute;top:6px;pointer-events:none;display:none;
       padding:3px 10px;border-radius:20px;
       background:var(--g1);
       backdrop-filter:blur(44px) saturate(2.4) brightness(1.04);
@@ -514,11 +516,47 @@
       box-shadow:inset 0 1px 0 var(--spec-sm),var(--shadow);
       font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;
       color:var(--t1);white-space:nowrap;letter-spacing:0.3px;z-index:11;
+      transition:border-color 0.15s;
     }
+    .chart-tip.locked { border-color:rgba(251,191,36,0.55);box-shadow:inset 0 1px 0 var(--spec-sm),0 0 8px rgba(251,191,36,0.18); }
     .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
     .stat-kv-label { font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600; }
     .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-top:1px;word-break:break-all; }
-    .modal-wide { width:740px; }
+    .modal-wide { width:840px; }
+    /* Network section */
+    .net-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px 14px; }
+    .net-metric { }
+    .net-speed { font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;margin:3px 0; }
+    /* Log filter controls */
+    .log-filter-btn {
+      padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:600;
+      border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
+      color:rgba(255,255,255,0.45);cursor:pointer;font-family:'Inter',sans-serif;
+      transition:all 0.15s;
+    }
+    .log-filter-btn:hover { background:rgba(255,255,255,0.11);color:rgba(255,255,255,0.75); }
+    .log-filter-btn.active { background:rgba(255,255,255,0.16);color:rgba(255,255,255,0.92);border-color:rgba(255,255,255,0.28); }
+    .log-search-input {
+      padding:3px 9px;border-radius:5px;font-size:10.5px;
+      border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
+      color:rgba(255,255,255,0.7);font-family:'JetBrains Mono',monospace;outline:none;width:110px;
+      transition:all 0.15s;
+    }
+    .log-search-input:focus { border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.09); }
+    .log-search-input::placeholder { color:rgba(255,255,255,0.22); }
+    /* Column editor */
+    .col-item {
+      display:flex;align-items:center;gap:10px;padding:9px 12px;
+      background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);
+      margin-bottom:5px;user-select:none;transition:background 0.1s,opacity 0.15s,border-color 0.1s;
+    }
+    .col-item.dragging { opacity:0.35; }
+    .col-item.drag-over { border-color:var(--accent);background:var(--g1); }
+    .col-drag { cursor:grab;color:var(--t4);font-size:15px;line-height:1;flex-shrink:0;padding:0 2px; }
+    .col-drag:active { cursor:grabbing; }
+    .col-check { width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0; }
+    .col-lbl { font-size:12.5px;font-weight:500;color:var(--t2);flex:1;cursor:pointer; }
+    .col-locked { font-size:10px;color:var(--t4);flex-shrink:0;font-style:italic; }
   </style>
   </head>
   <body>
@@ -601,14 +639,17 @@
           <div class="card fill">
             <div class="card-hdr">
               <div class="card-title">⚙ Processes</div>
-              <button class="btn sm" onclick="refreshProcesses()">⟳
-                Refresh</button>
+              <div style="display:flex;gap:6px">
+                <button class="btn sm" onclick="openColumnsModal()" title="Customize columns">⊞ Columns</button>
+                <button class="btn sm" onclick="refreshProcesses()">⟳ Refresh</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table class="proc-table" id="proc-table" style="display:none">
                 <thead><tr>
-                    <th>ID</th><th>Name</th><th>Status</th><th>CPU</th><th>RAM</th>
-                    <th>Issues</th><th>Restarts</th><th>Uptime</th><th>PID</th><th>Actions</th>
+                    <th>Name</th><th>Status</th><th>CPU</th><th>RAM</th>
+                    <th>Net↓</th><th>Net↑</th><th>Sockets</th>
+                    <th>Uptime</th><th>Restarts</th><th>Issues</th><th>Actions</th>
                   </tr></thead>
                 <tbody id="proc-tbody"></tbody>
               </table>
@@ -712,6 +753,35 @@
               <div class="sm-label">Running Procs</div>
               <div class="sm-val" id="sys-procs-big"
                 style="color:var(--cyan)">0</div>
+            </div>
+          </div>
+          <div class="card" style="flex-shrink:0">
+            <div class="card-hdr">
+              <div class="card-title">🌐 Network</div>
+              <div style="display:flex;gap:16px;font-size:11.5px;color:var(--t3)">
+                <span>↓ <span id="sys-net-rx" style="color:var(--green);font-weight:700;font-family:'JetBrains Mono',monospace">—</span></span>
+                <span>↑ <span id="sys-net-tx" style="color:var(--cyan);font-weight:700;font-family:'JetBrains Mono',monospace">—</span></span>
+              </div>
+            </div>
+            <div class="net-grid">
+              <div class="net-metric">
+                <div class="sm-label">Download</div>
+                <div class="net-speed" id="sys-net-rx-big" style="color:var(--green)">—</div>
+                <div class="chart-hover-area" id="sys-net-rx-area" style="margin-top:6px">
+                  <div class="chart-wrap" id="sys-net-rx-chart" style="padding:6px 8px 2px"></div>
+                  <div class="chart-xhair" id="sys-net-rx-xhair" style="background:var(--green)"></div>
+                  <div class="chart-tip"   id="sys-net-rx-tip"></div>
+                </div>
+              </div>
+              <div class="net-metric">
+                <div class="sm-label">Upload</div>
+                <div class="net-speed" id="sys-net-tx-big" style="color:var(--cyan)">—</div>
+                <div class="chart-hover-area" id="sys-net-tx-area" style="margin-top:6px">
+                  <div class="chart-wrap" id="sys-net-tx-chart" style="padding:6px 8px 2px"></div>
+                  <div class="chart-xhair" id="sys-net-tx-xhair" style="background:var(--cyan)"></div>
+                  <div class="chart-tip"   id="sys-net-tx-tip"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="card fill">
@@ -822,15 +892,22 @@
           </div>
         </div>
         <div class="log-shell">
-          <div class="log-hdr">
-            <div class="log-title">
+          <div class="log-hdr" style="flex-wrap:wrap;gap:6px">
+            <div class="log-title" style="flex:1;min-width:120px">
               <span id="logs-modal-proc-name"
-                style="color:rgba(255,255,255,0.6);font-size:11px">No process
-                selected</span>
+                style="color:rgba(255,255,255,0.6);font-size:11px">No process selected</span>
               <span class="stdin-badge" id="stdin-badge" style="display:none">stdin</span>
             </div>
-            <span style="font-size:10.5px;color:rgba(255,255,255,0.35)">Live ·
-              Auto-scroll</span>
+            <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+              <div style="display:flex;gap:2px">
+                <button class="log-filter-btn active" data-stream="all"  onclick="setLogStream('all')">All</button>
+                <button class="log-filter-btn"        data-stream="out"  onclick="setLogStream('out')">Out</button>
+                <button class="log-filter-btn"        data-stream="err"  onclick="setLogStream('err')">Err</button>
+              </div>
+              <input class="log-search-input" id="log-search" placeholder="Filter…" oninput="reRenderModalLogs()" autocomplete="off" spellcheck="false">
+              <button class="log-filter-btn active" id="log-ts-btn" onclick="toggleLogTimestamps()" title="Toggle timestamps">⏱</button>
+              <span style="font-size:10.5px;color:rgba(255,255,255,0.28)">Live</span>
+            </div>
           </div>
           <div class="log-body" id="logs-modal-body">Select a process above to
             view logs…</div>
@@ -866,6 +943,27 @@
       </div>
     </div>
 
+    <!-- COLUMNS MODAL -->
+    <div class="modal-overlay" id="columns-modal">
+      <div class="modal" style="width:380px">
+        <div class="modal-hdr">
+          <div class="modal-title">⊞ Customize Columns</div>
+          <div class="modal-close" onclick="closeColumnsModal()">×</div>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:11.5px;color:var(--t3);margin-bottom:12px">Drag to reorder · toggle checkbox to show/hide</p>
+          <div id="columns-list"></div>
+          <div style="display:flex;gap:8px;margin-top:14px;justify-content:space-between">
+            <button class="btn sm" onclick="resetColumnsToDefault()" style="color:var(--t3)">↺ Reset</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn" onclick="closeColumnsModal()">Cancel</button>
+              <button class="btn primary" onclick="saveColumnsModal()">💾 Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -877,15 +975,44 @@ let issueFilter = 'all';
 let issueFilterProc = null;
 let configSchema = {};
 let configValues = {};
+
+// ── Table column config ────────────────────────────
+const DEFAULT_COLUMNS = [
+  { key: 'name',         label: 'Name',     visible: true  },
+  { key: 'status',       label: 'Status',   visible: true  },
+  { key: 'cpu',          label: 'CPU',      visible: true  },
+  { key: 'memory',       label: 'RAM',      visible: true  },
+  { key: 'netRx',        label: 'Net↓',     visible: true  },
+  { key: 'netTx',        label: 'Net↑',     visible: true  },
+  { key: 'connections',  label: 'Sockets',  visible: true  },
+  { key: 'uptime',       label: 'Uptime',   visible: true  },
+  { key: 'restartCount', label: 'Restarts', visible: true  },
+  { key: 'issues',       label: 'Issues',   visible: true  },
+  { key: 'id',           label: 'ID',       visible: false },
+  { key: 'pid',          label: 'PID',      visible: false },
+  { key: 'actions',      label: 'Actions',  visible: true,  locked: true },
+];
+let tableColumns = DEFAULT_COLUMNS.map(c => ({...c}));
+
 const procHistory = {};       // { name: { cpu: [], mem: [] } }
 const HISTORY_MAX = 90;       // 90 × 2 s = 3 minutes of data
+const netHistory  = { rx: [], tx: [] };
+const NET_HISTORY_MAX = 60;   // 60 × 3 s = 3 minutes of network data
 let statsModalName = null;
 let statsModalTimer = null;
+let editModalName = null;
+let editModalTimer = null;
 
 socket.on('init', data => {
   processes = data.processes || {};
   issues = data.issues || [];
-  renderProcesses(); renderIssues(); updateProcStats(); updateIssueStats();
+  if (data.prefs) { applyPrefs(data.prefs); applyColumns(); }
+  else { renderProcesses(); }
+  renderIssues(); updateProcStats(); updateIssueStats();
+});
+socket.on('prefs:update', prefs => {
+  applyPrefs(prefs);
+  applyColumns();
 });
 socket.on('process:update', proc => {
   processes[proc.name] = proc;
@@ -976,9 +1103,35 @@ function updateSysMetrics(data) {
     document.getElementById('sys-mem-detail').textContent = fmt(data.memory.used) + ' used · ' + fmt(data.memory.available ?? (data.memory.total - data.memory.used)) + ' available';
   }
   document.getElementById('sys-procs-big').textContent = running;
+  if (data.network) {
+    netHistory.rx.push(data.network.rxSec);
+    netHistory.tx.push(data.network.txSec);
+    if (netHistory.rx.length > NET_HISTORY_MAX) netHistory.rx.shift();
+    if (netHistory.tx.length > NET_HISTORY_MAX) netHistory.tx.shift();
+    _updateNetDisplay(data.network.rxSec, data.network.txSec);
+  }
+}
+function _updateNetDisplay(rxSec, txSec) {
+  const rx = fmtSpeed(rxSec), tx = fmtSpeed(txSec);
+  ['sys-net-rx','sys-net-rx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=rx; });
+  ['sys-net-tx','sys-net-tx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=tx; });
+  const rxChart = document.getElementById('sys-net-rx-chart');
+  const txChart = document.getElementById('sys-net-tx-chart');
+  const toKB = arr => arr.map(v => Math.round(v/1024));
+  const rxKB = toKB(netHistory.rx);
+  const txKB = toKB(netHistory.tx);
+  _statsData.sys_netrx = rxKB;
+  _statsData.sys_nettx = txKB;
+  if (rxChart) rxChart.innerHTML = renderChart(rxKB, 'var(--green)', 'netrx', ' KB/s');
+  if (txChart) txChart.innerHTML = renderChart(txKB, 'var(--cyan)',  'nettx', ' KB/s');
+  ['sys-net-rx-area','sys-net-tx-area'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el?._refreshTip) el._refreshTip();
+  });
 }
 function updateSysTab(data) {
   if (data.uptime) document.getElementById('sys-up-big').textContent = formatUptime(data.uptime);
+  if (data.network) _updateNetDisplay(data.network.rxSec, data.network.txSec);
   if (data.disk) document.getElementById('disk-list').innerHTML = data.disk.map(d => `
     <div style="padding:9px 14px;border-bottom:1px solid var(--border-sm)">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
@@ -1027,30 +1180,153 @@ function issueIndicatorCell(name) {
       transition:opacity 0.15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">${procIssues.length}</span>
   </td>`;
 }
+const COL_RENDERERS = {
+  name:         p => `<td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>`,
+  status:       p => `<td><span class="status-pill status-${p.status}">${p.status}</span></td>`,
+  cpu:          p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.cpu!=null?p.cpu+'%':'—'}</td>`,
+  memory:       p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.memory?p.memory+' MB':'—'}</td>`,
+  netRx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--green);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netRx!=null?fmtSpeed(p.netRx):'—'}</td>`,
+  netTx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--cyan);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netTx!=null?fmtSpeed(p.netTx):'—'}</td>`,
+  connections:  p => `<td class="mono stat-cell" title="View stats" style="color:var(--t3)" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.connections!=null?p.connections:'—'}</td>`,
+  uptime:       p => `<td class="mono">${formatUptime(p.uptime)}</td>`,
+  restartCount: p => `<td class="mono stat-cell" title="Click to reset to 0" onclick="event.stopPropagation();resetRestarts('${p.name}')">${p.restartCount}</td>`,
+  issues:       p => issueIndicatorCell(p.name),
+  id:           p => `<td class="mono" style="color:var(--t4)">${p.id}</td>`,
+  pid:          p => `<td class="mono" style="color:var(--t4)">${p.pid||'—'}</td>`,
+  actions:      p => `<td onclick="event.stopPropagation()">
+    <div class="proc-actions">
+      ${p.status==='running'||p.status==='starting'
+        ? `<button class="pab pab-stop"    onclick="procAction('stop','${p.name}')">■ Stop</button>`
+        : `<button class="pab pab-start"   onclick="procAction('start','${p.name}')">▶ Start</button>`}
+      <button class="pab pab-restart" onclick="procAction('restart','${p.name}')">↺ Restart</button>
+      <button class="pab pab-logs"    onclick="openLogsFor('${p.name}')">📋 Logs</button>
+      <button class="pab pab-issues"  onclick="openIssuesFor('${p.name}')">⚠ Issues</button>
+      <div class="sep"></div>
+      <button class="pab pab-gear"    onclick="openEditModal('${p.name}')" title="Edit settings">⚙</button>
+      <button class="pab pab-delete"  onclick="procAction('delete','${p.name}')">✕ Delete</button>
+    </div>
+  </td>`,
+};
 function procRowHTML(p) {
-  return `
-    <td class="mono" style="color:var(--t3)">${p.id}</td>
-    <td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>
-    <td><span class="status-pill status-${p.status}">${p.status}</span></td>
-    <td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.cpu!=null?p.cpu+'%':'—'}</td>
-    <td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.memory?p.memory+' MB':'—'}</td>
-    ${issueIndicatorCell(p.name)}
-    <td class="mono">${p.restartCount}</td>
-    <td class="mono">${formatUptime(p.uptime)}</td>
-    <td class="mono" style="color:var(--t4)">${p.pid||'—'}</td>
-    <td onclick="event.stopPropagation()">
-      <div class="proc-actions">
-        ${p.status==='running'||p.status==='starting'
-          ? `<button class="pab pab-stop"    onclick="procAction('stop','${p.name}')">■ Stop</button>`
-          : `<button class="pab pab-start"   onclick="procAction('start','${p.name}')">▶ Start</button>`}
-        <button class="pab pab-restart" onclick="procAction('restart','${p.name}')">↺ Restart</button>
-        <button class="pab pab-logs"    onclick="openLogsFor('${p.name}')">📋 Logs</button>
-        <button class="pab pab-issues"  onclick="openIssuesFor('${p.name}')">⚠ Issues</button>
-        <div class="sep"></div>
-        <button class="pab pab-gear"    onclick="openEditModal('${p.name}')" title="Edit settings">⚙</button>
-        <button class="pab pab-delete"  onclick="procAction('delete','${p.name}')">✕ Delete</button>
-      </div>
-    </td>`;
+  return tableColumns.filter(c => c.visible).map(c => {
+    const r = COL_RENDERERS[c.key];
+    return r ? r(p) : '';
+  }).join('');
+}
+// ── Column customization ──────────────────────────
+function applyPrefs(prefs) {
+  if (!prefs?.tableColumns) return;
+  const saved = prefs.tableColumns;
+  const result = [];
+  for (const col of saved) {
+    const def = DEFAULT_COLUMNS.find(c => c.key === col.key);
+    if (def) result.push({ ...def, visible: col.visible });
+  }
+  for (const def of DEFAULT_COLUMNS) {
+    if (!result.find(c => c.key === def.key)) result.push({ ...def });
+  }
+  tableColumns = result;
+}
+
+function applyColumns() {
+  const tr = document.querySelector('#proc-table thead tr');
+  if (tr) tr.innerHTML = tableColumns.filter(c => c.visible).map(c => `<th>${c.label}</th>`).join('');
+  renderProcesses();
+}
+
+let _dragSrc = null;
+function openColumnsModal() {
+  const list = document.getElementById('columns-list');
+  list.innerHTML = tableColumns.map(c => `
+    <div class="col-item" draggable="${!c.locked}" data-key="${c.key}">
+      <span class="col-drag" title="${c.locked ? '' : 'Drag to reorder'}" style="${c.locked ? 'opacity:0.2;cursor:default' : ''}">⠿</span>
+      <input type="checkbox" class="col-check" id="colchk-${c.key}" ${c.visible ? 'checked' : ''} ${c.locked ? 'disabled' : ''}>
+      <label class="col-lbl" for="colchk-${c.key}">${c.label}</label>
+      ${c.locked ? '<span class="col-locked">always shown</span>' : ''}
+    </div>`).join('');
+  _initColDrag();
+  document.getElementById('columns-modal').classList.add('open');
+}
+
+function closeColumnsModal() {
+  document.getElementById('columns-modal').classList.remove('open');
+}
+
+function _initColDrag() {
+  const list = document.getElementById('columns-list');
+  list.querySelectorAll('.col-item[draggable="true"]').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      _dragSrc = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      list.querySelectorAll('.col-item').forEach(i => i.classList.remove('drag-over'));
+      _dragSrc = null;
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (_dragSrc && _dragSrc !== item) {
+        list.querySelectorAll('.col-item').forEach(i => i.classList.remove('drag-over'));
+        item.classList.add('drag-over');
+      }
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      if (_dragSrc && _dragSrc !== item) {
+        const items = [...list.querySelectorAll('.col-item')];
+        const srcIdx = items.indexOf(_dragSrc);
+        const dstIdx = items.indexOf(item);
+        if (srcIdx < dstIdx) item.after(_dragSrc);
+        else item.before(_dragSrc);
+      }
+    });
+  });
+}
+
+function saveColumnsModal() {
+  const items = document.querySelectorAll('#columns-list .col-item');
+  tableColumns = Array.from(items).map(item => {
+    const key = item.dataset.key;
+    const chk = item.querySelector('.col-check');
+    const def = DEFAULT_COLUMNS.find(c => c.key === key);
+    return { key, label: def ? def.label : key, visible: chk ? chk.checked : true, locked: def?.locked };
+  });
+  applyColumns();
+  savePrefsToServer();
+  toast('Columns saved', 'success');
+  closeColumnsModal();
+}
+
+function resetColumnsToDefault() {
+  tableColumns = DEFAULT_COLUMNS.map(c => ({...c}));
+  openColumnsModal();
+  applyColumns();
+  savePrefsToServer();
+  toast('Reset to default', 'success');
+}
+
+async function savePrefsToServer() {
+  try {
+    await fetch('/api/prefs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableColumns }),
+    });
+  } catch {}
+}
+
+async function resetRestarts(name) {
+  try {
+    const r = await fetch(`/api/processes/${encodeURIComponent(name)}/reset-restarts`, { method: 'POST' });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'error'); return; }
+    toast(`"${name}" restarts reset`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 async function procAction(action, name) {
   const methods = {stop:'POST',restart:'POST',delete:'DELETE',start:'POST'};
@@ -1123,11 +1399,14 @@ function openLogsFor(name) {
 function closeLogsModal() {
   document.getElementById('logs-modal').classList.remove('open');
   modalLogProcess = null;
+  modalLogLines.length = 0;
   document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
   document.getElementById('logs-modal-title-name').textContent = 'Logs';
   document.getElementById('stdin-bar').style.display   = 'none';
   document.getElementById('stdin-badge').style.display = 'none';
   document.getElementById('stdin-input').value = '';
+  const searchEl = document.getElementById('log-search');
+  if (searchEl) searchEl.value = '';
 }
 async function loadModalLogs() {
   const name = document.getElementById('logs-modal-select').value;
@@ -1138,26 +1417,72 @@ async function loadModalLogs() {
   updateStdinBar();
   const body = document.getElementById('logs-modal-body');
   body.textContent = 'Loading…';
+  modalLogLines.length = 0;
   try {
     const r = await fetch(`/api/logs/${name}?lines=200`);
     const d = await r.json();
-    body.innerHTML = '';
-    const lines = (d.out+'\n'+d.err).split('\n').filter(Boolean).sort();
-    lines.forEach(line => appendModalLog(line, line.includes('[ERR]')?'err':'out'));
-    body.scrollTop = body.scrollHeight;
+    // Merge out + err, preserving type, sorted by timestamp prefix
+    const outLines = d.out ? d.out.split('\n').filter(Boolean).map(l => ({ line: l, type: 'out' })) : [];
+    const errLines = d.err ? d.err.split('\n').filter(Boolean).map(l => ({ line: l, type: 'err' })) : [];
+    const merged = [...outLines, ...errLines].sort((a, b) => a.line.localeCompare(b.line));
+    modalLogLines.push(...merged);
+    reRenderModalLogs();
   } catch(e) { body.textContent = 'Error: ' + e.message; }
 }
-function appendModalLog(line, type) {
+function appendModalLog(line, type, skipBuffer) {
+  if (!skipBuffer) {
+    modalLogLines.push({ line, type });
+    if (modalLogLines.length > 600) modalLogLines.shift();
+  }
+  // Check filters before appending to DOM
+  if (logStream !== 'all' && type !== logStream && type !== 'stdin') return;
+  const search = document.getElementById('log-search')?.value.toLowerCase() || '';
+  const displayLine = logShowTimestamps ? line : line.replace(LOG_TS_RE, '');
+  if (search && !displayLine.toLowerCase().includes(search)) return;
+  _appendLogSpan(displayLine, type);
+}
+
+function _appendLogSpan(displayLine, type) {
   const body = document.getElementById('logs-modal-body');
   const span = document.createElement('span');
   span.className = type === 'err' ? 'log-err' : 'log-out';
   if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
-  span.textContent = line + '\n';
+  span.textContent = displayLine + '\n';
   body.appendChild(span);
   while(body.children.length > 500) body.removeChild(body.firstChild);
   body.scrollTop = body.scrollHeight;
 }
-function clearModalLogView() { document.getElementById('logs-modal-body').innerHTML = ''; }
+
+function reRenderModalLogs() {
+  const body = document.getElementById('logs-modal-body');
+  const search = document.getElementById('log-search')?.value.toLowerCase() || '';
+  body.innerHTML = '';
+  for (const { line, type } of modalLogLines) {
+    if (logStream !== 'all' && type !== logStream && type !== 'stdin') continue;
+    const displayLine = logShowTimestamps ? line : line.replace(LOG_TS_RE, '');
+    if (search && !displayLine.toLowerCase().includes(search)) continue;
+    _appendLogSpan(displayLine, type);
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+function setLogStream(stream) {
+  logStream = stream;
+  document.querySelectorAll('.log-filter-btn[data-stream]').forEach(b =>
+    b.classList.toggle('active', b.dataset.stream === stream));
+  reRenderModalLogs();
+}
+
+function toggleLogTimestamps() {
+  logShowTimestamps = !logShowTimestamps;
+  document.getElementById('log-ts-btn').classList.toggle('active', logShowTimestamps);
+  reRenderModalLogs();
+}
+
+function clearModalLogView() {
+  modalLogLines.length = 0;
+  document.getElementById('logs-modal-body').innerHTML = '';
+}
 
 // ── Issues ────────────────────────────────────────
 function openIssuesFor(name) { issueFilterProc=name; setIssueFilter('proc'); switchTab('issues'); }
@@ -1398,31 +1723,67 @@ function formatUptime(s) {
 }
 function formatDate(iso) { return new Date(iso).toLocaleString(); }
 function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
+function fmtSpeed(bps) { if(!bps) return '0 B/s'; if(bps>=1048576) return (bps/1048576).toFixed(1)+' MB/s'; if(bps>=1024) return (bps/1024).toFixed(0)+' KB/s'; return bps+' B/s'; }
 function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Log filter state ──────────────────────────────
+const modalLogLines = [];     // { line, type } buffer of all loaded/live lines
+let logStream = 'all';        // 'all' | 'out' | 'err'
+let logShowTimestamps = true;
+const LOG_TS_RE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]\s*/;
 
 // ── History recording ─────────────────────────────
 function recordHistory(proc) {
-  if (!procHistory[proc.name]) procHistory[proc.name] = { cpu: [], mem: [] };
+  if (!procHistory[proc.name]) procHistory[proc.name] = { cpu: [], mem: [], conn: [], netRx: [], netTx: [] };
   const h = procHistory[proc.name];
-  if (proc.cpu != null)    { h.cpu.push(proc.cpu);    if (h.cpu.length > HISTORY_MAX) h.cpu.shift(); }
-  if (proc.memory != null) { h.mem.push(proc.memory); if (h.mem.length > HISTORY_MAX) h.mem.shift(); }
+  if (proc.cpu != null)         { h.cpu.push(proc.cpu);         if (h.cpu.length > HISTORY_MAX) h.cpu.shift(); }
+  if (proc.memory != null)      { h.mem.push(proc.memory);      if (h.mem.length > HISTORY_MAX) h.mem.shift(); }
+  if (proc.connections != null) { h.conn.push(proc.connections); if (h.conn.length > HISTORY_MAX) h.conn.shift(); }
+  if (proc.netRx != null)       { h.netRx.push(proc.netRx);     if (h.netRx.length > HISTORY_MAX) h.netRx.shift(); }
+  if (proc.netTx != null)       { h.netTx.push(proc.netTx);     if (h.netTx.length > HISTORY_MAX) h.netTx.shift(); }
 }
 
 // ── SVG sparkline chart ───────────────────────────
-function renderChart(values, color) {
-  const W = 680, H = 72;
-  if (!values.length) return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block"><text x="${W/2}" y="${H/2+4}" text-anchor="middle" fill="var(--t4)" font-size="12" font-family="Inter,sans-serif">No data yet — waiting for stats…</text></svg>`;
+function _smoothPath(pts) {
+  if (pts.length < 2) return `M${pts[0].x},${pts[0].y}`;
+  let d = `M${pts[0].x},${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[Math.max(0, i-2)], p1 = pts[i-1], p2 = pts[i], p3 = pts[Math.min(pts.length-1, i+1)];
+    const cp1x = (p1.x + (p2.x-p0.x)/6).toFixed(1), cp1y = (p1.y + (p2.y-p0.y)/6).toFixed(1);
+    const cp2x = (p2.x - (p3.x-p1.x)/6).toFixed(1), cp2y = (p2.y - (p3.y-p1.y)/6).toFixed(1);
+    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  return d;
+}
+
+function renderChart(values, color, chartId, unit, chartH) {
+  const W = 660, H = chartH || 84, PAD_R = 36, PAD_T = 6, PAD_B = 6;
+  const cW = W - PAD_R;
+  unit = unit || '';
+  if (!values.length) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
+    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
   const max = Math.max(...values, 1);
-  const pts = values.map((v, i) => {
-    const x = Math.round((i / Math.max(values.length - 1, 1)) * W);
-    const y = Math.round(H - (v / max) * (H - 6) - 3);
-    return `${x},${y}`;
-  });
-  const line = pts.join(' ');
-  const area = `0,${H} ${line} ${W},${H}`;
-  return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">
-    <polygon points="${area}" fill="${color}" opacity="0.14"/>
-    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  const pts = values.map((v, i) => ({
+    x: Math.round((i / Math.max(values.length-1, 1)) * cW),
+    y: Math.round(H - PAD_B - (v/max) * (H-PAD_T-PAD_B)),
+  }));
+  const linePath = _smoothPath(pts);
+  const areaPath = linePath + ` L${pts[pts.length-1].x},${H-PAD_B} L${pts[0].x},${H-PAD_B} Z`;
+  const gid = `cg_${chartId}`;
+  const gridSvg = [0.25, 0.5, 0.75, 1].map(p => {
+    const y = Math.round(H - PAD_B - p*(H-PAD_T-PAD_B));
+    const lbl = Math.round(max*p) + unit;
+    return `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>
+<text x="${cW+4}" y="${y+3.5}" font-size="8" style="fill:var(--t4)" font-family="Inter,sans-serif">${lbl}</text>`;
+  }).join('');
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+    </linearGradient></defs>
+    ${gridSvg}
+    <path d="${areaPath}" fill="url(#${gid})"/>
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
 }
 
@@ -1446,25 +1807,69 @@ function closeStatsModal() {
 
 function _buildStatsModal() {
   document.getElementById('stats-modal-body').innerHTML = `
-    <div class="chart-block">
-      <div class="chart-label">CPU <span class="cur" id="sm-cpu-cur">—</span><span id="sm-cpu-peak" style="font-size:10.5px;color:var(--t3);margin-left:8px"></span></div>
-      <div class="chart-hover-area" id="sm-cpu-area">
-        <div class="chart-wrap" id="sm-cpu-wrap"></div>
-        <div class="chart-xhair" id="sm-cpu-xhair" style="background:var(--accent)"></div>
-        <div class="chart-tip"   id="sm-cpu-tip"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">CPU
+          <span class="cur" id="sm-cpu-cur">—</span>
+          <span class="chart-stats" id="sm-cpu-stats"></span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">tap to pin · 3 min</span>
+        </div>
+        <div class="chart-hover-area" id="sm-cpu-area">
+          <div class="chart-wrap" id="sm-cpu-wrap"></div>
+          <div class="chart-xhair" id="sm-cpu-xhair" style="background:var(--accent)"></div>
+          <div class="chart-tip"   id="sm-cpu-tip"></div>
+        </div>
+      </div>
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">RAM
+          <span class="cur" id="sm-mem-cur">—</span>
+          <span class="chart-stats" id="sm-mem-stats"></span>
+        </div>
+        <div class="chart-hover-area" id="sm-mem-area">
+          <div class="chart-wrap" id="sm-mem-wrap"></div>
+          <div class="chart-xhair" id="sm-mem-xhair" style="background:var(--accent2)"></div>
+          <div class="chart-tip"   id="sm-mem-tip"></div>
+        </div>
       </div>
     </div>
-    <div class="chart-block">
-      <div class="chart-label">RAM <span class="cur" id="sm-mem-cur">—</span><span id="sm-mem-peak" style="font-size:10.5px;color:var(--t3);margin-left:8px"></span></div>
-      <div class="chart-hover-area" id="sm-mem-area">
-        <div class="chart-wrap" id="sm-mem-wrap"></div>
-        <div class="chart-xhair" id="sm-mem-xhair" style="background:var(--accent2)"></div>
-        <div class="chart-tip"   id="sm-mem-tip"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div>
+        <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Connections
+          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1)" id="sm-conn-cur">—</span>
+        </div>
+        <div class="chart-hover-area" id="sm-conn-area">
+          <div class="chart-wrap" id="sm-conn-wrap"></div>
+          <div class="chart-xhair" id="sm-conn-xhair" style="background:var(--green)"></div>
+          <div class="chart-tip"   id="sm-conn-tip"></div>
+        </div>
+      </div>
+      <div>
+        <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↓
+          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--green)" id="sm-net-rx">—</span>
+        </div>
+        <div class="chart-hover-area" id="sm-netrx-area">
+          <div class="chart-wrap" id="sm-netrx-wrap"></div>
+          <div class="chart-xhair" id="sm-netrx-xhair" style="background:var(--green)"></div>
+          <div class="chart-tip"   id="sm-netrx-tip"></div>
+        </div>
+      </div>
+      <div>
+        <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↑
+          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--cyan)" id="sm-net-tx">—</span>
+        </div>
+        <div class="chart-hover-area" id="sm-nettx-area">
+          <div class="chart-wrap" id="sm-nettx-wrap"></div>
+          <div class="chart-xhair" id="sm-nettx-xhair" style="background:var(--cyan)"></div>
+          <div class="chart-tip"   id="sm-nettx-tip"></div>
+        </div>
       </div>
     </div>
-    <div class="stat-grid" id="sm-kv"></div>`;
-  _attachChartHover('sm-cpu-area', 'sm-cpu-xhair', 'sm-cpu-tip', 'cpu', '%');
-  _attachChartHover('sm-mem-area', 'sm-mem-xhair', 'sm-mem-tip', 'mem', ' MB');
+    <div class="stat-grid" id="sm-kv" style="grid-template-columns:repeat(3,1fr);gap:6px 14px"></div>`;
+  _attachChartHover('sm-cpu-area',   'sm-cpu-xhair',   'sm-cpu-tip',   'cpu',   '%');
+  _attachChartHover('sm-mem-area',   'sm-mem-xhair',   'sm-mem-tip',   'mem',   ' MB');
+  _attachChartHover('sm-conn-area',  'sm-conn-xhair',  'sm-conn-tip',  'conn',  '');
+  _attachChartHover('sm-netrx-area', 'sm-netrx-xhair', 'sm-netrx-tip', 'netrx', ' KB/s');
+  _attachChartHover('sm-nettx-area', 'sm-nettx-xhair', 'sm-nettx-tip', 'nettx', ' KB/s');
 }
 
 function _attachChartHover(areaId, xhairId, tipId, key, unit) {
@@ -1472,73 +1877,180 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   const xhair = document.getElementById(xhairId);
   const tip   = document.getElementById(tipId);
   if (!area) return;
-  area.addEventListener('mousemove', e => {
-    const rect = area.getBoundingClientRect();
-    const x    = e.clientX - rect.left;
-    const pct  = Math.max(0, Math.min(1, x / rect.width));
+  let lockedPct = null;
+
+  function showAt(pct) {
     const data = _statsData[key] || [];
     if (!data.length) return;
-    const idx = Math.min(Math.round(pct * (data.length - 1)), data.length - 1);
+    const rect = area.getBoundingClientRect();
+    const x = pct * rect.width;
+    const idx = Math.min(Math.round(pct * (data.length-1)), data.length-1);
+    xhair.style.left = x + 'px';
     xhair.style.display = 'block';
-    xhair.style.left    = x + 'px';
-    tip.style.display   = 'block';
-    tip.textContent     = data[idx] + unit;
-    // Centre tooltip on the crosshair, keep it within bounds
-    const half = tip.offsetWidth / 2;
-    tip.style.left = Math.max(4, Math.min(x - half, rect.width - tip.offsetWidth - 4)) + 'px';
+    xhair.classList.toggle('locked', lockedPct !== null);
+    tip.style.display = 'block';
+    tip.textContent = data[idx] + unit;
+    tip.classList.toggle('locked', lockedPct !== null);
+    requestAnimationFrame(() => {
+      const half = tip.offsetWidth / 2;
+      tip.style.left = Math.max(4, Math.min(x - half, rect.width - tip.offsetWidth - 4)) + 'px';
+    });
+  }
+
+  // Called every tick to refresh value at locked position
+  area._refreshTip = () => { if (lockedPct !== null) showAt(lockedPct); };
+
+  // Mouse hover preview (not locked)
+  area.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;
+    if (lockedPct !== null) return;
+    const rect = area.getBoundingClientRect();
+    showAt(Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width)));
   });
-  area.addEventListener('mouseleave', () => {
+
+  area.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'touch') return;
+    if (lockedPct !== null) return;
     xhair.style.display = 'none';
-    tip.style.display   = 'none';
+    tip.style.display = 'none';
   });
+
+  // Click or touch to lock/move position
+  area.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const rect = area.getBoundingClientRect();
+    lockedPct = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+    showAt(lockedPct);
+  }, { passive: false });
 }
 
 function _tickStatsModal() {
   const name = statsModalName;
   if (!name) return;
   const proc = processes[name];
-  const h    = procHistory[name] || { cpu: [], mem: [] };
-  _statsData = { cpu: h.cpu, mem: h.mem };
-
-  const cpuCur = proc && proc.cpu != null ? proc.cpu + '%' : '—';
-  const memCur = proc && proc.memory      ? proc.memory + ' MB' : '—';
-  const cpuMax = h.cpu.length ? Math.max(...h.cpu).toFixed(1) + '%' : '';
-  const memMax = h.mem.length ? Math.max(...h.mem) + ' MB' : '';
+  const h    = procHistory[name] || { cpu: [], mem: [], conn: [] };
 
   const setCur  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML  = v; };
 
-  setCur ('sm-cpu-cur',  cpuCur);
-  setCur ('sm-mem-cur',  memCur);
-  setCur ('sm-cpu-peak', cpuMax ? `peak ${cpuMax} · 3 min` : '');
-  setCur ('sm-mem-peak', memMax ? `peak ${memMax} · 3 min` : '');
-  setHTML('sm-cpu-wrap', renderChart(h.cpu, 'var(--accent)'));
-  setHTML('sm-mem-wrap', renderChart(h.mem, 'var(--accent2)'));
+  const cpuCur  = proc?.cpu != null        ? proc.cpu + '%'        : '—';
+  const memCur  = proc?.memory             ? proc.memory + ' MB'   : '—';
+  const connCur = proc?.connections != null ? proc.connections + ' sockets' : '—';
+
+  function chartStats(arr, unit) {
+    if (!arr.length) return '';
+    const mn = Math.min(...arr).toFixed(unit==='%'?1:0);
+    const mx = Math.max(...arr).toFixed(unit==='%'?1:0);
+    const av = (arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(unit==='%'?1:0);
+    return `min ${mn}${unit} · avg ${av}${unit} · max ${mx}${unit}`;
+  }
+
+  const connArr  = h.conn  || [];
+  const netRxKB  = (h.netRx || []).map(v => Math.round(v/1024));
+  const netTxKB  = (h.netTx || []).map(v => Math.round(v/1024));
+  const latestRx = h.netRx?.length ? h.netRx[h.netRx.length-1] : 0;
+  const latestTx = h.netTx?.length ? h.netTx[h.netTx.length-1] : 0;
+
+  _statsData = { cpu: h.cpu, mem: h.mem, conn: connArr, netrx: netRxKB, nettx: netTxKB };
+
+  setCur ('sm-cpu-cur',    cpuCur);
+  setCur ('sm-mem-cur',    memCur);
+  setCur ('sm-conn-cur',   connCur);
+  setCur ('sm-cpu-stats',  chartStats(h.cpu, '%'));
+  setCur ('sm-mem-stats',  chartStats(h.mem, ' MB'));
+  setCur ('sm-conn-stats', chartStats(connArr, ''));
+  setCur ('sm-net-rx',     fmtSpeed(latestRx));
+  setCur ('sm-net-tx',     fmtSpeed(latestTx));
+  setHTML('sm-cpu-wrap',   renderChart(h.cpu,   'var(--accent)',  'cpu_sm',   '%'));
+  setHTML('sm-mem-wrap',   renderChart(h.mem,   'var(--accent2)', 'mem_sm',   ' MB'));
+  setHTML('sm-conn-wrap',  renderChart(connArr, 'var(--green)',   'conn_sm',  '',      56));
+  setHTML('sm-netrx-wrap', renderChart(netRxKB, 'var(--green)',   'netrx_sm', ' KB/s', 56));
+  setHTML('sm-nettx-wrap', renderChart(netTxKB, 'var(--cyan)',    'nettx_sm', ' KB/s', 56));
+
+  // Refresh all pinned tooltip values after chart re-render
+  ['sm-cpu-area','sm-mem-area','sm-conn-area','sm-netrx-area','sm-nettx-area'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el?._refreshTip) el._refreshTip();
+  });
 
   if (!proc) return;
-  setCur('sm-kv', ''); // handled via innerHTML below
+
+  const envEntries = proc.env && typeof proc.env === 'object' ? Object.entries(proc.env) : [];
+  const envHtml = envEntries.length
+    ? `<div style="grid-column:1/-1;margin-top:2px">
+        <div class="stat-kv-label">Environment</div>
+        <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
+          ${envEntries.map(([k,v])=>`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;background:var(--g2);border:1px solid var(--border-sm);border-radius:4px;padding:1px 6px;color:var(--t2)">${escapeHtml(k)}=<span style="color:var(--accent)">${escapeHtml(String(v))}</span></span>`).join('')}
+        </div>
+      </div>`
+    : '';
+
   setHTML('sm-kv', `
     <div><div class="stat-kv-label">Status</div><div class="stat-kv-val"><span class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span></div></div>
     <div><div class="stat-kv-label">PID</div><div class="stat-kv-val">${proc.pid || '—'}</div></div>
     <div><div class="stat-kv-label">Uptime</div><div class="stat-kv-val">${formatUptime(proc.uptime)}</div></div>
-    <div><div class="stat-kv-label">Restarts</div><div class="stat-kv-val">${proc.restartCount}</div></div>
+    <div><div class="stat-kv-label">Restarts</div><div class="stat-kv-val">${proc.restartCount} / ${proc.maxRestarts === -1 ? '∞' : proc.maxRestarts}</div></div>
     <div><div class="stat-kv-label">Auto-restart</div><div class="stat-kv-val">${proc.autorestart ? 'Yes' : 'No'}</div></div>
-    <div><div class="stat-kv-label">Max Restarts</div><div class="stat-kv-val">${proc.maxRestarts}</div></div>
     <div><div class="stat-kv-label">Memory Limit</div><div class="stat-kv-val">${proc.memoryLimit ? proc.memoryLimit + ' MB' : '—'}</div></div>
+    <div><div class="stat-kv-label">Connections</div><div class="stat-kv-val">${proc.connections != null ? proc.connections + ' sockets' : '—'}</div></div>
     <div><div class="stat-kv-label">Issues</div><div class="stat-kv-val">${issueCountForProc(name)}</div></div>
+    <div><div class="stat-kv-label">Net I/O</div><div class="stat-kv-val" style="font-size:10.5px;color:var(--t3)">↓ <span style="color:var(--green)">${fmtSpeed(latestRx)}</span> · ↑ <span style="color:var(--cyan)">${fmtSpeed(latestTx)}</span></div></div>
     <div style="grid-column:1/-1"><div class="stat-kv-label">Script</div><div class="stat-kv-val">${escapeHtml(proc.script || '—')}</div></div>
     <div style="grid-column:1/-1"><div class="stat-kv-label">Working Dir</div><div class="stat-kv-val">${escapeHtml(proc.cwd || '—')}</div></div>
-    <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>`);
+    <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>
+    ${envHtml}`);
 }
 
 // ── Edit modal ────────────────────────────────────
+function _tickEditModal() {
+  const name = editModalName;
+  if (!name) return;
+  const proc = processes[name];
+  if (!proc) return;
+  const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const statusEl = document.getElementById('els-status');
+  if (statusEl) { statusEl.textContent = proc.status; statusEl.className = `status-pill status-${proc.status}`; statusEl.style.fontSize = '10px'; }
+  s('els-cpu',   proc.cpu != null    ? proc.cpu + '%'       : '—');
+  s('els-mem',   proc.memory         ? proc.memory + ' MB'  : '—');
+  s('els-netrx', proc.netRx != null  ? fmtSpeed(proc.netRx) : '—');
+  s('els-nettx', proc.netTx != null  ? fmtSpeed(proc.netTx) : '—');
+  s('els-conn',  proc.connections != null ? proc.connections : '—');
+}
+
 function openEditModal(name) {
   const proc = processes[name];
   if (!proc) return;
+  editModalName = name;
   document.getElementById('edit-modal-title').textContent = `Edit — ${name}`;
   const body = document.getElementById('edit-modal-body');
   const arOn = proc.autorestart !== false;
   body.innerHTML = `
+    <div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 16px 12px;margin:-16px -16px 16px;background:var(--g3);border-bottom:1px solid var(--border-sm);border-radius:var(--r) var(--r) 0 0">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Status</span>
+        <span id="els-status" class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">CPU</span>
+        <span id="els-cpu" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)">${proc.cpu != null ? proc.cpu + '%' : '—'}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">RAM</span>
+        <span id="els-mem" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent2)">${proc.memory ? proc.memory + ' MB' : '—'}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Net ↓</span>
+        <span id="els-netrx" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green)">${proc.netRx != null ? fmtSpeed(proc.netRx) : '—'}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Net ↑</span>
+        <span id="els-nettx" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--cyan)">${proc.netTx != null ? fmtSpeed(proc.netTx) : '—'}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Sockets</span>
+        <span id="els-conn" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--t2)">${proc.connections != null ? proc.connections : '—'}</span>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-label">Name</label>
       <input class="form-input" id="edit-name" value="${escapeHtml(proc.name)}" />
@@ -1556,9 +2068,9 @@ function openEditModal(name) {
     <div class="form-group">
       <label class="form-label" style="margin-bottom:8px">Auto-restart</label>
       <div class="cfg-toggle" onclick="toggleEditAr()">
-        <input type="checkbox" id="edit-autorestart" ${arOn?'checked':''} style="display:none">
-        <div class="toggle-track ${arOn?'on':''}" id="edit-ar-track"><div class="toggle-knob"></div></div>
-        <span class="toggle-label" id="edit-ar-label">${arOn?'Enabled':'Disabled'}</span>
+        <input type="checkbox" id="edit-autorestart" ${arOn ? 'checked' : ''} style="display:none">
+        <div class="toggle-track ${arOn ? 'on' : ''}" id="edit-ar-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label" id="edit-ar-label">${arOn ? 'Enabled' : 'Disabled'}</span>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
@@ -1568,6 +2080,7 @@ function openEditModal(name) {
   body.querySelector('#edit-save-btn').addEventListener('click', () => saveEdit(name));
   document.getElementById('edit-modal').classList.add('open');
   document.getElementById('edit-name').focus();
+  editModalTimer = setInterval(_tickEditModal, 2000);
 }
 function toggleEditAr() {
   const cb = document.getElementById('edit-autorestart');
@@ -1577,6 +2090,9 @@ function toggleEditAr() {
 }
 function closeEditModal() {
   document.getElementById('edit-modal').classList.remove('open');
+  clearInterval(editModalTimer);
+  editModalTimer = null;
+  editModalName = null;
 }
 async function saveEdit(originalName) {
   const newName     = document.getElementById('edit-name').value.trim();
@@ -1619,6 +2135,7 @@ document.getElementById('issue-modal').addEventListener('click',e=>{if(e.target=
 document.getElementById('logs-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLogsModal();});
 document.getElementById('stats-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStatsModal();});
 document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
+document.getElementById('columns-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeColumnsModal();});
 document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
 document.getElementById('stdin-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); sendStdinCmd(); return; }
@@ -1636,6 +2153,10 @@ document.getElementById('stdin-input').addEventListener('keydown', e => {
     else { stdinHistoryIdx = -1; document.getElementById('stdin-input').value = ''; }
   }
 });
+
+// ── System network chart hover (static DOM — attach once) ─────────────────
+_attachChartHover('sys-net-rx-area', 'sys-net-rx-xhair', 'sys-net-rx-tip', 'sys_netrx', ' KB/s');
+_attachChartHover('sys-net-tx-area', 'sys-net-tx-xhair', 'sys-net-tx-tip', 'sys_nettx', ' KB/s');
 
 // ── Theme ─────────────────────────────────────────
 function applyTheme(theme) {

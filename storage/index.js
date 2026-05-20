@@ -86,12 +86,23 @@ function clearLog(name) {
   });
 }
 
+// --- Dashboard prefs ---
+function loadPrefs() {
+  return readJSON(PATHS.prefs, {});
+}
+
+function savePrefs(prefs) {
+  writeJSON(PATHS.prefs, prefs);
+}
+
 module.exports = {
   ensureHome,
   loadProcesses,
   saveProcesses,
   loadIssues,
   saveIssues,
+  loadPrefs,
+  savePrefs,
   getLogPath,
   appendLog,
   readLog,

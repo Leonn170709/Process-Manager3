@@ -14,6 +14,9 @@ const issueTracker = require('../issues');
 // In-memory process map: id -> { proc, config, stats, watcher }
 const runtime = {};
 
+// Previous /proc/<pid>/io snapshots for computing per-process network delta
+const prevProcIO = {}; // { pid: { rchar, wchar, read_bytes, write_bytes, ts } }
+
 // Event emitter for broadcasting to dashboard
 let _emitter = null;
 function setEmitter(emitter) { _emitter = emitter; }
@@ -149,21 +152,28 @@ function _spawnProcess(procRecord) {
     _handleCrash(procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
   });
 
-  // Log stdout
+  // Log stdout — split chunks so every output line gets its own timestamp
   child.stdout.on('data', data => {
-    const line = `[${new Date().toISOString()}] ${data.toString().trimEnd()}`;
-    storage.appendLog(name, 'out', line);
-    emit('log', { name, line, type: 'out' });
+    const ts = new Date().toISOString();
+    data.toString().trimEnd().split('\n').forEach(rawLine => {
+      if (!rawLine) return;
+      const line = `[${ts}] ${rawLine}`;
+      storage.appendLog(name, 'out', line);
+      emit('log', { name, line, type: 'out' });
+    });
   });
 
   // Log stderr
   child.stderr.on('data', data => {
-    const line = `[${new Date().toISOString()}] [ERR] ${data.toString().trimEnd()}`;
-    storage.appendLog(name, 'err', line);
-    emit('log', { name, line, type: 'err' });
-
-    // Detect error patterns
+    const ts = new Date().toISOString();
     const text = data.toString();
+    text.trimEnd().split('\n').forEach(rawLine => {
+      if (!rawLine) return;
+      const line = `[${ts}] [ERR] ${rawLine}`;
+      storage.appendLog(name, 'err', line);
+      emit('log', { name, line, type: 'err' });
+    });
+    // Detect error patterns
     if (text.includes('Error:') || text.includes('Exception') || text.includes('FATAL')) {
       _captureIssue(name, text, SEVERITY.ERROR);
     }
@@ -314,6 +324,7 @@ function restartProcess(name) {
   setTimeout(() => {
     const latest = storage.loadProcesses();
     if (latest[name]) {
+      latest[name].restartCount = (latest[name].restartCount || 0) + 1;
       latest[name].status = STATUS.RESTARTING;
       storage.saveProcesses(latest);
       _spawnProcess(latest[name]);
@@ -366,6 +377,50 @@ async function updateStats() {
         procs[name].memory = Math.round(s.memory / 1024 / 1024);
         procs[name].uptime = s.elapsed ? Math.floor(s.elapsed / 1000) : 0;
         changed = true;
+      }
+    }
+
+    // Per-process metrics from /proc/<pid>/ (Linux only)
+    if (process.platform === 'linux') {
+      for (const [name, r] of Object.entries(runtime)) {
+        if (!r.proc?.pid || !procs[name]) continue;
+        const pid = r.proc.pid;
+
+        // Socket count
+        try {
+          const fds = fs.readdirSync(`/proc/${pid}/fd`);
+          let sockets = 0;
+          for (const fd of fds) {
+            try { if (fs.readlinkSync(`/proc/${pid}/fd/${fd}`).startsWith('socket:')) sockets++; } catch {}
+          }
+          procs[name].connections = sockets;
+          changed = true;
+        } catch {}
+
+        // Network I/O via /proc/<pid>/io:
+        // rchar/wchar = total read/write syscall bytes (disk + network + pipes)
+        // read_bytes/write_bytes = actual disk bytes only
+        // => (rchar - read_bytes) ≈ network+pipe RX  |  (wchar - write_bytes) ≈ network+pipe TX
+        try {
+          const io = {};
+          fs.readFileSync(`/proc/${pid}/io`, 'utf8').split('\n').forEach(line => {
+            const [k, v] = line.split(': ');
+            if (k && v !== undefined) io[k.trim()] = parseInt(v.trim()) || 0;
+          });
+          const now = Date.now();
+          const prev = prevProcIO[pid];
+          if (prev) {
+            const dt = (now - prev.ts) / 1000;
+            if (dt >= 0.5) {
+              const rxDelta = Math.max(0, (io.rchar - prev.rchar) - (io.read_bytes - prev.read_bytes));
+              const txDelta = Math.max(0, (io.wchar - prev.wchar) - (io.write_bytes - prev.write_bytes));
+              procs[name].netRx = Math.round(rxDelta / dt);
+              procs[name].netTx = Math.round(txDelta / dt);
+              changed = true;
+            }
+          }
+          prevProcIO[pid] = { rchar: io.rchar, wchar: io.wchar, read_bytes: io.read_bytes, write_bytes: io.write_bytes, ts: Date.now() };
+        } catch {}
       }
     }
 
@@ -448,6 +503,15 @@ function sendStdin(name, data) {
   }
 }
 
+function resetRestartCount(name) {
+  const procs = storage.loadProcesses();
+  if (!procs[name]) return { error: `Process "${name}" not found` };
+  procs[name].restartCount = 0;
+  storage.saveProcesses(procs);
+  emit('process:update', procs[name]);
+  return procs[name];
+}
+
 module.exports = {
   setEmitter,
   startProcess,
@@ -461,4 +525,5 @@ module.exports = {
   resolveProcess,
   updateProcess,
   sendStdin,
+  resetRestartCount,
 };
