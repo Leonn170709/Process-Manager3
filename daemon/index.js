@@ -56,7 +56,19 @@ emitter.on('process:update', data => io.emit('process:update', data));
 emitter.on('process:delete', data => io.emit('process:delete', data));
 emitter.on('stats:update', data => io.emit('stats:update', data));
 emitter.on('issue:new', data => io.emit('issue:new', data));
-emitter.on('log', data => io.emit('log', data));
+// Batch log lines into a single Socket.IO event per 50 ms window to prevent
+// flooding the WebSocket when a process outputs at high speed.
+const _logBatch = [];
+let _logTimer = null;
+emitter.on('log', data => {
+  _logBatch.push(data);
+  if (!_logTimer) {
+    _logTimer = setTimeout(() => {
+      io.emit('log:batch', _logBatch.splice(0));
+      _logTimer = null;
+    }, 50);
+  }
+});
 
 app.use(express.json());
 

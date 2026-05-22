@@ -1041,11 +1041,13 @@ socket.on('issue:new', issue => {
     toast(`⚠ [${issue.severity}] ${issue.processName}: ${issue.message.slice(0, 60)}`, color);
   }
 });
-socket.on('log', data => {
-  if (data.name !== modalLogProcess) return;
+socket.on('log:batch', batch => {
   const modal = document.getElementById('logs-modal');
   if (!modal.classList.contains('open')) return;
-  appendModalLog(data.line, data.type || (data.line.includes('[ERR]') ? 'err' : 'out'));
+  for (const data of batch) {
+    if (data.name !== modalLogProcess) continue;
+    appendModalLog(data.line, data.type || (data.line.includes('[ERR]') ? 'err' : 'out'));
+  }
 });
 
 async function fetchSystem() {
