@@ -906,7 +906,7 @@
               </div>
               <input class="log-search-input" id="log-search" placeholder="Filter…" oninput="reRenderModalLogs()" autocomplete="off" spellcheck="false">
               <button class="log-filter-btn active" id="log-ts-btn" onclick="toggleLogTimestamps()" title="Toggle timestamps">⏱</button>
-              <span style="font-size:10.5px;color:rgba(255,255,255,0.28)">Live</span>
+              <button class="log-filter-btn active" id="log-pause-btn" onclick="toggleLogPause()" title="Pause / resume live logs">⏸</button>
             </div>
           </div>
           <div class="log-body" id="logs-modal-body">Select a process above to
@@ -1046,7 +1046,12 @@ socket.on('log:batch', batch => {
   if (!modal.classList.contains('open')) return;
   for (const data of batch) {
     if (data.name !== modalLogProcess) continue;
-    appendModalLog(data.line, data.type || (data.line.includes('[ERR]') ? 'err' : 'out'));
+    const type = data.type || (data.line.includes('[ERR]') ? 'err' : 'out');
+    if (logPaused) {
+      pausedLogQueue.push({ line: data.line, type });
+    } else {
+      appendModalLog(data.line, type);
+    }
   }
 });
 
@@ -1398,10 +1403,19 @@ function openLogsFor(name) {
     loadModalLogs();
   }
 }
+function _resetLogPause() {
+  logPaused = false;
+  pausedLogQueue.length = 0;
+  const btn = document.getElementById('log-pause-btn');
+  if (btn) { btn.textContent = '⏸'; btn.title = 'Pause live logs'; btn.classList.add('active'); }
+  const dot = document.getElementById('logs-modal-dot');
+  if (dot) dot.style.opacity = '';
+}
 function closeLogsModal() {
   document.getElementById('logs-modal').classList.remove('open');
   modalLogProcess = null;
   modalLogLines.length = 0;
+  _resetLogPause();
   document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
   document.getElementById('logs-modal-title-name').textContent = 'Logs';
   document.getElementById('stdin-bar').style.display   = 'none';
@@ -1417,6 +1431,7 @@ async function loadModalLogs() {
   document.getElementById('logs-modal-proc-name').textContent = name;
   document.getElementById('logs-modal-title-name').textContent = name;
   updateStdinBar();
+  _resetLogPause();
   const body = document.getElementById('logs-modal-body');
   body.textContent = 'Loading…';
   modalLogLines.length = 0;
@@ -1479,6 +1494,20 @@ function toggleLogTimestamps() {
   logShowTimestamps = !logShowTimestamps;
   document.getElementById('log-ts-btn').classList.toggle('active', logShowTimestamps);
   reRenderModalLogs();
+}
+
+function toggleLogPause() {
+  logPaused = !logPaused;
+  const btn = document.getElementById('log-pause-btn');
+  const dot = document.getElementById('logs-modal-dot');
+  btn.classList.toggle('active', !logPaused);
+  btn.textContent = logPaused ? '▶' : '⏸';
+  btn.title = logPaused ? 'Resume live logs' : 'Pause live logs';
+  dot.style.opacity = logPaused ? '0.25' : '';
+  if (!logPaused && pausedLogQueue.length) {
+    for (const { line, type } of pausedLogQueue) appendModalLog(line, type);
+    pausedLogQueue.length = 0;
+  }
 }
 
 function clearModalLogView() {
@@ -1732,6 +1761,8 @@ function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g
 const modalLogLines = [];     // { line, type } buffer of all loaded/live lines
 let logStream = 'all';        // 'all' | 'out' | 'err'
 let logShowTimestamps = true;
+let logPaused = false;
+const pausedLogQueue = [];    // holds { line, type } entries received while paused
 const LOG_TS_RE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]\s*/;
 
 // ── History recording ─────────────────────────────
