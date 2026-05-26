@@ -73,9 +73,10 @@
 
     /* ── Animated blobs ──────────────────────────── */
     .blob {
-      position: fixed; border-radius: 50%; filter: blur(90px);
+      position: fixed; border-radius: 50%; filter: blur(80px);
       pointer-events: none; z-index: 0;
       animation: blobDrift var(--dur,20s) ease-in-out infinite alternate;
+      will-change: transform;
     }
     .blob-a { width:620px;height:620px;top:-180px;left:-80px;
       background:radial-gradient(circle,rgba(147,197,253,0.72),rgba(196,181,253,0.42));--dur:18s; }
@@ -1023,14 +1024,24 @@ socket.on('process:update', proc => {
 });
 socket.on('process:delete', data => {
   delete processes[data.name];
+  delete procHistory[data.name];
   renderProcesses(); updateProcStats();
 });
+let _statsRafPending = false;
 socket.on('stats:update', procs => {
   processes = procs;
-  Object.values(procs).forEach(p => { recordHistory(p); renderProcessRow(p); });
-  updateProcStats();
+  Object.values(procs).forEach(p => recordHistory(p));
+  if (!_statsRafPending) {
+    _statsRafPending = true;
+    requestAnimationFrame(() => {
+      _statsRafPending = false;
+      Object.values(processes).forEach(p => renderProcessRow(p));
+      updateProcStats();
+    });
+  }
 });
-socket.on('system:update', data => updateSysMetrics(data));
+let _lastSocketSystemTs = 0;
+socket.on('system:update', data => { _lastSocketSystemTs = Date.now(); updateSysMetrics(data); });
 socket.on('issue:new', issue => {
   issues.unshift(issue);
   if (issues.length > 200) issues = issues.slice(0, 200);
@@ -1056,6 +1067,7 @@ socket.on('log:batch', batch => {
 });
 
 async function fetchSystem() {
+  if (Date.now() - _lastSocketSystemTs < 4000) return;
   try { const r = await fetch('/api/system'); const d = await r.json(); updateSysMetrics(d); updateSysTab(d); } catch {}
 }
 fetchSystem(); setInterval(fetchSystem, 5000);
@@ -1122,13 +1134,15 @@ function _updateNetDisplay(rxSec, txSec) {
   const rx = fmtSpeed(rxSec), tx = fmtSpeed(txSec);
   ['sys-net-rx','sys-net-rx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=rx; });
   ['sys-net-tx','sys-net-tx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=tx; });
-  const rxChart = document.getElementById('sys-net-rx-chart');
-  const txChart = document.getElementById('sys-net-tx-chart');
   const toKB = arr => arr.map(v => Math.round(v/1024));
   const rxKB = toKB(netHistory.rx);
   const txKB = toKB(netHistory.tx);
   _statsData.sys_netrx = rxKB;
   _statsData.sys_nettx = txKB;
+  // Skip expensive SVG re-render when System tab is not visible
+  if (!document.getElementById('tab-system')?.classList.contains('active')) return;
+  const rxChart = document.getElementById('sys-net-rx-chart');
+  const txChart = document.getElementById('sys-net-tx-chart');
   if (rxChart) rxChart.innerHTML = renderChart(rxKB, 'var(--green)', 'netrx', ' KB/s');
   if (txChart) txChart.innerHTML = renderChart(txKB, 'var(--cyan)',  'nettx', ' KB/s');
   ['sys-net-rx-area','sys-net-tx-area'].forEach(id => {
@@ -1169,6 +1183,9 @@ function renderProcessRow(proc) {
   table.style.display=''; empty.style.display='none';
   let row = document.getElementById(`proc-row-${proc.name}`);
   if (!row) { row = document.createElement('tr'); row.className='proc-row'; row.id=`proc-row-${proc.name}`; document.getElementById('proc-tbody').appendChild(row); }
+  const hash = _procHash(proc);
+  if (row.dataset.hash === hash) return;
+  row.dataset.hash = hash;
   row.innerHTML = procRowHTML(proc);
 }
 function issueCountForProc(name) { return issues.filter(i => i.processName === name).length; }
@@ -1415,6 +1432,7 @@ function closeLogsModal() {
   document.getElementById('logs-modal').classList.remove('open');
   modalLogProcess = null;
   modalLogLines.length = 0;
+  _logRafQueue.length = 0;
   _resetLogPause();
   document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
   document.getElementById('logs-modal-title-name').textContent = 'Logs';
@@ -1446,40 +1464,63 @@ async function loadModalLogs() {
     reRenderModalLogs();
   } catch(e) { body.textContent = 'Error: ' + e.message; }
 }
+// RAF-batched log append — avoids one reflow per log line
+let _logRafPending = false;
+const _logRafQueue = [];
+
 function appendModalLog(line, type, skipBuffer) {
   if (!skipBuffer) {
     modalLogLines.push({ line, type });
     if (modalLogLines.length > 600) modalLogLines.shift();
   }
-  // Check filters before appending to DOM
   if (logStream !== 'all' && type !== logStream && type !== 'stdin') return;
   const search = document.getElementById('log-search')?.value.toLowerCase() || '';
   const displayLine = logShowTimestamps ? line : line.replace(LOG_TS_RE, '');
   if (search && !displayLine.toLowerCase().includes(search)) return;
-  _appendLogSpan(displayLine, type);
+  _logRafQueue.push({ displayLine, type });
+  if (!_logRafPending) {
+    _logRafPending = true;
+    requestAnimationFrame(_flushLogQueue);
+  }
 }
 
-function _appendLogSpan(displayLine, type) {
+function _flushLogQueue() {
+  _logRafPending = false;
+  if (!_logRafQueue.length) return;
   const body = document.getElementById('logs-modal-body');
-  const span = document.createElement('span');
-  span.className = type === 'err' ? 'log-err' : 'log-out';
-  if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
-  span.textContent = displayLine + '\n';
-  body.appendChild(span);
-  while(body.children.length > 500) body.removeChild(body.firstChild);
+  const frag = document.createDocumentFragment();
+  for (const { displayLine, type } of _logRafQueue) {
+    const span = document.createElement('span');
+    span.className = type === 'err' ? 'log-err' : 'log-out';
+    if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
+    span.textContent = displayLine + '\n';
+    frag.appendChild(span);
+  }
+  _logRafQueue.length = 0;
+  while (body.children.length + frag.childElementCount > 500) {
+    if (!body.firstChild) break;
+    body.removeChild(body.firstChild);
+  }
+  body.appendChild(frag);
   body.scrollTop = body.scrollHeight;
 }
 
 function reRenderModalLogs() {
   const body = document.getElementById('logs-modal-body');
   const search = document.getElementById('log-search')?.value.toLowerCase() || '';
-  body.innerHTML = '';
+  const frag = document.createDocumentFragment();
   for (const { line, type } of modalLogLines) {
     if (logStream !== 'all' && type !== logStream && type !== 'stdin') continue;
     const displayLine = logShowTimestamps ? line : line.replace(LOG_TS_RE, '');
     if (search && !displayLine.toLowerCase().includes(search)) continue;
-    _appendLogSpan(displayLine, type);
+    const span = document.createElement('span');
+    span.className = type === 'err' ? 'log-err' : 'log-out';
+    if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
+    span.textContent = displayLine + '\n';
+    frag.appendChild(span);
   }
+  body.textContent = '';
+  body.appendChild(frag);
   body.scrollTop = body.scrollHeight;
 }
 
@@ -1576,7 +1617,6 @@ function renderIssues() {
         </div>
       </div>
     </div>`).join('');
-  Object.values(processes).forEach(p => renderProcessRow(p));
 }
 function openIssueById(id) {
   const iss = issues.find(i => i.id === id);
@@ -1740,6 +1780,9 @@ function switchTab(name) {
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`tab-${name}`));
   if (name === 'config') loadConfig();
+  if (name === 'system' && netHistory.rx.length) {
+    _updateNetDisplay(netHistory.rx[netHistory.rx.length-1], netHistory.tx[netHistory.tx.length-1]);
+  }
 }
 
 // ── Helpers ───────────────────────────────────────
@@ -1764,6 +1807,11 @@ let logShowTimestamps = true;
 let logPaused = false;
 const pausedLogQueue = [];    // holds { line, type } entries received while paused
 const LOG_TS_RE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]\s*/;
+
+// ── Row hash — skip re-render when nothing visible changed ────────────────
+function _procHash(p) {
+  return `${p.status}|${p.cpu}|${p.memory}|${p.netRx}|${p.netTx}|${p.connections}|${p.restartCount}`;
+}
 
 // ── History recording ─────────────────────────────
 function recordHistory(proc) {
@@ -2195,6 +2243,19 @@ document.getElementById('stdin-input').addEventListener('keydown', e => {
     e.preventDefault();
     if (stdinHistoryIdx > 0) { stdinHistoryIdx--; document.getElementById('stdin-input').value = stdinHistory[stdinHistoryIdx] || ''; }
     else { stdinHistoryIdx = -1; document.getElementById('stdin-input').value = ''; }
+  }
+});
+
+// ── Page Visibility — pause heavy timers when tab is hidden ───────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (statsModalTimer) { clearInterval(statsModalTimer); statsModalTimer = null; }
+    if (editModalTimer)  { clearInterval(editModalTimer);  editModalTimer  = null; }
+  } else {
+    if (statsModalName && !statsModalTimer) statsModalTimer = setInterval(_tickStatsModal, 2000);
+    if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
+    // Refresh process data after returning to tab
+    if (Date.now() - _lastSocketSystemTs > 3000) refreshProcesses();
   }
 });
 
