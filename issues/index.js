@@ -3,8 +3,7 @@
 const { v4: uuidv4 } = require('uuid');
 const storage = require('../storage');
 const { SEVERITY } = require('../config/constants');
-
-const MAX_ISSUES = 200;
+const userConfig = require('../config/userConfig');
 
 function createIssue({ processName, processId, message, stack, exitCode, reason, severity, logs }) {
   const issues = storage.loadIssues();
@@ -22,7 +21,8 @@ function createIssue({ processName, processId, message, stack, exitCode, reason,
     resolved: false,
   };
   issues.unshift(issue); // newest first
-  storage.saveIssues(issues.slice(0, MAX_ISSUES)); // drop oldest beyond limit
+  const maxIssues = userConfig.get('maxIssues');
+  storage.saveIssues(maxIssues === -1 ? issues : issues.slice(0, maxIssues));
   return issue;
 }
 

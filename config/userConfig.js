@@ -43,6 +43,11 @@ const SCHEMA = {
     unit: '',
     desc: 'Daemon / dashboard port  (requires daemon restart to apply)',
   },
+  maxIssues: {
+    default: 200,
+    unit: 'issues',
+    desc: 'Maximum number of stored issues (-1 = unlimited)',
+  },
 };
 
 const DEFAULTS = Object.fromEntries(
