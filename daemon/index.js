@@ -161,6 +161,14 @@ app.get('/api/logs/:name', (req, res) => {
   res.json({ name, out, err, combined: mergeAndSort(out, err) });
 });
 
+// Clear log files
+app.delete('/api/logs/:name', (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  storage.clearLog(name);
+  res.json({ ok: true });
+});
+
 // Get log file stream (tail)
 app.get('/api/logs/:name/stream', (req, res) => {
   const name = pm.resolveProcess(req.params.name);

@@ -1055,8 +1055,10 @@ socket.on('issue:new', issue => {
 socket.on('log:batch', batch => {
   const modal = document.getElementById('logs-modal');
   if (!modal.classList.contains('open')) return;
+  let got = false;
   for (const data of batch) {
     if (data.name !== modalLogProcess) continue;
+    got = true;
     const type = data.type || (data.line.includes('[ERR]') ? 'err' : 'out');
     if (logPaused) {
       pausedLogQueue.push({ line: data.line, type });
@@ -1064,6 +1066,7 @@ socket.on('log:batch', batch => {
       appendModalLog(data.line, type);
     }
   }
+  if (got) _lastLogSocketTs = Date.now();
 });
 
 async function fetchSystem() {
@@ -1428,7 +1431,33 @@ function _resetLogPause() {
   const dot = document.getElementById('logs-modal-dot');
   if (dot) dot.style.opacity = '';
 }
+// HTTP fallback: poll for new log lines when socket hasn't delivered events recently
+async function _pollLogsIfStale() {
+  if (!modalLogProcess || logPaused) return;
+  if (!document.getElementById('logs-modal').classList.contains('open')) return;
+  if (Date.now() - _lastLogSocketTs < 4000) return; // socket is delivering — skip
+  try {
+    const r = await fetch(`/api/logs/${encodeURIComponent(modalLogProcess)}?lines=500`);
+    const d = await r.json();
+    const outLines = (d.out || '').split('\n').filter(Boolean).map(l => ({ line: l, type: 'out' }));
+    const errLines = (d.err || '').split('\n').filter(Boolean).map(l => ({ line: l, type: 'err' }));
+    const merged = [...outLines, ...errLines].sort((a, b) => a.line.localeCompare(b.line));
+    if (!merged.length) return;
+    const lastKnown = modalLogLines.length ? modalLogLines[modalLogLines.length - 1].line : '';
+    let newLines;
+    if (!lastKnown) {
+      newLines = merged;
+    } else {
+      let idx = -1;
+      for (let i = merged.length - 1; i >= 0; i--) { if (merged[i].line === lastKnown) { idx = i; break; } }
+      newLines = idx >= 0 ? merged.slice(idx + 1) : [];
+    }
+    for (const { line, type } of newLines) appendModalLog(line, type);
+  } catch {}
+}
+
 function closeLogsModal() {
+  if (_logPollTimer) { clearInterval(_logPollTimer); _logPollTimer = null; }
   document.getElementById('logs-modal').classList.remove('open');
   modalLogProcess = null;
   modalLogLines.length = 0;
@@ -1450,9 +1479,13 @@ async function loadModalLogs() {
   document.getElementById('logs-modal-title-name').textContent = name;
   updateStdinBar();
   _resetLogPause();
+  _lastLogSocketTs = 0;
+  if (_logPollTimer) clearInterval(_logPollTimer);
+  _logPollTimer = setInterval(_pollLogsIfStale, 3000);
   const body = document.getElementById('logs-modal-body');
   body.textContent = 'Loading…';
   modalLogLines.length = 0;
+  _logRafQueue.length = 0;
   try {
     const r = await fetch(`/api/logs/${name}?lines=200`);
     const d = await r.json();
@@ -1460,8 +1493,12 @@ async function loadModalLogs() {
     const outLines = d.out ? d.out.split('\n').filter(Boolean).map(l => ({ line: l, type: 'out' })) : [];
     const errLines = d.err ? d.err.split('\n').filter(Boolean).map(l => ({ line: l, type: 'err' })) : [];
     const merged = [...outLines, ...errLines].sort((a, b) => a.line.localeCompare(b.line));
-    modalLogLines.push(...merged);
+    // Prepend historical lines; any live events that arrived during the fetch are already at
+    // the end of modalLogLines — keep them so the ordering is historical → live.
+    modalLogLines.unshift(...merged);
     reRenderModalLogs();
+    // Discard any items the re-render already showed so the RAF doesn't duplicate them.
+    _logRafQueue.length = 0;
   } catch(e) { body.textContent = 'Error: ' + e.message; }
 }
 // RAF-batched log append — avoids one reflow per log line
@@ -1551,9 +1588,12 @@ function toggleLogPause() {
   }
 }
 
-function clearModalLogView() {
+async function clearModalLogView() {
+  _logRafQueue.length = 0;
   modalLogLines.length = 0;
   document.getElementById('logs-modal-body').innerHTML = '';
+  if (!modalLogProcess) return;
+  try { await fetch(`/api/logs/${encodeURIComponent(modalLogProcess)}`, { method: 'DELETE' }); } catch {}
 }
 
 // ── Issues ────────────────────────────────────────
@@ -1803,6 +1843,8 @@ function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g
 // ── Log filter state ──────────────────────────────
 const modalLogLines = [];     // { line, type } buffer of all loaded/live lines
 let logStream = 'all';        // 'all' | 'out' | 'err'
+let _lastLogSocketTs = 0;     // timestamp of last socket log received for current modal process
+let _logPollTimer = null;     // interval handle for HTTP fallback polling
 let logShowTimestamps = true;
 let logPaused = false;
 const pausedLogQueue = [];    // holds { line, type } entries received while paused
@@ -2256,6 +2298,8 @@ document.addEventListener('visibilitychange', () => {
     if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
     // Refresh process data after returning to tab
     if (Date.now() - _lastSocketSystemTs > 3000) refreshProcesses();
+    // Flush any log lines that accumulated while RAF was paused in the background
+    if (_logRafQueue.length) _flushLogQueue();
   }
 });
 
