@@ -16,6 +16,7 @@
 - **Process persistence** — `pm3 save` / `pm3 resurrect` to survive reboots
 - **System boot integration** — systemd, launchd, and Windows Task Scheduler via `pm3 startup`
 - **Zero-config daemon** — starts automatically on first use, runs detached in the background
+- **CPU & memory detail modals** — click the CPU or Memory card in the System tab for live charts, per-core/thread breakdown, and a sortable process list that can switch between PM3-managed and all system-wide processes
 
 ---
 
@@ -135,7 +136,30 @@ Open at `http://localhost:4926/dashboard` or run `pm3 dashboard`.
 | **Processes** | Live status, CPU/RAM usage, restart count, uptime · per-process Start/Stop/Restart/Logs/Delete |
 | **Logs** | Real-time log streaming via WebSocket with process selector |
 | **Issues** | Crash history with severity levels, full error messages, and stack traces |
-| **System** | CPU load, memory usage with progress bars, disk usage, server uptime |
+| **System** | CPU load, memory usage, network I/O with sparklines, disk usage, server uptime — click the CPU or Memory card for a detailed modal |
+| **Config** | Edit all PM3 settings live via the dashboard |
+
+### CPU detail modal
+
+Click the **CPU Load** card in the System tab to open a detailed view:
+
+- **3-minute sparkline** — rolling CPU history with tap-to-pin crosshair
+- **Stat boxes** — User %, System %, Idle %, Load average (1m / 5m / 15m), logical core count
+- **Per-core grid** — individual load bar for every logical thread. If the CPU has hyperthreading enabled (physical cores < logical threads), a **Thread / Core toggle** appears:
+  - *Threads* — shows each logical CPU separately (Thread 0, Thread 1 …)
+  - *Cores* — groups sibling threads by physical core, shows the averaged load, and displays a per-thread breakdown line (`T0: X% · T1: Y%`) inside each box
+- **Process list** — sortable by CPU usage (highest / lowest). Toggle between **⚡ PM3** (managed processes only) and **🖥 System** (all running system processes, top 60). Click any row to expand it:
+  - PM3 process: PID, status, uptime, restarts, net I/O, memory limit, script path — plus buttons to open the full Stats or Logs modal
+  - System process: PID, parent PID, user, state, nice, priority, full command line
+
+### Memory detail modal
+
+Click the **Memory** card in the System tab to open a detailed view:
+
+- **3-minute sparkline** — rolling memory % history
+- **Segmented usage bar** — shows Used (active), Cached, and Buffers as distinct colour bands with a legend
+- **Stat boxes** — Total RAM, Used (active), Available, Cached, Buffers, Swap used / total
+- **Process list** — sortable by RAM usage. Same **⚡ PM3 / 🖥 System** toggle and click-to-expand rows as the CPU modal
 
 ---
 
