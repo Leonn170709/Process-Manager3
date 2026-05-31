@@ -1085,6 +1085,7 @@ let memSysMode = false;
 let cpuExpanded = null;
 let memExpanded = null;
 let _sysProcs = null;
+let coreView = 'thread';
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -2225,7 +2226,7 @@ function _tickStatsModal() {
 
 // ── CPU detail modal ──────────────────────────────
 function openCpuModal() {
-  cpuSysMode = false; cpuExpanded = null;
+  cpuSysMode = false; cpuExpanded = null; coreView = 'thread';
   document.getElementById('cpu-modal').classList.add('open');
   _buildCpuModal();
   _tickCpuModal();
@@ -2325,6 +2326,7 @@ function _pm3DetailHtml(modal, p) {
       <button class="btn sm" onclick="event.stopPropagation();openLogsFromRes('${escapeHtml(p.name)}')">📋 Logs</button>
     </div>`);
 }
+function setCoreView(mode) { coreView = mode; _tickCpuModal(); }
 function openStatsFromRes(name) { closeCpuModal(); closeMemModal(); openStatsModal(name); }
 function openLogsFromRes(name)  { closeCpuModal(); closeMemModal(); openLogsFor(name); }
 function _sysDetailHtml(modal, p) {
@@ -2441,19 +2443,48 @@ function _tickCpuModal() {
       <div class="res-stat-sub">Logical CPUs</div>
     </div>`);
 
-  const cores = d?.cpus;
+  const threads = d?.cpus || [];
+  const physCores = d?.physicalCores ?? null;
   const coresSection = el('cm-cores-section');
-  if (coresSection && cores && cores.length) {
-    coresSection.innerHTML = `
-      <div style="font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:8px 0 5px">Per-core utilization</div>
-      <div class="res-core-grid">${cores.map((c, i) => {
+  if (coresSection && threads.length) {
+    const canToggle = physCores && physCores < threads.length;
+    const tpc = canToggle ? Math.round(threads.length / physCores) : 1;
+    let gridHtml;
+    if (coreView === 'core' && canToggle) {
+      const coreCount = physCores;
+      gridHtml = Array.from({ length: coreCount }, (_, ci) => {
+        const slice = threads.slice(ci * tpc, ci * tpc + tpc);
+        const avg = parseFloat((slice.reduce((s, t) => s + t.load, 0) / slice.length).toFixed(1));
+        const cc = avg > 80 ? 'var(--red)' : avg > 50 ? 'var(--yellow)' : 'var(--accent)';
+        const threadTip = slice.map((t, ti) => `T${ti}: ${t.load}%`).join(' · ');
+        return `<div class="res-core-box" title="${threadTip}">
+          <div class="res-core-lbl">Core ${ci}</div>
+          <div class="res-core-val" style="color:${cc}">${avg}%</div>
+          <div class="res-core-bar"><div class="res-core-fill" style="width:${avg}%;background:${cc}"></div></div>
+          <div style="font-size:8.5px;color:var(--t4);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${threadTip}</div>
+        </div>`;
+      }).join('');
+    } else {
+      gridHtml = threads.map((c, i) => {
         const cc = c.load > 80 ? 'var(--red)' : c.load > 50 ? 'var(--yellow)' : 'var(--accent)';
         return `<div class="res-core-box">
-          <div class="res-core-lbl">Core ${i}</div>
+          <div class="res-core-lbl">Thread ${i}</div>
           <div class="res-core-val" style="color:${cc}">${c.load}%</div>
           <div class="res-core-bar"><div class="res-core-fill" style="width:${c.load}%;background:${cc}"></div></div>
         </div>`;
-      }).join('')}</div>`;
+      }).join('');
+    }
+    coresSection.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 5px">
+        <span style="font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">
+          ${coreView === 'core' && canToggle ? `Physical cores (${physCores})` : `Logical threads (${threads.length})`}
+        </span>
+        ${canToggle ? `<div class="res-mode-toggle">
+          <button class="rmt-btn${coreView==='thread'?' active':''}" onclick="setCoreView('thread')">Threads</button>
+          <button class="rmt-btn${coreView==='core'?' active':''}" onclick="setCoreView('core')">Cores</button>
+        </div>` : ''}
+      </div>
+      <div class="res-core-grid">${gridHtml}</div>`;
   } else if (coresSection) {
     coresSection.innerHTML = '';
   }

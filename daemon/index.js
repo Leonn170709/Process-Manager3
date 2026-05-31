@@ -224,10 +224,11 @@ app.post('/api/config/reset', (req, res) => {
 // System metrics
 app.get('/api/system', async (req, res) => {
   try {
-    const [cpu, mem, disk] = await Promise.all([
+    const [cpu, mem, disk, cpuStatic] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       si.fsSize(),
+      _getCpuStatic(),
     ]);
     await _pollNetSpeed();
     res.json({
@@ -240,6 +241,7 @@ app.get('/api/system', async (req, res) => {
         user: parseFloat((c.loadUser || 0).toFixed(1)),
         system: parseFloat((c.loadSystem || 0).toFixed(1)),
       })),
+      physicalCores: cpuStatic?.physicalCores ?? null,
       loadavg: os.loadavg(),
       memory: {
         total: mem.total,
@@ -335,6 +337,14 @@ io.on('connection', socket => {
   });
 });
 
+// CPU static info (physical cores, model) — fetched once and cached
+let _cpuStaticInfo = null;
+async function _getCpuStatic() {
+  if (!_cpuStaticInfo) _cpuStaticInfo = await si.cpu();
+  return _cpuStaticInfo;
+}
+_getCpuStatic().catch(() => {});
+
 // --- Stats polling ---
 setInterval(() => {
   pm.updateStats();
@@ -343,7 +353,7 @@ setInterval(() => {
 // --- System metrics broadcast ---
 setInterval(async () => {
   try {
-    const [cpu, mem] = await Promise.all([si.currentLoad(), si.mem()]);
+    const [cpu, mem, cpuStatic] = await Promise.all([si.currentLoad(), si.mem(), _getCpuStatic()]);
     await _pollNetSpeed();
     io.emit('system:update', {
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
@@ -355,6 +365,7 @@ setInterval(async () => {
         user: parseFloat((c.loadUser || 0).toFixed(1)),
         system: parseFloat((c.loadSystem || 0).toFixed(1)),
       })),
+      physicalCores: cpuStatic?.physicalCores ?? null,
       loadavg: os.loadavg(),
       memory: {
         total: mem.total,
