@@ -5,6 +5,7 @@ process.on('uncaughtException',  err  => console.error('[PM3] Uncaught exception
 process.on('unhandledRejection', reason => console.error('[PM3] Unhandled rejection:', reason));
 
 const http = require('http');
+const os = require('os');
 const express = require('express');
 const { Server: SocketIOServer } = require('socket.io');
 const { EventEmitter } = require('events');
@@ -223,20 +224,33 @@ app.post('/api/config/reset', (req, res) => {
 // System metrics
 app.get('/api/system', async (req, res) => {
   try {
-    const [cpu, mem, disk, load] = await Promise.all([
+    const [cpu, mem, disk] = await Promise.all([
       si.currentLoad(),
       si.mem(),
       si.fsSize(),
-      si.currentLoad(),
     ]);
     await _pollNetSpeed();
     res.json({
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
+      cpuUser: parseFloat((cpu.currentLoadUser || 0).toFixed(1)),
+      cpuSystem: parseFloat((cpu.currentLoadSystem || 0).toFixed(1)),
+      cpuIdle: parseFloat((cpu.currentLoadIdle || 0).toFixed(1)),
+      cpus: (cpu.cpus || []).map(c => ({
+        load: parseFloat((c.load || 0).toFixed(1)),
+        user: parseFloat((c.loadUser || 0).toFixed(1)),
+        system: parseFloat((c.loadSystem || 0).toFixed(1)),
+      })),
+      loadavg: os.loadavg(),
       memory: {
         total: mem.total,
         used: mem.active,
         available: mem.available,
         percent: parseFloat(((mem.active / mem.total) * 100).toFixed(1)),
+        buffers: mem.buffers || 0,
+        cached: mem.cached || 0,
+        swapTotal: mem.swaptotal || 0,
+        swapUsed: mem.swapused || 0,
+        swapFree: mem.swapfree || 0,
       },
       disk: disk.map(d => ({
         fs: d.fs,
@@ -245,11 +259,39 @@ app.get('/api/system', async (req, res) => {
         mount: d.mount,
         percent: d.use,
       })),
-      loadAverage: load.avgLoad,
+      loadAverage: cpu.avgLoad,
       uptime: si.time().uptime,
       network: _netSpeed,
       processCount: Object.values(pm.getAllProcesses()).filter(p => p.status === STATUS.RUNNING).length,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// System-wide process list (cached 2 s to avoid hammering /proc)
+let _sysProcCache = null;
+let _sysProcTs = 0;
+app.get('/api/system/processes', async (req, res) => {
+  try {
+    if (_sysProcCache && Date.now() - _sysProcTs < 2000) return res.json(_sysProcCache);
+    const data = await si.processes();
+    _sysProcCache = data.list.map(p => ({
+      pid:       p.pid,
+      parentPid: p.parentPid,
+      name:      p.name,
+      command:   p.command || p.name,
+      user:      p.user || '—',
+      cpu:       parseFloat((p.cpu   || 0).toFixed(1)),
+      mem:       parseFloat((p.mem   || 0).toFixed(2)),
+      memRss:    Math.round((p.memRss || 0) / 1024),
+      state:     p.state || '—',
+      nice:      p.nice  ?? 0,
+      started:   p.started || '',
+      priority:  p.priority ?? 0,
+    }));
+    _sysProcTs = Date.now();
+    res.json(_sysProcCache);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -301,11 +343,25 @@ setInterval(async () => {
     await _pollNetSpeed();
     io.emit('system:update', {
       cpu: parseFloat(cpu.currentLoad.toFixed(1)),
+      cpuUser: parseFloat((cpu.currentLoadUser || 0).toFixed(1)),
+      cpuSystem: parseFloat((cpu.currentLoadSystem || 0).toFixed(1)),
+      cpuIdle: parseFloat((cpu.currentLoadIdle || 0).toFixed(1)),
+      cpus: (cpu.cpus || []).map(c => ({
+        load: parseFloat((c.load || 0).toFixed(1)),
+        user: parseFloat((c.loadUser || 0).toFixed(1)),
+        system: parseFloat((c.loadSystem || 0).toFixed(1)),
+      })),
+      loadavg: os.loadavg(),
       memory: {
         total: mem.total,
         used: mem.active,
         available: mem.available,
         percent: parseFloat(((mem.active / mem.total) * 100).toFixed(1)),
+        buffers: mem.buffers || 0,
+        cached: mem.cached || 0,
+        swapTotal: mem.swaptotal || 0,
+        swapUsed: mem.swapused || 0,
+        swapFree: mem.swapfree || 0,
       },
       network: _netSpeed,
     });

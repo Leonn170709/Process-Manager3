@@ -351,6 +351,52 @@
     .disk-scroll::-webkit-scrollbar { width:4px; }
     .disk-scroll::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
 
+    /* ── Resource detail modals ──────────────────── */
+    .sys-metric.clickable { cursor:pointer;transition:background 0.18s,transform 0.15s,box-shadow 0.15s; }
+    .sys-metric.clickable:hover { background:var(--g1);transform:translateY(-1.5px);box-shadow:var(--shadow-md); }
+    .sys-metric.clickable:hover .sm-hint { opacity:1; }
+    .sm-hint { font-size:9.5px;color:var(--accent);margin-top:4px;opacity:0;transition:opacity 0.2s;font-weight:600;letter-spacing:0.2px; }
+    .res-modal { width:900px;max-height:90vh; }
+    .res-stats-grid { display:grid;gap:6px;margin:10px 0 8px; }
+    .res-stat-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:9px 12px; }
+    .res-stat-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
+    .res-stat-val { font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1);line-height:1.1; }
+    .res-stat-sub { font-size:9.5px;color:var(--t4);margin-top:2px; }
+    .res-core-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px;margin:8px 0 2px; }
+    .res-core-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:6px 8px; }
+    .res-core-lbl { font-size:9px;color:var(--t3);font-weight:600;margin-bottom:3px; }
+    .res-core-val { font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:3px; }
+    .res-core-bar { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;overflow:hidden; }
+    .res-core-fill { height:100%;border-radius:2px;transition:width 0.5s; }
+    .res-sec-hdr { display:flex;align-items:center;justify-content:space-between;padding:8px 0 5px;border-top:1px solid var(--border-sm);margin-top:6px; }
+    .res-sec-title { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px; }
+    .res-sort-btn { font-size:10px;font-weight:600;padding:3px 10px;background:var(--g2);border:1px solid var(--border-sm);border-radius:20px;color:var(--t2);cursor:pointer;transition:all 0.15s; }
+    .res-sort-btn:hover { background:var(--g1);color:var(--t1);border-color:var(--border); }
+    .res-proc-scroll { max-height:320px;overflow-y:auto;border-radius:var(--r-xs);border:1px solid var(--border-sm); }
+    .res-proc-scroll::-webkit-scrollbar { width:4px; }
+    .res-proc-scroll::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.2);border-radius:2px; }
+    .res-proc-row { display:grid;grid-template-columns:minmax(120px,1.4fr) 60px 1fr 72px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border-sm);transition:background 0.12s;gap:12px;cursor:pointer; }
+    .res-proc-row:last-child { border-bottom:none; }
+    .res-proc-row:hover { background:var(--g2); }
+    .res-proc-row.expanded { background:var(--g2); }
+    .res-proc-name { font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .res-proc-script { font-size:10px;color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px; }
+    .rp-val { font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;text-align:right;white-space:nowrap; }
+    .rp-bar { height:6px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden;width:100%; }
+    .rp-bar-fill { height:100%;border-radius:3px;transition:width 0.45s ease; }
+    .rp-sub { font-size:10.5px;color:var(--t3);font-family:'JetBrains Mono',monospace;text-align:right;white-space:nowrap; }
+    .res-proc-detail { padding:10px 14px 13px 14px;border-bottom:1px solid var(--border-sm);background:var(--g3);animation:detailIn 0.14s ease; }
+    @keyframes detailIn { from{opacity:0;margin-top:-6px}to{opacity:1;margin-top:0} }
+    .rpd-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px;margin-bottom:8px; }
+    .rpd-lbl { font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;display:block;margin-bottom:1px; }
+    .rpd-val { font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-word; }
+    .rpd-cmd { font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);word-break:break-all;margin:6px 0 8px;line-height:1.5;padding:5px 8px;background:var(--g2);border-radius:5px;border:1px solid var(--border-sm); }
+    .res-mode-toggle { display:flex;background:var(--g2);border:1px solid var(--border-sm);border-radius:20px;padding:2px;gap:2px; }
+    .rmt-btn { font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:16px;cursor:pointer;color:var(--t3);background:transparent;transition:all 0.15s;font-family:inherit; }
+    .rmt-btn.active { background:var(--g1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,0.12); }
+    .res-big-bar { height:10px;background:rgba(0,0,0,0.07);border-radius:5px;overflow:hidden;margin:8px 0 4px; }
+    .res-big-fill { height:100%;border-radius:5px;transition:width 0.6s ease; }
+
     /* ── Config tab ──────────────────────────────── */
     .cfg-scroll { flex:1;overflow-y:auto;min-height:0;padding:0; }
     .cfg-scroll::-webkit-scrollbar { width:4px; }
@@ -730,20 +776,22 @@
         <!-- SYSTEM -->
         <div class="panel" id="tab-system">
           <div class="sys-grid">
-            <div class="card sys-metric">
+            <div class="card sys-metric clickable" onclick="openCpuModal()" title="Click for CPU details">
               <div class="sm-label">CPU Load</div>
               <div class="sm-val" id="sys-cpu-big"
                 style="color:var(--accent)">—</div>
               <div class="progress"><div class="progress-fill" id="sys-cpu-bar"
                   style="background:var(--accent);width:0%"></div></div>
+              <div class="sm-hint">↗ Details &amp; processes</div>
             </div>
-            <div class="card sys-metric">
+            <div class="card sys-metric clickable" onclick="openMemModal()" title="Click for memory details">
               <div class="sm-label">Memory</div>
               <div class="sm-val" id="sys-mem-big"
                 style="color:var(--accent2)">—</div>
               <div class="progress"><div class="progress-fill" id="sys-mem-bar"
                   style="background:var(--accent2);width:0%"></div></div>
               <div class="sm-sub" id="sys-mem-detail">—</div>
+              <div class="sm-hint">↗ Details &amp; processes</div>
             </div>
             <div class="card sys-metric">
               <div class="sm-label">Server Uptime</div>
@@ -965,6 +1013,28 @@
       </div>
     </div>
 
+    <!-- CPU DETAIL MODAL -->
+    <div class="modal-overlay" id="cpu-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">⚡ CPU Load Details</div>
+          <div class="modal-close" onclick="closeCpuModal()">×</div>
+        </div>
+        <div class="modal-body" id="cpu-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- MEMORY DETAIL MODAL -->
+    <div class="modal-overlay" id="mem-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">💾 Memory Details</div>
+          <div class="modal-close" onclick="closeMemModal()">×</div>
+        </div>
+        <div class="modal-body" id="mem-modal-body"></div>
+      </div>
+    </div>
+
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -999,10 +1069,22 @@ const procHistory = {};       // { name: { cpu: [], mem: [] } }
 const HISTORY_MAX = 90;       // 90 × 2 s = 3 minutes of data
 const netHistory  = { rx: [], tx: [] };
 const NET_HISTORY_MAX = 60;   // 60 × 3 s = 3 minutes of network data
+const sysHistory  = { cpu: [], mem: [] };
+const SYS_HISTORY_MAX = 90;
+let _lastSysData  = null;
 let statsModalName = null;
 let statsModalTimer = null;
 let editModalName = null;
 let editModalTimer = null;
+let cpuModalTimer = null;
+let memModalTimer = null;
+let cpuSortDesc = true;
+let memSortDesc = true;
+let cpuSysMode = false;
+let memSysMode = false;
+let cpuExpanded = null;
+let memExpanded = null;
+let _sysProcs = null;
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -1112,6 +1194,15 @@ setInterval(async () => {
 }, 5000);
 
 function updateSysMetrics(data) {
+  _lastSysData = data;
+  sysHistory.cpu.push(data.cpu || 0);
+  if (sysHistory.cpu.length > SYS_HISTORY_MAX) sysHistory.cpu.shift();
+  if (data.memory) {
+    sysHistory.mem.push(data.memory.percent);
+    if (sysHistory.mem.length > SYS_HISTORY_MAX) sysHistory.mem.shift();
+  }
+  _statsData.sys_cpu = sysHistory.cpu;
+  _statsData.sys_mem = sysHistory.mem;
   document.getElementById('sys-cpu').textContent = (data.cpu || 0) + '%';
   document.getElementById('sys-ram').textContent = data.memory ? Math.round(data.memory.used/1024/1024) + ' MB' : '—';
   if (data.uptime) document.getElementById('sys-uptime').textContent = formatUptime(data.uptime);
@@ -1125,6 +1216,8 @@ function updateSysMetrics(data) {
     document.getElementById('sys-mem-detail').textContent = fmt(data.memory.used) + ' used · ' + fmt(data.memory.available ?? (data.memory.total - data.memory.used)) + ' available';
   }
   document.getElementById('sys-procs-big').textContent = running;
+  if (cpuModalTimer) _tickCpuModal();
+  if (memModalTimer) _tickMemModal();
   if (data.network) {
     netHistory.rx.push(data.network.rxSec);
     netHistory.tx.push(data.network.txSec);
@@ -1693,6 +1786,7 @@ async function deleteIssue(id) {
     if (!r.ok) { toast(`Delete failed (${r.status})`, 'error'); return; }
     issues = issues.filter(i => i.id !== id);
     renderIssues();
+    renderProcesses();
     toast('Issue deleted', 'info');
   } catch (e) {
     toast('Delete failed: ' + e.message, 'error');
@@ -1700,7 +1794,7 @@ async function deleteIssue(id) {
 }
 async function clearAllIssues() {
   if(!confirm('Delete all issues?')) return;
-  await fetch('/api/issues',{method:'DELETE'}); issues=[]; renderIssues(); toast('All issues cleared','info');
+  await fetch('/api/issues',{method:'DELETE'}); issues=[]; renderIssues(); renderProcesses(); toast('All issues cleared','info');
 }
 
 // ── Start modal ───────────────────────────────────
@@ -2077,7 +2171,7 @@ function _tickStatsModal() {
   const latestRx = h.netRx?.length ? h.netRx[h.netRx.length-1] : 0;
   const latestTx = h.netTx?.length ? h.netTx[h.netTx.length-1] : 0;
 
-  _statsData = { cpu: h.cpu, mem: h.mem, conn: connArr, netrx: netRxKB, nettx: netTxKB };
+  Object.assign(_statsData, { cpu: h.cpu, mem: h.mem, conn: connArr, netrx: netRxKB, nettx: netTxKB });
 
   setCur ('sm-cpu-cur',    cpuCur);
   setCur ('sm-mem-cur',    memCur);
@@ -2127,6 +2221,418 @@ function _tickStatsModal() {
     <div style="grid-column:1/-1"><div class="stat-kv-label">Working Dir</div><div class="stat-kv-val">${escapeHtml(proc.cwd || '—')}</div></div>
     <div style="grid-column:1/-1"><div class="stat-kv-label">Started</div><div class="stat-kv-val">${proc.startTime ? formatDate(proc.startTime) : '—'}</div></div>
     ${envHtml}`);
+}
+
+// ── CPU detail modal ──────────────────────────────
+function openCpuModal() {
+  cpuSysMode = false; cpuExpanded = null;
+  document.getElementById('cpu-modal').classList.add('open');
+  _buildCpuModal();
+  _tickCpuModal();
+  cpuModalTimer = setInterval(_tickCpuModal, 2000);
+}
+function closeCpuModal() {
+  document.getElementById('cpu-modal').classList.remove('open');
+  clearInterval(cpuModalTimer);
+  cpuModalTimer = null;
+}
+function _buildCpuModal() {
+  document.getElementById('cpu-modal-body').innerHTML = `
+    <div class="chart-block" style="margin-bottom:8px">
+      <div class="chart-label">CPU History
+        <span class="cur" id="cm-cpu-cur">—</span>
+        <span class="chart-stats" id="cm-cpu-stats"></span>
+        <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
+      </div>
+      <div class="chart-hover-area" id="cm-cpu-area">
+        <div class="chart-wrap" id="cm-cpu-wrap"></div>
+        <div class="chart-xhair" id="cm-cpu-xhair" style="background:var(--accent)"></div>
+        <div class="chart-tip"   id="cm-cpu-tip"></div>
+      </div>
+    </div>
+    <div class="res-stats-grid" id="cm-stats-row" style="grid-template-columns:repeat(5,1fr)"></div>
+    <div id="cm-cores-section"></div>
+    <div class="res-sec-hdr">
+      <span class="res-sec-title">Processes by CPU</span>
+      <div style="display:flex;gap:7px;align-items:center">
+        <div class="res-mode-toggle">
+          <button class="rmt-btn active" id="cm-mode-pm3" onclick="setCpuMode(false)">⚡ PM3</button>
+          <button class="rmt-btn" id="cm-mode-sys" onclick="setCpuMode(true)">🖥 System</button>
+        </div>
+        <button class="res-sort-btn" id="cm-sort-btn" onclick="toggleCpuSort()">↓ Highest</button>
+      </div>
+    </div>
+    <div class="res-proc-scroll" id="cm-proc-list"></div>`;
+  _attachChartHover('cm-cpu-area', 'cm-cpu-xhair', 'cm-cpu-tip', 'sys_cpu', '%');
+}
+async function fetchSysProcs() {
+  try {
+    const r = await fetch('/api/system/processes');
+    if (r.ok) _sysProcs = await r.json();
+  } catch {}
+}
+function setCpuMode(isSystem) {
+  cpuSysMode = isSystem;
+  cpuExpanded = null;
+  const pm3Btn = document.getElementById('cm-mode-pm3');
+  const sysBtn = document.getElementById('cm-mode-sys');
+  if (pm3Btn) pm3Btn.classList.toggle('active', !isSystem);
+  if (sysBtn) sysBtn.classList.toggle('active',  isSystem);
+  if (isSystem && !_sysProcs) fetchSysProcs().then(_renderCpuProcList);
+  else _renderCpuProcList();
+}
+function setMemMode(isSystem) {
+  memSysMode = isSystem;
+  memExpanded = null;
+  const pm3Btn = document.getElementById('mm-mode-pm3');
+  const sysBtn = document.getElementById('mm-mode-sys');
+  if (pm3Btn) pm3Btn.classList.toggle('active', !isSystem);
+  if (sysBtn) sysBtn.classList.toggle('active',  isSystem);
+  if (isSystem && !_sysProcs) fetchSysProcs().then(_renderMemProcList);
+  else _renderMemProcList();
+}
+function toggleResExpand(modal, key) {
+  if (modal === 'cpu') { cpuExpanded = cpuExpanded === key ? null : key; _renderCpuProcList(); }
+  else                 { memExpanded = memExpanded === key ? null : key; _renderMemProcList(); }
+}
+function _procDetailHtml(modal, key, detailHtml) {
+  const expanded = modal === 'cpu' ? cpuExpanded : memExpanded;
+  if (expanded !== key) return '';
+  return `<div class="res-proc-detail">${detailHtml}</div>`;
+}
+function _pm3DetailHtml(modal, p) {
+  const key = 'pm3_' + p.name;
+  const issueCount = issueCountForProc(p.name);
+  return _procDetailHtml(modal, key, `
+    <div class="rpd-grid">
+      <div><span class="rpd-lbl">PID</span><span class="rpd-val">${p.pid || '—'}</span></div>
+      <div><span class="rpd-lbl">Status</span><span class="rpd-val"><span class="status-pill status-${p.status}" style="font-size:9px">${p.status}</span></span></div>
+      <div><span class="rpd-lbl">Uptime</span><span class="rpd-val">${formatUptime(p.uptime)}</span></div>
+      <div><span class="rpd-lbl">Restarts</span><span class="rpd-val">${p.restartCount} / ${p.maxRestarts === -1 ? '∞' : p.maxRestarts}</span></div>
+      <div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu != null ? p.cpu + '%' : '—'}</span></div>
+      <div><span class="rpd-lbl">RAM</span><span class="rpd-val">${p.memory ? p.memory + ' MB' : '—'}</span></div>
+      <div><span class="rpd-lbl">Mem limit</span><span class="rpd-val">${p.memoryLimit ? p.memoryLimit + ' MB' : 'none'}</span></div>
+      <div><span class="rpd-lbl">Issues</span><span class="rpd-val" style="color:${issueCount ? 'var(--red)' : 'var(--t3)'}">${issueCount}</span></div>
+      <div><span class="rpd-lbl">Auto-restart</span><span class="rpd-val">${p.autorestart ? 'yes' : 'no'}</span></div>
+      <div><span class="rpd-lbl">Net ↓</span><span class="rpd-val" style="color:var(--green)">${p.netRx != null ? fmtSpeed(p.netRx) : '—'}</span></div>
+      <div><span class="rpd-lbl">Net ↑</span><span class="rpd-val" style="color:var(--cyan)">${p.netTx != null ? fmtSpeed(p.netTx) : '—'}</span></div>
+      <div><span class="rpd-lbl">Sockets</span><span class="rpd-val">${p.connections != null ? p.connections : '—'}</span></div>
+    </div>
+    <div class="rpd-lbl" style="margin-bottom:3px">Script</div>
+    <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
+    <div style="display:flex;gap:7px">
+      <button class="btn sm primary" onclick="event.stopPropagation();openStatsModal('${escapeHtml(p.name)}')">📊 Full stats</button>
+      <button class="btn sm" onclick="event.stopPropagation();openLogsFor('${escapeHtml(p.name)}')">📋 Logs</button>
+    </div>`);
+}
+function _sysDetailHtml(modal, p) {
+  const key = 'sys_' + p.pid;
+  return _procDetailHtml(modal, key, `
+    <div class="rpd-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div><span class="rpd-lbl">PID</span><span class="rpd-val">${p.pid}</span></div>
+      <div><span class="rpd-lbl">Parent PID</span><span class="rpd-val">${p.parentPid || '—'}</span></div>
+      <div><span class="rpd-lbl">User</span><span class="rpd-val">${escapeHtml(p.user)}</span></div>
+      <div><span class="rpd-lbl">State</span><span class="rpd-val">${escapeHtml(p.state)}</span></div>
+      <div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu}%</span></div>
+      <div><span class="rpd-lbl">RSS</span><span class="rpd-val">${p.memRss} MB</span></div>
+      <div><span class="rpd-lbl">Nice</span><span class="rpd-val">${p.nice}</span></div>
+      <div><span class="rpd-lbl">Priority</span><span class="rpd-val">${p.priority}</span></div>
+    </div>
+    <div class="rpd-lbl" style="margin-bottom:3px">Command</div>
+    <div class="rpd-cmd">${escapeHtml(p.command || p.name)}</div>`);
+}
+function toggleCpuSort() {
+  cpuSortDesc = !cpuSortDesc;
+  const btn = document.getElementById('cm-sort-btn');
+  if (btn) btn.textContent = cpuSortDesc ? '↓ Highest' : '↑ Lowest';
+  _renderCpuProcList();
+}
+function _renderCpuProcList() {
+  const container = document.getElementById('cm-proc-list');
+  if (!container) return;
+  if (cpuSysMode) {
+    if (!_sysProcs) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">Loading…</div>'; return; }
+    const list = [..._sysProcs].sort((a, b) => cpuSortDesc ? b.cpu - a.cpu : a.cpu - b.cpu).slice(0, 60);
+    if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No data</div>'; return; }
+    const maxVal = Math.max(...list.map(p => p.cpu), 0.1);
+    container.innerHTML = list.map(p => {
+      const key = 'sys_' + p.pid;
+      const isExp = cpuExpanded === key;
+      const pct = Math.round(p.cpu / maxVal * 100);
+      const col = p.cpu > 50 ? 'var(--red)' : p.cpu > 20 ? 'var(--yellow)' : 'var(--accent)';
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleResExpand('cpu','${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
+        <div class="rp-val" style="color:${col}">${p.cpu}%</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="rp-sub">${p.memRss} MB</div>
+      </div>${_sysDetailHtml('cpu', p)}`;
+    }).join('');
+  } else {
+    const list = Object.values(processes).filter(p => p.cpu != null);
+    list.sort((a, b) => cpuSortDesc ? b.cpu - a.cpu : a.cpu - b.cpu);
+    if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No PM3 process data yet</div>'; return; }
+    const maxVal = Math.max(...list.map(p => p.cpu || 0), 0.1);
+    container.innerHTML = list.map(p => {
+      const key = 'pm3_' + p.name;
+      const isExp = cpuExpanded === key;
+      const pct = Math.round((p.cpu || 0) / maxVal * 100);
+      const col = p.cpu > 80 ? 'var(--red)' : p.cpu > 50 ? 'var(--yellow)' : 'var(--accent)';
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleResExpand('cpu','${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.script || '')}</div></div>
+        <div class="rp-val" style="color:${col}">${p.cpu}%</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="rp-sub">${p.memory ? p.memory + ' MB' : '—'}</div>
+      </div>${_pm3DetailHtml('cpu', p)}`;
+    }).join('');
+  }
+}
+function _tickCpuModal() {
+  const d = _lastSysData;
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const hist = sysHistory.cpu;
+  const cur = d?.cpu ?? (hist.length ? hist[hist.length-1] : 0);
+  const col = cur > 80 ? 'var(--red)' : cur > 50 ? 'var(--yellow)' : 'var(--accent)';
+
+  function chartStats(arr, unit) {
+    if (!arr.length) return '';
+    const mn = Math.min(...arr).toFixed(1), mx = Math.max(...arr).toFixed(1);
+    const av = (arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(1);
+    return `min ${mn}${unit} · avg ${av}${unit} · max ${mx}${unit}`;
+  }
+
+  setText('cm-cpu-cur', cur + '%');
+  el('cm-cpu-cur') && (el('cm-cpu-cur').style.color = col);
+  setText('cm-cpu-stats', chartStats(hist, '%'));
+  set('cm-cpu-wrap', renderChart(hist, col, 'cm_cpu', '%'));
+  const cpuArea = el('cm-cpu-area');
+  if (cpuArea?._refreshTip) cpuArea._refreshTip();
+
+  const la = d?.loadavg || [0, 0, 0];
+  const user = d?.cpuUser ?? 0, sys = d?.cpuSystem ?? 0, idle = d?.cpuIdle ?? 0;
+  set('cm-stats-row', `
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">User</div>
+      <div class="res-stat-val" style="color:var(--accent)">${user}%</div>
+      <div class="res-stat-sub">User space</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">System</div>
+      <div class="res-stat-val" style="color:var(--accent2)">${sys}%</div>
+      <div class="res-stat-sub">Kernel space</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">Idle</div>
+      <div class="res-stat-val" style="color:var(--green)">${idle}%</div>
+      <div class="res-stat-sub">Available</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">Load avg</div>
+      <div class="res-stat-val" style="font-size:12px">${la[0].toFixed(2)} · ${la[1].toFixed(2)} · ${la[2].toFixed(2)}</div>
+      <div class="res-stat-sub">1m · 5m · 15m</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">Cores</div>
+      <div class="res-stat-val" style="color:var(--cyan)">${d?.cpus?.length ?? '—'}</div>
+      <div class="res-stat-sub">Logical CPUs</div>
+    </div>`);
+
+  const cores = d?.cpus;
+  const coresSection = el('cm-cores-section');
+  if (coresSection && cores && cores.length) {
+    coresSection.innerHTML = `
+      <div style="font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:8px 0 5px">Per-core utilization</div>
+      <div class="res-core-grid">${cores.map((c, i) => {
+        const cc = c.load > 80 ? 'var(--red)' : c.load > 50 ? 'var(--yellow)' : 'var(--accent)';
+        return `<div class="res-core-box">
+          <div class="res-core-lbl">Core ${i}</div>
+          <div class="res-core-val" style="color:${cc}">${c.load}%</div>
+          <div class="res-core-bar"><div class="res-core-fill" style="width:${c.load}%;background:${cc}"></div></div>
+        </div>`;
+      }).join('')}</div>`;
+  } else if (coresSection) {
+    coresSection.innerHTML = '';
+  }
+
+  if (cpuSysMode) fetchSysProcs().then(_renderCpuProcList);
+  else _renderCpuProcList();
+}
+
+// ── Memory detail modal ───────────────────────────
+function openMemModal() {
+  memSysMode = false; memExpanded = null;
+  document.getElementById('mem-modal').classList.add('open');
+  _buildMemModal();
+  _tickMemModal();
+  memModalTimer = setInterval(_tickMemModal, 2000);
+}
+function closeMemModal() {
+  document.getElementById('mem-modal').classList.remove('open');
+  clearInterval(memModalTimer);
+  memModalTimer = null;
+}
+function _buildMemModal() {
+  document.getElementById('mem-modal-body').innerHTML = `
+    <div class="chart-block" style="margin-bottom:8px">
+      <div class="chart-label">Memory History
+        <span class="cur" id="mm-mem-cur">—</span>
+        <span class="chart-stats" id="mm-mem-stats"></span>
+        <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
+      </div>
+      <div class="chart-hover-area" id="mm-mem-area">
+        <div class="chart-wrap" id="mm-mem-wrap"></div>
+        <div class="chart-xhair" id="mm-mem-xhair" style="background:var(--accent2)"></div>
+        <div class="chart-tip"   id="mm-mem-tip"></div>
+      </div>
+    </div>
+    <div id="mm-big-bar-wrap" style="margin:0 0 4px"></div>
+    <div class="res-stats-grid" id="mm-stats-row" style="grid-template-columns:repeat(3,1fr)"></div>
+    <div class="res-stats-grid" id="mm-stats-row2" style="grid-template-columns:repeat(3,1fr);margin-top:0"></div>
+    <div class="res-sec-hdr">
+      <span class="res-sec-title">Processes by RAM</span>
+      <div style="display:flex;gap:7px;align-items:center">
+        <div class="res-mode-toggle">
+          <button class="rmt-btn active" id="mm-mode-pm3" onclick="setMemMode(false)">⚡ PM3</button>
+          <button class="rmt-btn" id="mm-mode-sys" onclick="setMemMode(true)">🖥 System</button>
+        </div>
+        <button class="res-sort-btn" id="mm-sort-btn" onclick="toggleMemSort()">↓ Highest</button>
+      </div>
+    </div>
+    <div class="res-proc-scroll" id="mm-proc-list"></div>`;
+  _attachChartHover('mm-mem-area', 'mm-mem-xhair', 'mm-mem-tip', 'sys_mem', '%');
+}
+function toggleMemSort() {
+  memSortDesc = !memSortDesc;
+  const btn = document.getElementById('mm-sort-btn');
+  if (btn) btn.textContent = memSortDesc ? '↓ Highest' : '↑ Lowest';
+  _renderMemProcList();
+}
+function _renderMemProcList() {
+  const container = document.getElementById('mm-proc-list');
+  if (!container) return;
+  if (memSysMode) {
+    if (!_sysProcs) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">Loading…</div>'; return; }
+    const list = [..._sysProcs].sort((a, b) => memSortDesc ? b.memRss - a.memRss : a.memRss - b.memRss).slice(0, 60);
+    if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No data</div>'; return; }
+    const maxVal = Math.max(...list.map(p => p.memRss), 1);
+    container.innerHTML = list.map(p => {
+      const key = 'sys_' + p.pid;
+      const isExp = memExpanded === key;
+      const pct = Math.round(p.memRss / maxVal * 100);
+      const col = p.memRss > 2048 ? 'var(--red)' : p.memRss > 512 ? 'var(--yellow)' : 'var(--accent2)';
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleResExpand('mem','${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
+        <div class="rp-val" style="color:${col}">${p.memRss} MB</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="rp-sub">${p.cpu}% CPU</div>
+      </div>${_sysDetailHtml('mem', p)}`;
+    }).join('');
+  } else {
+    const list = Object.values(processes).filter(p => p.memory != null);
+    list.sort((a, b) => memSortDesc ? b.memory - a.memory : a.memory - b.memory);
+    if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No PM3 process data yet</div>'; return; }
+    const maxVal = Math.max(...list.map(p => p.memory || 0), 1);
+    container.innerHTML = list.map(p => {
+      const key = 'pm3_' + p.name;
+      const isExp = memExpanded === key;
+      const pct = Math.round((p.memory || 0) / maxVal * 100);
+      const col = p.memory > 1024 ? 'var(--red)' : p.memory > 512 ? 'var(--yellow)' : 'var(--accent2)';
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleResExpand('mem','${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.script || '')}</div></div>
+        <div class="rp-val" style="color:${col}">${p.memory} MB</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="rp-sub">${p.cpu != null ? p.cpu + '%' : '—'} CPU</div>
+      </div>${_pm3DetailHtml('mem', p)}`;
+    }).join('');
+  }
+}
+function _tickMemModal() {
+  const d = _lastSysData;
+  const m = d?.memory;
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const hist = sysHistory.mem;
+  const cur = m?.percent ?? (hist.length ? hist[hist.length-1] : 0);
+  const col = cur > 90 ? 'var(--red)' : cur > 70 ? 'var(--yellow)' : 'var(--accent2)';
+
+  function chartStats(arr, unit) {
+    if (!arr.length) return '';
+    const mn = Math.min(...arr).toFixed(1), mx = Math.max(...arr).toFixed(1);
+    const av = (arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(1);
+    return `min ${mn}${unit} · avg ${av}${unit} · max ${mx}${unit}`;
+  }
+
+  setText('mm-mem-cur', cur + '%');
+  el('mm-mem-cur') && (el('mm-mem-cur').style.color = col);
+  setText('mm-mem-stats', chartStats(hist, '%'));
+  set('mm-mem-wrap', renderChart(hist, col, 'mm_mem', '%'));
+  const memArea = el('mm-mem-area');
+  if (memArea?._refreshTip) memArea._refreshTip();
+
+  if (m) {
+    const usedPct = m.percent;
+    const cachedPct = m.total ? Math.round((m.cached||0)/m.total*100) : 0;
+    const buffPct = m.total ? Math.round((m.buffers||0)/m.total*100) : 0;
+    set('mm-big-bar-wrap', `
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px">
+        <span>0</span>
+        <span style="color:var(--t2);font-weight:600">${fmt(m.used)} used of ${fmt(m.total)}</span>
+        <span>${fmt(m.total)}</span>
+      </div>
+      <div class="res-big-bar">
+        <div style="height:100%;display:flex;border-radius:5px;overflow:hidden">
+          <div style="width:${usedPct}%;background:${col};transition:width 0.6s"></div>
+          <div style="width:${cachedPct}%;background:var(--accent2);opacity:0.45;transition:width 0.6s"></div>
+          <div style="width:${buffPct}%;background:var(--cyan);opacity:0.35;transition:width 0.6s"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;font-size:9.5px;color:var(--t3);margin-top:4px">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};margin-right:3px"></span>Used</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--accent2);opacity:0.7;margin-right:3px"></span>Cached</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--cyan);opacity:0.7;margin-right:3px"></span>Buffers</span>
+      </div>`);
+
+    const swapUsedPct = m.swapTotal ? Math.round(m.swapUsed/m.swapTotal*100) : 0;
+    set('mm-stats-row', `
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Total RAM</div>
+        <div class="res-stat-val">${fmt(m.total)}</div>
+        <div class="res-stat-sub">Physical memory</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Used (active)</div>
+        <div class="res-stat-val" style="color:${col}">${fmt(m.used)}</div>
+        <div class="res-stat-sub">${usedPct}% of total</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Available</div>
+        <div class="res-stat-val" style="color:var(--green)">${fmt(m.available)}</div>
+        <div class="res-stat-sub">${m.total ? Math.round(m.available/m.total*100) : 0}% free</div>
+      </div>`);
+    set('mm-stats-row2', `
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Cached</div>
+        <div class="res-stat-val" style="color:var(--accent2);font-size:13px">${fmt(m.cached||0)}</div>
+        <div class="res-stat-sub">Page cache</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Buffers</div>
+        <div class="res-stat-val" style="color:var(--cyan);font-size:13px">${fmt(m.buffers||0)}</div>
+        <div class="res-stat-sub">I/O buffers</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Swap</div>
+        <div class="res-stat-val" style="color:${swapUsedPct>80?'var(--red)':'var(--t2)'};font-size:13px">${fmt(m.swapUsed||0)} / ${fmt(m.swapTotal||0)}</div>
+        <div class="res-stat-sub">${swapUsedPct}% used</div>
+      </div>`);
+  }
+
+  if (memSysMode) fetchSysProcs().then(_renderMemProcList);
+  else _renderMemProcList();
 }
 
 // ── Edit modal ────────────────────────────────────
@@ -2270,6 +2776,8 @@ document.getElementById('logs-modal').addEventListener('click',e=>{if(e.target==
 document.getElementById('stats-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStatsModal();});
 document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
 document.getElementById('columns-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeColumnsModal();});
+document.getElementById('cpu-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeCpuModal();});
+document.getElementById('mem-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMemModal();});
 document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
 document.getElementById('stdin-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); sendStdinCmd(); return; }
@@ -2293,9 +2801,13 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (statsModalTimer) { clearInterval(statsModalTimer); statsModalTimer = null; }
     if (editModalTimer)  { clearInterval(editModalTimer);  editModalTimer  = null; }
+    if (cpuModalTimer)   { clearInterval(cpuModalTimer);   cpuModalTimer   = null; }
+    if (memModalTimer)   { clearInterval(memModalTimer);   memModalTimer   = null; }
   } else {
     if (statsModalName && !statsModalTimer) statsModalTimer = setInterval(_tickStatsModal, 2000);
     if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
+    if (document.getElementById('cpu-modal')?.classList.contains('open') && !cpuModalTimer) cpuModalTimer = setInterval(_tickCpuModal, 2000);
+    if (document.getElementById('mem-modal')?.classList.contains('open') && !memModalTimer) memModalTimer = setInterval(_tickMemModal, 2000);
     // Refresh process data after returning to tab
     if (Date.now() - _lastSocketSystemTs > 3000) refreshProcesses();
     // Flush any log lines that accumulated while RAF was paused in the background
