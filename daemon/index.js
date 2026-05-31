@@ -276,20 +276,24 @@ app.get('/api/system/processes', async (req, res) => {
   try {
     if (_sysProcCache && Date.now() - _sysProcTs < 2000) return res.json(_sysProcCache);
     const data = await si.processes();
-    _sysProcCache = data.list.map(p => ({
-      pid:       p.pid,
-      parentPid: p.parentPid,
-      name:      p.name,
-      command:   p.command || p.name,
-      user:      p.user || '—',
-      cpu:       parseFloat((p.cpu   || 0).toFixed(1)),
-      mem:       parseFloat((p.mem   || 0).toFixed(2)),
-      memRss:    Math.round((p.memRss || 0) / 1024),
-      state:     p.state || '—',
-      nice:      p.nice  ?? 0,
-      started:   p.started || '',
-      priority:  p.priority ?? 0,
-    }));
+    _sysProcCache = data.list.map(p => {
+      const exe  = p.path ? `${p.path}/${p.command || p.name}` : (p.command || p.name);
+      const full = p.params ? `${exe} ${p.params}` : exe;
+      return {
+        pid:       p.pid,
+        parentPid: p.parentPid,
+        name:      p.name,
+        command:   full,
+        user:      p.user || '—',
+        cpu:       parseFloat((p.cpu   || 0).toFixed(1)),
+        mem:       parseFloat((p.mem   || 0).toFixed(2)),
+        memRss:    Math.round((p.memRss || 0) / 1024),
+        state:     p.state || '—',
+        nice:      p.nice  ?? 0,
+        started:   p.started || '',
+        priority:  p.priority ?? 0,
+      };
+    });
     _sysProcTs = Date.now();
     res.json(_sysProcCache);
   } catch (err) {

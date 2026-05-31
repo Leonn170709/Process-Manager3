@@ -2321,10 +2321,12 @@ function _pm3DetailHtml(modal, p) {
     <div class="rpd-lbl" style="margin-bottom:3px">Script</div>
     <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
     <div style="display:flex;gap:7px">
-      <button class="btn sm primary" onclick="event.stopPropagation();openStatsModal('${escapeHtml(p.name)}')">📊 Full stats</button>
-      <button class="btn sm" onclick="event.stopPropagation();openLogsFor('${escapeHtml(p.name)}')">📋 Logs</button>
+      <button class="btn sm primary" onclick="event.stopPropagation();openStatsFromRes('${escapeHtml(p.name)}')">📊 Full stats</button>
+      <button class="btn sm" onclick="event.stopPropagation();openLogsFromRes('${escapeHtml(p.name)}')">📋 Logs</button>
     </div>`);
 }
+function openStatsFromRes(name) { closeCpuModal(); closeMemModal(); openStatsModal(name); }
+function openLogsFromRes(name)  { closeCpuModal(); closeMemModal(); openLogsFor(name); }
 function _sysDetailHtml(modal, p) {
   const key = 'sys_' + p.pid;
   return _procDetailHtml(modal, key, `
@@ -2456,8 +2458,10 @@ function _tickCpuModal() {
     coresSection.innerHTML = '';
   }
 
-  if (cpuSysMode) fetchSysProcs().then(_renderCpuProcList);
-  else _renderCpuProcList();
+  if (!cpuExpanded) {
+    if (cpuSysMode) fetchSysProcs().then(_renderCpuProcList);
+    else _renderCpuProcList();
+  }
 }
 
 // ── Memory detail modal ───────────────────────────
@@ -2631,8 +2635,10 @@ function _tickMemModal() {
       </div>`);
   }
 
-  if (memSysMode) fetchSysProcs().then(_renderMemProcList);
-  else _renderMemProcList();
+  if (!memExpanded) {
+    if (memSysMode) fetchSysProcs().then(_renderMemProcList);
+    else _renderMemProcList();
+  }
 }
 
 // ── Edit modal ────────────────────────────────────
