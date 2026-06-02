@@ -7,6 +7,9 @@ process.on('unhandledRejection', reason => console.error('[PM3] Unhandled reject
 const http = require('http');
 const os = require('os');
 const dns = require('dns');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 const express = require('express');
 const { Server: SocketIOServer } = require('socket.io');
 const { EventEmitter } = require('events');
@@ -420,6 +423,119 @@ app.get('/api/system/runtime', async (req, res) => {
   }
 });
 
+// ── Tool / package detection ───────────────────────────────────────────────
+
+function _detectPkgManager() {
+  try {
+    const rel = fs.readFileSync('/etc/os-release', 'utf8');
+    const id = ((rel.match(/^ID=["']?(.+?)["']?\s*$/m) || [])[1] || '').toLowerCase();
+    const like = ((rel.match(/^ID_LIKE=["']?(.+?)["']?\s*$/m) || [])[1] || '').toLowerCase();
+    const s = id + ' ' + like;
+    if (s.includes('arch') || s.includes('cachyos') || s.includes('manjaro') || s.includes('endeavour'))
+      return { name: 'pacman', install: 'sudo pacman -S' };
+    if (s.includes('debian') || s.includes('ubuntu') || s.includes('mint'))
+      return { name: 'apt', install: 'sudo apt install' };
+    if (s.includes('fedora') || s.includes('rhel') || s.includes('centos') || s.includes('rocky'))
+      return { name: 'dnf', install: 'sudo dnf install' };
+    if (s.includes('suse'))
+      return { name: 'zypper', install: 'sudo zypper install' };
+  } catch {}
+  for (const [p, install] of [['/usr/bin/pacman','sudo pacman -S'],['/usr/bin/apt','sudo apt install'],['/usr/bin/dnf','sudo dnf install']]) {
+    if (fs.existsSync(p)) return { name: p.split('/').pop(), install };
+  }
+  return { name: null, install: 'your-package-manager install' };
+}
+
+function _getNvmeSysfsTemps() {
+  const temps = {};
+  try {
+    for (const ctrl of fs.readdirSync('/sys/class/nvme')) {
+      const base = `/sys/class/nvme/${ctrl}`;
+      for (const entry of fs.readdirSync(base)) {
+        if (!entry.startsWith('hwmon')) continue;
+        try {
+          const mc = parseInt(fs.readFileSync(`${base}/${entry}/temp1_input`, 'utf8').trim(), 10);
+          if (!isNaN(mc)) temps[ctrl] = Math.round(mc / 1000);
+        } catch {}
+        break;
+      }
+    }
+  } catch {}
+  return temps;
+}
+
+async function _getSmartHealth(device, useSudo) {
+  try {
+    const [cmd, args] = useSudo
+      ? ['sudo', ['-n', 'smartctl', '-H', device]]
+      : ['smartctl', ['-H', device]];
+    const r = await execFileAsync(cmd, args, { timeout: 6000 }).catch(e => e);
+    const out = (r.stdout || '') + (r.stderr || '');
+    const m = out.match(/overall-health.*?:\s*(\w+)/i);
+    if (m) return m[1]; // 'PASSED' or 'FAILED!'
+    if (out.includes('Permission denied') || out.includes('Keine Berechtigung')) return null;
+  } catch {}
+  return 'unknown';
+}
+
+let _toolsCache = null;
+let _toolsTs = 0;
+
+async function _checkTools() {
+  if (_toolsCache && Date.now() - _toolsTs < 60000) return _toolsCache;
+
+  const pkgManager = _detectPkgManager();
+  const result = { pkgManager };
+
+  // smartmontools
+  try {
+    const { stdout: wp } = await execFileAsync('which', ['smartctl']);
+    const smartPath = wp.trim();
+    result.smartmontools = { installed: true, path: smartPath };
+
+    const layout = await si.diskLayout().catch(() => []);
+    const device = layout[0]?.device || null;
+    if (device) {
+      // Try without elevated permissions first
+      const r = await execFileAsync('smartctl', ['-H', device], { timeout: 6000 }).catch(e => e);
+      const out = (r.stdout || '') + (r.stderr || '');
+      if (out.match(/overall-health.*?:\s*\w+/i)) {
+        result.smartmontools.canAccess = true;
+      } else if (out.includes('Permission denied') || out.includes('Keine Berechtigung')) {
+        result.smartmontools.needsPermission = true;
+        // Try sudo -n (no-password sudo)
+        const sr = await execFileAsync('sudo', ['-n', 'smartctl', '-H', device], { timeout: 6000 }).catch(e => e);
+        const sout = (sr.stdout || '') + (sr.stderr || '');
+        if (sout.match(/overall-health.*?:\s*\w+/i)) {
+          result.smartmontools.canAccess = true;
+          result.smartmontools.usesSudo = true;
+        } else {
+          result.smartmontools.canAccess = false;
+          result.smartmontools.fixHint = `sudo setcap cap_sys_rawio+ep ${smartPath}`;
+        }
+      } else {
+        result.smartmontools.canAccess = false;
+      }
+    } else {
+      result.smartmontools.canAccess = null; // no disks found
+    }
+  } catch {
+    result.smartmontools = {
+      installed: false,
+      fixHint: `${pkgManager.install} smartmontools`,
+    };
+  }
+
+  _toolsCache = result;
+  _toolsTs = Date.now();
+  return result;
+}
+
+app.get('/api/system/tools', async (req, res) => {
+  try { res.json(await _checkTools()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Storage detail — filesystems + physical drives + I/O rates (cached 4 s)
 let _storageCache = null;
 let _storageTs = 0;
@@ -431,7 +547,11 @@ app.get('/api/system/storage', async (req, res) => {
       _storageCache.writeSec = _diskSpeed.writeSec;
       return res.json(_storageCache);
     }
-    const [sizes, layout] = await Promise.all([si.fsSize(), si.diskLayout()]);
+    const [[sizes, layout], tools, nvmeTemps] = await Promise.all([
+      Promise.all([si.fsSize(), si.diskLayout()]),
+      _checkTools(),
+      Promise.resolve(_getNvmeSysfsTemps()),
+    ]);
     const fsList = sizes.filter(f =>
       f.size > 10 * 1024 * 1024 &&
       !_FS_SKIP_TYPES.has(f.type) &&
@@ -443,14 +563,30 @@ app.get('/api/system/storage', async (req, res) => {
       available: f.available ?? Math.max(0, f.size - f.used),
       use: f.use||0, mount: f.mount, rw: f.rw,
     }));
-    _storageCache = {
-      fs: fsList,
-      disks: layout.map(d => ({
+    const canUseSudo = tools.smartmontools?.usesSudo === true;
+    const disks = await Promise.all(layout.map(async d => {
+      // NVMe sysfs temperature fallback (no root needed)
+      let temperature = d.temperature || null;
+      if (temperature == null && d.device) {
+        const ctrl = d.device.replace(/^\/dev\//, '').replace(/n\d+$/, '');
+        if (nvmeTemps[ctrl] != null) temperature = nvmeTemps[ctrl];
+      }
+      // SMART health via sudo if systeminformation couldn't get it
+      let smartStatus = d.smartStatus || null;
+      if ((!smartStatus || smartStatus === 'unknown') && d.device && tools.smartmontools?.installed) {
+        const h = await _getSmartHealth(d.device, canUseSudo);
+        if (h && h !== 'unknown') smartStatus = h;
+      }
+      return {
         name: d.name, type: d.type, vendor: d.vendor||null, size: d.size,
-        interfaceType: d.interfaceType||null, smartStatus: d.smartStatus||null,
-        temperature: d.temperature||null, powerOnHours: d.powerOnHours||null,
+        interfaceType: d.interfaceType||null, smartStatus,
+        temperature, powerOnHours: d.powerOnHours||null,
         serialNum: d.serialNum||null, firmwareRevision: d.firmwareRevision||null,
-      })),
+        device: d.device||null,
+      };
+    }));
+    _storageCache = {
+      fs: fsList, disks,
       readSec: _diskSpeed.readSec,
       writeSec: _diskSpeed.writeSec,
     };
@@ -517,6 +653,9 @@ app.put('/api/prefs', (req, res) => {
   res.json({ ok: true });
 });
 
+// Run tool check once at startup so it's cached when the dashboard connects
+_checkTools().catch(() => {});
+
 // --- Socket.IO ---
 io.on('connection', socket => {
   // Send current state on connect
@@ -524,6 +663,7 @@ io.on('connection', socket => {
     processes: pm.getAllProcesses(),
     issues: issueTracker.getIssues(),
     prefs: storage.loadPrefs(),
+    tools: _toolsCache || null,
   });
 });
 

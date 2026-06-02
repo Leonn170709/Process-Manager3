@@ -816,6 +816,51 @@ program
   });
 
 // ══════════════════════════════════════════════════════════════
+//  pm3 doctor — check required / optional system tools
+// ══════════════════════════════════════════════════════════════
+
+program
+  .command('doctor')
+  .description('Check system tools required or used by PM3')
+  .action(async () => {
+    await ensureDaemon();
+    const tools = await api('get', '/api/system/tools');
+    const W = Math.min(termW(), 62);
+    nl();
+    console.log(boxTop('PM3 Doctor', 'tool check', W));
+    console.log(boxBlank(W));
+
+    function toolRow(icon, label, status, detail) {
+      const labelPad = padR(label, 18);
+      console.log(boxRow(`${icon}  ${labelPad}${status}`, W));
+      if (detail) console.log(boxRow(`   ${chalk.dim(padR('', 18))}${chalk.dim(detail)}`, W));
+    }
+
+    const sm = tools.smartmontools;
+    if (!sm) {
+      toolRow(chalk.red('✕'), 'smartmontools', chalk.red('unknown'));
+    } else if (!sm.installed) {
+      toolRow(chalk.red('✕'), 'smartmontools', chalk.red('not installed'));
+      if (sm.fixHint) {
+        console.log(boxRow(`   ${chalk.dim('Fix: ')}${chalk.cyan(sm.fixHint)}`, W));
+      }
+    } else if (sm.needsPermission && !sm.canAccess) {
+      toolRow(chalk.yellow('⚠'), 'smartmontools', chalk.yellow('needs permission'), sm.path || '');
+      if (sm.fixHint) {
+        console.log(boxRow(`   ${chalk.dim('Fix: ')}${chalk.cyan(sm.fixHint)}`, W));
+      }
+    } else if (sm.usesSudo) {
+      toolRow(chalk.green('✓'), 'smartmontools', chalk.green('ok') + chalk.dim(' (via sudo)'), sm.path || '');
+    } else {
+      toolRow(chalk.green('✓'), 'smartmontools', chalk.green('ok'), sm.path || '');
+    }
+
+    console.log(boxBlank(W));
+    console.log(boxBot(W));
+    nl();
+  });
+
+// ══════════════════════════════════════════════════════════════
 //  Help screen & parse
 // ══════════════════════════════════════════════════════════════
 

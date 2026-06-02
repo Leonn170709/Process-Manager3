@@ -359,6 +359,16 @@
     .res-modal { width:900px;max-height:90vh; }
     .res-stats-grid { display:grid;gap:6px;margin:10px 0 8px; }
     .res-stat-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:9px 12px; }
+    .res-stat-box.clickable { cursor:pointer;transition:background 0.15s,border-color 0.15s,transform 0.12s; }
+    .res-stat-box.clickable:hover { background:var(--g1);border-color:var(--border);transform:translateY(-1px); }
+    .res-stat-box.clickable .res-stat-sub { transition:color 0.15s; }
+    .res-stat-box.clickable:hover .res-stat-sub { color:var(--accent); }
+    @keyframes navFlash {
+      0%   { box-shadow:inset 0 0 0 2px transparent,0 0 0 0 transparent; }
+      18%  { box-shadow:inset 0 0 0 2px var(--accent),0 0 12px 4px rgba(79,142,255,0.22); background:rgba(79,142,255,0.10); }
+      100% { box-shadow:inset 0 0 0 2px transparent,0 0 0 0 transparent; }
+    }
+    .nav-flash { animation:navFlash 1.6s ease-out !important; border-radius:var(--r-xs); }
     .res-stat-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
     .res-stat-val { font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1);line-height:1.1; }
     .res-stat-sub { font-size:9.5px;color:var(--t4);margin-top:2px; }
@@ -488,6 +498,16 @@
     }
     .form-input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
     .form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+
+    /* ── Tool notices ────────────────────────────── */
+    #tools-notices { display:flex;flex-direction:column;gap:6px;padding:0 16px; }
+    .tools-notice {
+      display:flex;align-items:flex-start;gap:10px;
+      padding:10px 12px;border-radius:var(--r-sm);
+      background:color-mix(in srgb,var(--yellow) 8%,var(--g1));
+      border:1px solid color-mix(in srgb,var(--yellow) 30%,transparent);
+      font-size:12px;
+    }
 
     /* ── Toast ───────────────────────────────────── */
     .toast-container { position:fixed;bottom:18px;right:18px;z-index:200;display:flex;flex-direction:column;gap:6px;pointer-events:none; }
@@ -663,6 +683,9 @@
             Process</button>
         </div>
       </nav>
+
+      <!-- ── Tool notices ──────────────────────────── -->
+      <div id="tools-notices"></div>
 
       <!-- ── Content ────────────────────────────────── -->
       <div class="content">
@@ -1184,6 +1207,7 @@ let runtimeSysMode = false;
 let runtimeExpanded = null;
 const diskHistory = { read: [], write: [] };
 const DISK_HISTORY_MAX = 60;
+let _toolsStatus = null;
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -1191,6 +1215,7 @@ socket.on('init', data => {
   if (data.prefs) { applyPrefs(data.prefs); applyColumns(); }
   else { renderProcesses(); }
   renderIssues(); updateProcStats(); updateIssueStats();
+  if (data.tools) { _toolsStatus = data.tools; _showToolsNotifications(); }
 });
 socket.on('prefs:update', prefs => {
   applyPrefs(prefs);
@@ -1259,13 +1284,15 @@ fetchSystem(); setInterval(fetchSystem, 5000);
 // Load initial data via HTTP — works even if Socket.IO can't connect
 async function loadInitialData() {
   try {
-    const [procsRes, issuesRes] = await Promise.all([
+    const [procsRes, issuesRes, toolsRes] = await Promise.all([
       fetch('/api/processes'),
       fetch('/api/issues'),
+      fetch('/api/system/tools').catch(() => null),
     ]);
     processes = await procsRes.json();
     issues    = await issuesRes.json();
     renderProcesses(); renderIssues(); updateProcStats(); updateIssueStats();
+    if (toolsRes?.ok) { _toolsStatus = await toolsRes.json(); _showToolsNotifications(); }
   } catch {}
 }
 loadInitialData();
@@ -2065,6 +2092,54 @@ function toast(msg,type='info') {
   const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg;
   document.getElementById('toast-container').appendChild(el); setTimeout(()=>el.remove(),3200);
 }
+
+function _showToolsNotifications() {
+  const container = document.getElementById('tools-notices');
+  if (!container || !_toolsStatus) return;
+  container.innerHTML = '';
+  const notices = [];
+  const sm = _toolsStatus.smartmontools;
+  if (sm) {
+    if (!sm.installed) {
+      notices.push({
+        id: 'smartmontools-missing',
+        icon: '📦',
+        title: 'smartmontools not installed',
+        msg: 'Required for drive health (SMART) data.',
+        fix: sm.fixHint || 'Install smartmontools via your package manager',
+        level: 'warn',
+      });
+    } else if (sm.needsPermission && !sm.canAccess) {
+      notices.push({
+        id: 'smartmontools-perm',
+        icon: '🔒',
+        title: 'smartmontools needs permission',
+        msg: 'smartctl is installed but cannot access drives.',
+        fix: sm.fixHint || 'sudo setcap cap_sys_rawio+ep /usr/bin/smartctl',
+        level: 'warn',
+      });
+    }
+  }
+  for (const n of notices) {
+    const el = document.createElement('div');
+    el.className = 'tools-notice';
+    el.dataset.id = n.id;
+    el.innerHTML = `
+      <span style="font-size:14px">${n.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px;color:var(--t1)">${escapeHtml(n.title)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${escapeHtml(n.msg)}</div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px">
+          <span style="font-size:10px;color:var(--t4)">Run</span>
+          <code style="font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px">pm3 doctor</code>
+          <span style="font-size:10px;color:var(--t4)">for full diagnostics</span>
+          ${n.fix ? `<span style="font-size:10px;color:var(--t4);margin-left:2px">·</span><code style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px;word-break:break-all">${escapeHtml(n.fix)}</code>` : ''}
+        </div>
+      </div>
+      <button onclick="this.closest('.tools-notice').remove()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`;
+    container.appendChild(el);
+  }
+}
 function formatUptime(s) {
   if (!s) return '—'; s=Math.floor(s);
   const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),sec=s%60;
@@ -2074,6 +2149,16 @@ function formatDate(iso) { return new Date(iso).toLocaleString(); }
 function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
 function fmtSpeed(bps) { if(!bps) return '0 B/s'; if(bps>=1048576) return (bps/1048576).toFixed(1)+' MB/s'; if(bps>=1024) return (bps/1024).toFixed(0)+' KB/s'; return bps+' B/s'; }
 function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function flashHighlight(el, delay=0) {
+  if (!el) return;
+  const run = () => {
+    el.classList.remove('nav-flash');
+    void el.offsetWidth;
+    el.classList.add('nav-flash');
+    el.addEventListener('animationend', () => el.classList.remove('nav-flash'), { once: true });
+  };
+  delay ? setTimeout(run, delay) : run();
+}
 
 // ── Log filter state ──────────────────────────────
 const modalLogLines = [];     // { line, type } buffer of all loaded/live lines
@@ -3202,10 +3287,10 @@ function _buildRuntimeModal() {
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start">
-        <div class="res-stat-box" id="rm-pm3-running"><div class="res-stat-lbl">PM3 Running</div><div class="res-stat-val" style="color:var(--green)">—</div></div>
-        <div class="res-stat-box" id="rm-pm3-crashed"><div class="res-stat-lbl">PM3 Crashed</div><div class="res-stat-val" style="color:var(--red)">—</div></div>
-        <div class="res-stat-box" id="rm-sys-procs"><div class="res-stat-lbl">System Procs</div><div class="res-stat-val" style="color:var(--t2)">—</div></div>
-        <div class="res-stat-box" id="rm-sys-sleeping"><div class="res-stat-lbl">Sleeping</div><div class="res-stat-val" style="color:var(--t3)">—</div></div>
+        <div class="res-stat-box clickable" id="rm-pm3-running" onclick="setRuntimeMode(false);setTimeout(()=>{const l=document.getElementById('rm-proc-list');l?.scrollIntoView({behavior:'smooth'});flashHighlight(l)},80)" title="View running PM3 processes"><div class="res-stat-lbl">PM3 Running</div><div class="res-stat-val" style="color:var(--green)">—</div><div class="res-stat-sub">↓ Jump to list</div></div>
+        <div class="res-stat-box clickable" id="rm-pm3-crashed" onclick="closeRuntimeModal();switchTab('issues');flashHighlight(document.getElementById('issues-list'),120)" title="View crash reports in Issues tab"><div class="res-stat-lbl">PM3 Crashed</div><div class="res-stat-val" style="color:var(--red)">—</div><div class="res-stat-sub">→ Issues tab</div></div>
+        <div class="res-stat-box clickable" id="rm-sys-procs" onclick="setRuntimeMode(true);setTimeout(()=>{const l=document.getElementById('rm-proc-list');l?.scrollIntoView({behavior:'smooth'});flashHighlight(l)},80)" title="Browse all system processes"><div class="res-stat-lbl">System Procs</div><div class="res-stat-val" style="color:var(--t2)">—</div><div class="res-stat-sub">↓ Browse below</div></div>
+        <div class="res-stat-box clickable" id="rm-sys-sleeping" onclick="setRuntimeMode(true);setTimeout(()=>{const l=document.getElementById('rm-proc-list');l?.scrollIntoView({behavior:'smooth'});flashHighlight(l)},80)" title="Browse system processes (sleeping)"><div class="res-stat-lbl">Sleeping</div><div class="res-stat-val" style="color:var(--t3)">—</div><div class="res-stat-sub">↓ Browse below</div></div>
       </div>
     </div>
     <div class="res-stats-grid" id="rm-stats-row" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin-bottom:8px"></div>
@@ -3237,12 +3322,38 @@ function setRuntimeMode(isSystem) {
 function toggleRuntimeSort() {
   runtimeSortDesc = !runtimeSortDesc;
   const btn = document.getElementById('rm-sort-btn');
-  if (btn) btn.textContent = (runtimeSortDesc?'↓ ':'↑ ') + (runtimeSysMode ? 'CPU' : 'Uptime');
+  const sortLabel = runtimeSysMode ? 'CPU' : (runtimeSortBy==='restarts' ? 'Restarts' : 'Uptime');
+  if (btn) btn.textContent = (runtimeSortDesc?'↓ ':'↑ ') + sortLabel;
   _renderRuntimeProcList();
 }
 function toggleRuntimeExpand(key) {
   runtimeExpanded = runtimeExpanded === key ? null : key;
   _renderRuntimeProcList();
+}
+function _rmSortByRestarts() {
+  setRuntimeMode(false);
+  runtimeSortBy = 'restarts';
+  runtimeSortDesc = true;
+  const btn = document.getElementById('rm-sort-btn');
+  if (btn) btn.textContent = '↓ Restarts';
+  _renderRuntimeProcList();
+  setTimeout(() => {
+    const l = document.getElementById('rm-proc-list');
+    l?.scrollIntoView({behavior:'smooth'});
+    flashHighlight(l);
+    flashHighlight(document.getElementById('rm-sort-btn'));
+  }, 80);
+}
+function _rmExpandLongest() {
+  if (!_runtimeData?.pm3?.longestRunning) return;
+  setRuntimeMode(false);
+  const key = 'pm3_' + _runtimeData.pm3.longestRunning.name;
+  runtimeExpanded = key;
+  _renderRuntimeProcList();
+  setTimeout(() => {
+    const row = document.getElementById('rm-row-' + key);
+    if (row) { row.scrollIntoView({behavior:'smooth', block:'nearest'}); flashHighlight(row); }
+  }, 80);
 }
 function _renderRuntimeProcList() {
   const container = document.getElementById('rm-proc-list');
@@ -3260,12 +3371,15 @@ function _renderRuntimeProcList() {
       </div>${_sysDetailHtml('runtime',p)}`;
     }).join('');
   } else {
-    const list = Object.values(processes).sort((a,b)=>runtimeSortDesc?(b.uptime||0)-(a.uptime||0):(a.uptime||0)-(b.uptime||0));
+    const list = Object.values(processes).sort((a,b)=>{
+      if (runtimeSortBy==='restarts') return runtimeSortDesc?(b.restartCount||0)-(a.restartCount||0):(a.restartCount||0)-(b.restartCount||0);
+      return runtimeSortDesc?(b.uptime||0)-(a.uptime||0):(a.uptime||0)-(b.uptime||0);
+    });
     if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No PM3 processes</div>'; return; }
     container.innerHTML = list.map(p => {
       const key = 'pm3_'+p.name, isExp = runtimeExpanded===key;
       const sCol = p.status==='running'?'var(--green)':p.status==='crashed'?'var(--red)':'var(--t3)';
-      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleRuntimeExpand('${key}')">
+      return `<div class="res-proc-row${isExp?' expanded':''}" id="rm-row-${key}" onclick="toggleRuntimeExpand('${key}')">
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script"><span style="color:${sCol}">${p.status}</span></div></div>
         <div class="rp-val" style="font-size:11px">${formatUptime(p.uptime)}</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${Math.min(100,Math.round((p.cpu||0)*1.5))}%;background:var(--accent)"></div></div>
@@ -3302,11 +3416,11 @@ function _tickRuntimeModal() {
   const slEl = el('rm-sys-sleeping'); if (slEl) slEl.querySelector('.res-stat-val').textContent = rd?.system?.sleeping ?? '—';
 
   set('rm-stats-row', `
-    <div class="res-stat-box"><div class="res-stat-lbl">PM3 Managed</div><div class="res-stat-val">${pm3List.length}</div><div class="res-stat-sub">${pm3Running} running</div></div>
-    <div class="res-stat-box"><div class="res-stat-lbl">Total Restarts</div><div class="res-stat-val" style="color:var(--yellow)">${pm3List.reduce((s,p)=>s+(p.restartCount||0),0)}</div><div class="res-stat-sub">All time</div></div>
-    <div class="res-stat-box"><div class="res-stat-lbl">Total Issues</div><div class="res-stat-val" style="color:${issues.length?'var(--red)':'var(--green)'}">${issues.length}</div><div class="res-stat-sub">Tracked errors</div></div>
-    ${rd?.system?`<div class="res-stat-box"><div class="res-stat-lbl">Blocked</div><div class="res-stat-val" style="color:${rd.system.blocked>0?'var(--red)':'var(--t3)'}">${rd.system.blocked}</div><div class="res-stat-sub">I/O wait</div></div>`:''}
-    ${rd?.pm3?.longestRunning?`<div class="res-stat-box"><div class="res-stat-lbl">Longest Running</div><div class="res-stat-val" style="font-size:11px;color:var(--green)">${escapeHtml(rd.pm3.longestRunning.name)}</div><div class="res-stat-sub">${formatUptime(rd.pm3.longestRunning.uptime)}</div></div>`:''}`);
+    <div class="res-stat-box clickable" onclick="setRuntimeMode(false);setTimeout(()=>{const l=document.getElementById('rm-proc-list');l?.scrollIntoView({behavior:'smooth'});flashHighlight(l)},80)" title="View all PM3 processes"><div class="res-stat-lbl">PM3 Managed</div><div class="res-stat-val">${pm3List.length}</div><div class="res-stat-sub">${pm3Running} running · ↓ list</div></div>
+    <div class="res-stat-box clickable" onclick="_rmSortByRestarts()" title="Sort process list by restart count"><div class="res-stat-lbl">Total Restarts</div><div class="res-stat-val" style="color:var(--yellow)">${pm3List.reduce((s,p)=>s+(p.restartCount||0),0)}</div><div class="res-stat-sub">All time · sort list ↓</div></div>
+    <div class="res-stat-box clickable" onclick="closeRuntimeModal();switchTab('issues');flashHighlight(document.getElementById('issues-list'),120)" title="View all tracked issues"><div class="res-stat-lbl">Total Issues</div><div class="res-stat-val" style="color:${issues.length?'var(--red)':'var(--green)'}">${issues.length}</div><div class="res-stat-sub">→ Issues tab</div></div>
+    ${rd?.system?`<div class="res-stat-box clickable" onclick="closeRuntimeModal();openStorageModal();flashHighlight(document.getElementById('storage-modal-body'),200)" title="Processes blocked on disk I/O — click for storage details"><div class="res-stat-lbl">Blocked</div><div class="res-stat-val" style="color:${rd.system.blocked>0?'var(--red)':'var(--t3)'}">${rd.system.blocked}</div><div class="res-stat-sub">I/O wait · → disk</div></div>`:''}
+    ${rd?.pm3?.longestRunning?`<div class="res-stat-box clickable" onclick="_rmExpandLongest()" title="Jump to this process in the list"><div class="res-stat-lbl">Longest Running</div><div class="res-stat-val" style="font-size:11px;color:var(--green)">${escapeHtml(rd.pm3.longestRunning.name)}</div><div class="res-stat-sub">${formatUptime(rd.pm3.longestRunning.uptime)} · ↓ expand</div></div>`:''}`);
 
   if (rd?.uptime) {
     const u = rd.uptime;
@@ -3446,7 +3560,8 @@ function _renderDiskList() {
   const d = _storageData;
   if (!d || !d.disks || !d.disks.length) { container.innerHTML = ''; return; }
   const diskHtml = d.disks.map((dk, idx) => {
-    const sCl = dk.smartStatus==='Ok'||dk.smartStatus==='Passed' ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
+    const smartOk = dk.smartStatus==='Ok'||dk.smartStatus==='Passed'||dk.smartStatus==='PASSED';
+    const sCl = smartOk ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
     const tCl = dk.temperature!=null ? (dk.temperature>55?'var(--red)':dk.temperature>45?'var(--yellow)':'var(--green)') : 'var(--t4)';
     const smartLabel = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Unavailable' : dk.smartStatus;
     return `<div class="res-proc-row" style="grid-template-columns:1fr auto;cursor:pointer" onclick="openDriveDetailModal(${idx})">
@@ -3488,10 +3603,17 @@ function closeDriveDetailModal() {
   _driveDetailIdx = null;
 }
 function _buildDriveDetailModal(dk) {
-  const sCl = dk.smartStatus==='Ok'||dk.smartStatus==='Passed' ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
+  const smartOk = dk.smartStatus==='Ok'||dk.smartStatus==='Passed'||dk.smartStatus==='PASSED';
+  const sCl = smartOk ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
   const tCl = dk.temperature!=null ? (dk.temperature>55?'var(--red)':dk.temperature>45?'var(--yellow)':'var(--green)') : 'var(--t4)';
   const smartLabel = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Unavailable' : dk.smartStatus;
-  const smartNote = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Install smartmontools for health data' : '';
+  const smartNote = (() => {
+    if (dk.smartStatus && dk.smartStatus !== 'unknown') return '';
+    const sm = _toolsStatus?.smartmontools;
+    if (!sm || !sm.installed) return sm?.fixHint || 'Install smartmontools';
+    if (sm.needsPermission && !sm.canAccess) return sm.fixHint || 'sudo setcap cap_sys_rawio+ep /usr/bin/smartctl';
+    return 'SMART data unavailable';
+  })();
   document.getElementById('drive-detail-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-sm)">
       <div>
