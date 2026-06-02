@@ -340,7 +340,7 @@
     .severity-warning  { background:rgba(8,145,178,0.10);color:var(--cyan);border:1px solid rgba(8,145,178,0.2); }
 
     /* ── System tab ──────────────────────────────── */
-    .sys-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:7px;flex-shrink:0; }
+    .sys-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px;flex-shrink:0; }
     .sys-metric { padding:12px 14px; }
     .sm-label { font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:6px; }
     .sm-val   { font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1; }
@@ -397,6 +397,15 @@
     .res-big-bar { height:10px;background:rgba(0,0,0,0.07);border-radius:5px;overflow:hidden;margin:8px 0 4px; }
     .res-big-fill { height:100%;border-radius:5px;transition:width 0.6s ease; }
 
+    /* ── CPU/Net hw info boxes ───────────────────── */
+    .hw-info-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:5px;margin:6px 0; }
+    .hw-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:7px 10px; }
+    .hw-lbl { font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
+    .hw-val { font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-word;line-height:1.2; }
+    /* ── Net interface table ─────────────────────── */
+    .net-iface-row { display:grid;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--border-sm);align-items:center; }
+    .net-iface-row:last-child { border-bottom:none; }
+    .net-iface-row:hover { background:var(--g2); }
     /* ── Config tab ──────────────────────────────── */
     .cfg-scroll { flex:1;overflow-y:auto;min-height:0;padding:0; }
     .cfg-scroll::-webkit-scrollbar { width:4px; }
@@ -798,10 +807,22 @@
               <div class="sm-val" id="sys-up-big"
                 style="font-size:18px;color:var(--green)">—</div>
             </div>
-            <div class="card sys-metric">
+            <div class="card sys-metric clickable" onclick="openRuntimeModal()" title="Click for process runtime details">
               <div class="sm-label">Running Procs</div>
-              <div class="sm-val" id="sys-procs-big"
-                style="color:var(--cyan)">0</div>
+              <div class="sm-val" id="sys-procs-big" style="color:var(--cyan)">0</div>
+              <div class="sm-hint">↗ Runtime details</div>
+            </div>
+            <div class="card sys-metric clickable" onclick="openNetModal()" title="Click for network details">
+              <div class="sm-label">Network ↓</div>
+              <div class="sm-val" id="sys-net-card-rx" style="color:var(--green);font-size:16px">—</div>
+              <div class="sm-sub" id="sys-net-card-tx" style="margin-top:3px">↑ —</div>
+              <div class="sm-hint">↗ Interfaces &amp; details</div>
+            </div>
+            <div class="card sys-metric clickable" onclick="openStorageModal()" title="Click for storage details">
+              <div class="sm-label">Storage</div>
+              <div class="sm-val" id="sys-disk-big" style="color:var(--accent);font-size:16px">—</div>
+              <div class="sm-sub" id="sys-disk-io" style="margin-top:3px">— R · — W</div>
+              <div class="sm-hint">↗ Drives &amp; health</div>
             </div>
           </div>
           <div class="card" style="flex-shrink:0">
@@ -1035,6 +1056,61 @@
       </div>
     </div>
 
+    <!-- DRIVE DETAIL MODAL -->
+    <div class="modal-overlay" id="drive-detail-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">💾 <span id="drive-detail-title">Drive</span></div>
+          <div class="modal-close" onclick="closeDriveDetailModal()">×</div>
+        </div>
+        <div class="modal-body" id="drive-detail-body"></div>
+      </div>
+    </div>
+
+    <!-- INTERFACE DETAIL MODAL -->
+    <div class="modal-overlay" id="iface-detail-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">🔌 <span id="iface-detail-title">Interface</span></div>
+          <div class="modal-close" onclick="closeIfaceDetailModal()">×</div>
+        </div>
+        <div class="modal-body" id="iface-detail-body"></div>
+      </div>
+    </div>
+
+        <!-- RUNTIME DETAIL MODAL -->
+    <div class="modal-overlay" id="runtime-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">⚙ Process Runtime</div>
+          <div class="modal-close" onclick="closeRuntimeModal()">×</div>
+        </div>
+        <div class="modal-body" id="runtime-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- STORAGE DETAIL MODAL -->
+    <div class="modal-overlay" id="storage-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">💾 Storage Details</div>
+          <div class="modal-close" onclick="closeStorageModal()">×</div>
+        </div>
+        <div class="modal-body" id="storage-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- NETWORK DETAIL MODAL -->
+    <div class="modal-overlay" id="net-modal">
+      <div class="modal res-modal">
+        <div class="modal-hdr">
+          <div class="modal-title">🌐 Network Details</div>
+          <div class="modal-close" onclick="closeNetModal()">×</div>
+        </div>
+        <div class="modal-body" id="net-modal-body"></div>
+      </div>
+    </div>
+
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -1069,7 +1145,7 @@ const procHistory = {};       // { name: { cpu: [], mem: [] } }
 const HISTORY_MAX = 90;       // 90 × 2 s = 3 minutes of data
 const netHistory  = { rx: [], tx: [] };
 const NET_HISTORY_MAX = 60;   // 60 × 3 s = 3 minutes of network data
-const sysHistory  = { cpu: [], mem: [] };
+const sysHistory  = { cpu: [], mem: [], loadAvg: [] };
 const SYS_HISTORY_MAX = 90;
 let _lastSysData  = null;
 let statsModalName = null;
@@ -1078,6 +1154,10 @@ let editModalName = null;
 let editModalTimer = null;
 let cpuModalTimer = null;
 let memModalTimer = null;
+let netModalTimer = null;
+let runtimeModalTimer = null;
+let storageModalTimer = null;
+let _netDetailRefreshTimer = null;
 let cpuSortDesc = true;
 let memSortDesc = true;
 let cpuSysMode = false;
@@ -1086,6 +1166,24 @@ let cpuExpanded = null;
 let memExpanded = null;
 let _sysProcs = null;
 let coreView = 'thread';
+let _cpuStaticData = null;   // from /api/system cpuInfo (fetched once)
+let _lastTemp = null;        // from system:update temp field
+let _lastFreq = null;        // from system:update freq field
+let _netDetailData = null;   // from /api/system/network
+let _memLayoutData = null;   // from /api/system/mem-layout
+let _runtimeData = null;     // from /api/system/runtime
+let _storageData = null;     // from /api/system/storage
+const ifaceHistory = {};     // per-interface rx/tx speed history { 'eth0': { rx:[], tx:[] } }
+let driveDetailTimer = null;
+let ifaceDetailTimer = null;
+let _driveDetailIdx = null;
+let _ifaceDetailIdx = null;
+let runtimeSortBy = 'uptime';
+let runtimeSortDesc = true;
+let runtimeSysMode = false;
+let runtimeExpanded = null;
+const diskHistory = { read: [], write: [] };
+const DISK_HISTORY_MAX = 60;
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -1202,6 +1300,35 @@ function updateSysMetrics(data) {
     sysHistory.mem.push(data.memory.percent);
     if (sysHistory.mem.length > SYS_HISTORY_MAX) sysHistory.mem.shift();
   }
+  if (data.loadavg) {
+    sysHistory.loadAvg.push(parseFloat((data.loadavg[0]||0).toFixed(2)));
+    if (sysHistory.loadAvg.length > SYS_HISTORY_MAX) sysHistory.loadAvg.shift();
+  }
+  if (data.ifaceSpeed) {
+    for (const [iface, speed] of Object.entries(data.ifaceSpeed)) {
+      if (!ifaceHistory[iface]) ifaceHistory[iface] = { rx: [], tx: [] };
+      ifaceHistory[iface].rx.push(speed.rxSec || 0);
+      ifaceHistory[iface].tx.push(speed.txSec || 0);
+      if (ifaceHistory[iface].rx.length > NET_HISTORY_MAX) ifaceHistory[iface].rx.shift();
+      if (ifaceHistory[iface].tx.length > NET_HISTORY_MAX) ifaceHistory[iface].tx.shift();
+    }
+    if (ifaceDetailTimer) _tickIfaceDetailModal();
+  }
+  if (data.diskSpeed) {
+    diskHistory.read.push(data.diskSpeed.readSec || 0);
+    diskHistory.write.push(data.diskSpeed.writeSec || 0);
+    if (diskHistory.read.length > DISK_HISTORY_MAX) diskHistory.read.shift();
+    if (diskHistory.write.length > DISK_HISTORY_MAX) diskHistory.write.shift();
+    const diskIoEl = document.getElementById('sys-disk-io');
+    if (diskIoEl) diskIoEl.textContent = fmtSpeed(data.diskSpeed.readSec) + ' R · ' + fmtSpeed(data.diskSpeed.writeSec) + ' W';
+    if (storageModalTimer) {
+      if (_storageData) { _storageData.readSec = data.diskSpeed.readSec; _storageData.writeSec = data.diskSpeed.writeSec; }
+      _tickStorageModal();
+    }
+  }
+  if (data.cpuInfo) _cpuStaticData = data.cpuInfo;
+  if (data.temp !== undefined) _lastTemp = data.temp;
+  if (data.freq !== undefined) _lastFreq = data.freq;
   _statsData.sys_cpu = sysHistory.cpu;
   _statsData.sys_mem = sysHistory.mem;
   document.getElementById('sys-cpu').textContent = (data.cpu || 0) + '%';
@@ -1231,6 +1358,11 @@ function _updateNetDisplay(rxSec, txSec) {
   const rx = fmtSpeed(rxSec), tx = fmtSpeed(txSec);
   ['sys-net-rx','sys-net-rx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=rx; });
   ['sys-net-tx','sys-net-tx-big'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=tx; });
+  const cardRx = document.getElementById('sys-net-card-rx');
+  const cardTx = document.getElementById('sys-net-card-tx');
+  if (cardRx) cardRx.textContent = rx;
+  if (cardTx) cardTx.textContent = '↑ ' + tx;
+  if (netModalTimer) _tickNetModal();
   const toKB = arr => arr.map(v => Math.round(v/1024));
   const rxKB = toKB(netHistory.rx);
   const txKB = toKB(netHistory.tx);
@@ -1250,6 +1382,14 @@ function _updateNetDisplay(rxSec, txSec) {
 function updateSysTab(data) {
   if (data.uptime) document.getElementById('sys-up-big').textContent = formatUptime(data.uptime);
   if (data.network) _updateNetDisplay(data.network.rxSec, data.network.txSec);
+  if (data.disk && data.disk.length) {
+    const root = data.disk.find(d => d.mount === '/') || data.disk.reduce((a,b)=>b.size>a.size?b:a, data.disk[0]);
+    if (root) {
+      const pct = root.percent ?? Math.round(root.used/root.size*100);
+      const bigEl = document.getElementById('sys-disk-big');
+      if (bigEl) { bigEl.textContent = pct + '%'; bigEl.style.color = pct>85?'var(--red)':pct>65?'var(--yellow)':'var(--accent)'; }
+    }
+  }
   if (data.disk) document.getElementById('disk-list').innerHTML = data.disk.map(d => `
     <div style="padding:9px 14px;border-bottom:1px solid var(--border-sm)">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
@@ -2231,6 +2371,14 @@ function openCpuModal() {
   _buildCpuModal();
   _tickCpuModal();
   cpuModalTimer = setInterval(_tickCpuModal, 2000);
+  if (!_cpuStaticData) {
+    fetch('/api/system').then(r => r.json()).then(d => {
+      if (d.cpuInfo) _cpuStaticData = d.cpuInfo;
+      if (d.temp !== undefined) _lastTemp = d.temp;
+      if (d.freq !== undefined) _lastFreq = d.freq;
+      _tickCpuModal();
+    }).catch(() => {});
+  }
 }
 function closeCpuModal() {
   document.getElementById('cpu-modal').classList.remove('open');
@@ -2240,7 +2388,7 @@ function closeCpuModal() {
 function _buildCpuModal() {
   document.getElementById('cpu-modal-body').innerHTML = `
     <div class="chart-block" style="margin-bottom:8px">
-      <div class="chart-label">CPU History
+      <div class="chart-label">CPU Load History
         <span class="cur" id="cm-cpu-cur">—</span>
         <span class="chart-stats" id="cm-cpu-stats"></span>
         <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
@@ -2251,7 +2399,8 @@ function _buildCpuModal() {
         <div class="chart-tip"   id="cm-cpu-tip"></div>
       </div>
     </div>
-    <div class="res-stats-grid" id="cm-stats-row" style="grid-template-columns:repeat(5,1fr)"></div>
+    <div class="res-stats-grid" id="cm-stats-row" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr))"></div>
+    <div id="cm-hw-section"></div>
     <div id="cm-cores-section"></div>
     <div class="res-sec-hdr">
       <span class="res-sec-title">Processes by CPU</span>
@@ -2297,7 +2446,7 @@ function toggleResExpand(modal, key) {
   else                 { memExpanded = memExpanded === key ? null : key; _renderMemProcList(); }
 }
 function _procDetailHtml(modal, key, detailHtml) {
-  const expanded = modal === 'cpu' ? cpuExpanded : memExpanded;
+  const expanded = modal === 'cpu' ? cpuExpanded : modal === 'mem' ? memExpanded : modal === 'runtime' ? runtimeExpanded : null;
   if (expanded !== key) return '';
   return `<div class="res-proc-detail">${detailHtml}</div>`;
 }
@@ -2416,6 +2565,23 @@ function _tickCpuModal() {
 
   const la = d?.loadavg || [0, 0, 0];
   const user = d?.cpuUser ?? 0, sys = d?.cpuSystem ?? 0, idle = d?.cpuIdle ?? 0;
+  const temp = _lastTemp;
+  const freq = _lastFreq;
+  const tempCol = temp?.main != null ? (temp.main > 85 ? 'var(--red)' : temp.main > 70 ? 'var(--yellow)' : 'var(--green)') : 'var(--t3)';
+  const tempBox = temp?.main != null
+    ? `<div class="res-stat-box">
+        <div class="res-stat-lbl">Temperature</div>
+        <div class="res-stat-val" style="color:${tempCol}">${temp.main.toFixed(1)}°C</div>
+        <div class="res-stat-sub">${temp.max != null ? 'max ' + temp.max.toFixed(1) + '°C' : 'package temp'}</div>
+      </div>`
+    : '';
+  const freqBox = freq?.avg != null
+    ? `<div class="res-stat-box">
+        <div class="res-stat-lbl">Clock Speed</div>
+        <div class="res-stat-val" style="color:var(--cyan);font-size:13px">${freq.avg.toFixed(2)} GHz</div>
+        <div class="res-stat-sub">${freq.min != null ? 'min ' + freq.min.toFixed(2) : ''} · max ${freq.max != null ? freq.max.toFixed(2) : '—'} GHz</div>
+      </div>`
+    : '';
   set('cm-stats-row', `
     <div class="res-stat-box">
       <div class="res-stat-lbl">User</div>
@@ -2434,14 +2600,37 @@ function _tickCpuModal() {
     </div>
     <div class="res-stat-box">
       <div class="res-stat-lbl">Load avg</div>
-      <div class="res-stat-val" style="font-size:12px">${la[0].toFixed(2)} · ${la[1].toFixed(2)} · ${la[2].toFixed(2)}</div>
+      <div class="res-stat-val" style="font-size:11px">${la[0].toFixed(2)} · ${la[1].toFixed(2)} · ${la[2].toFixed(2)}</div>
       <div class="res-stat-sub">1m · 5m · 15m</div>
     </div>
     <div class="res-stat-box">
-      <div class="res-stat-lbl">Cores</div>
+      <div class="res-stat-lbl">Threads</div>
       <div class="res-stat-val" style="color:var(--cyan)">${d?.cpus?.length ?? '—'}</div>
-      <div class="res-stat-sub">Logical CPUs</div>
-    </div>`);
+      <div class="res-stat-sub">${d?.physicalCores ?? '—'} physical</div>
+    </div>
+    ${tempBox}${freqBox}`);
+
+  // Hardware info section (static — rendered once when _cpuStaticData is available)
+  const hwSection = el('cm-hw-section');
+  if (hwSection && _cpuStaticData && !hwSection.dataset.rendered) {
+    hwSection.dataset.rendered = '1';
+    const ci = _cpuStaticData;
+    function fmtCache(b) { if (!b || b < 0) return '—'; if (b >= 1048576) return (b/1048576).toFixed(1)+' MB'; return Math.round(b/1024)+' KB'; }
+    const cache = ci.cache || {};
+    hwSection.innerHTML = `
+      <div style="display:flex;align-items:center;padding:6px 0 4px;border-top:1px solid var(--border-sm);margin-top:6px">
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">CPU Hardware</span>
+      </div>
+      <div class="hw-info-grid">
+        ${ci.brand ? `<div class="hw-box" style="grid-column:span 2"><div class="hw-lbl">Model</div><div class="hw-val" style="font-size:11px">${escapeHtml(ci.manufacturer||'')} ${escapeHtml(ci.brand||'')}</div></div>` : ''}
+        ${ci.socket ? `<div class="hw-box"><div class="hw-lbl">Socket</div><div class="hw-val">${escapeHtml(ci.socket)}</div></div>` : ''}
+        ${ci.speed ? `<div class="hw-box"><div class="hw-lbl">Base Clock</div><div class="hw-val">${ci.speed} GHz</div></div>` : ''}
+        ${ci.speedMax ? `<div class="hw-box"><div class="hw-lbl">Max Clock</div><div class="hw-val">${ci.speedMax} GHz</div></div>` : ''}
+        ${cache.l1d ? `<div class="hw-box"><div class="hw-lbl">L1 Cache</div><div class="hw-val">${fmtCache(cache.l1d)} D · ${fmtCache(cache.l1i)} I</div></div>` : ''}
+        ${cache.l2 ? `<div class="hw-box"><div class="hw-lbl">L2 Cache</div><div class="hw-val">${fmtCache(cache.l2)}</div></div>` : ''}
+        ${cache.l3 ? `<div class="hw-box"><div class="hw-lbl">L3 Cache</div><div class="hw-val">${fmtCache(cache.l3)}</div></div>` : ''}
+      </div>`;
+  }
 
   const threads = d?.cpus || [];
   const physCores = d?.physicalCores ?? null;
@@ -2465,12 +2654,16 @@ function _tickCpuModal() {
         </div>`;
       }).join('');
     } else {
+      const coreTemps = (temp?.cores || []);
       gridHtml = threads.map((c, i) => {
         const cc = c.load > 80 ? 'var(--red)' : c.load > 50 ? 'var(--yellow)' : 'var(--accent)';
+        const ct = coreTemps[i] != null ? coreTemps[i] : null;
+        const tcol = ct != null ? (ct > 85 ? 'var(--red)' : ct > 70 ? 'var(--yellow)' : 'var(--t4)') : 'var(--t4)';
         return `<div class="res-core-box">
           <div class="res-core-lbl">Thread ${i}</div>
           <div class="res-core-val" style="color:${cc}">${c.load}%</div>
           <div class="res-core-bar"><div class="res-core-fill" style="width:${c.load}%;background:${cc}"></div></div>
+          ${ct != null ? `<div style="font-size:8.5px;color:${tcol};margin-top:2px">${ct.toFixed(0)}°C</div>` : ''}
         </div>`;
       }).join('');
     }
@@ -2496,12 +2689,19 @@ function _tickCpuModal() {
 }
 
 // ── Memory detail modal ───────────────────────────
+async function _fetchMemLayout() {
+  try {
+    const r = await fetch('/api/system/mem-layout');
+    if (r.ok) _memLayoutData = await r.json();
+  } catch {}
+}
 function openMemModal() {
   memSysMode = false; memExpanded = null;
   document.getElementById('mem-modal').classList.add('open');
   _buildMemModal();
   _tickMemModal();
   memModalTimer = setInterval(_tickMemModal, 2000);
+  if (!_memLayoutData) _fetchMemLayout().then(_tickMemModal);
 }
 function closeMemModal() {
   document.getElementById('mem-modal').classList.remove('open');
@@ -2525,6 +2725,7 @@ function _buildMemModal() {
     <div id="mm-big-bar-wrap" style="margin:0 0 4px"></div>
     <div class="res-stats-grid" id="mm-stats-row" style="grid-template-columns:repeat(3,1fr)"></div>
     <div class="res-stats-grid" id="mm-stats-row2" style="grid-template-columns:repeat(3,1fr);margin-top:0"></div>
+    <div id="mm-layout-section"></div>
     <div class="res-sec-hdr">
       <span class="res-sec-title">Processes by RAM</span>
       <div style="display:flex;gap:7px;align-items:center">
@@ -2666,9 +2867,705 @@ function _tickMemModal() {
       </div>`);
   }
 
+  // Memory hardware layout section (rendered once when data is available)
+  const layoutSection = el('mm-layout-section');
+  if (layoutSection && _memLayoutData && _memLayoutData.length > 0 && !layoutSection.dataset.rendered) {
+    layoutSection.dataset.rendered = '1';
+    const layout = _memLayoutData;
+    const usedSlots = layout.filter(m => m.size > 0).length;
+    const types = [...new Set(layout.filter(m => m.type && m.type !== 'Unknown').map(m => m.type))].join(', ');
+    const speeds = [...new Set(layout.filter(m => m.clockSpeed).map(m => m.clockSpeed + ' MHz'))].join(', ');
+    const mfrs = [...new Set(layout.filter(m => m.manufacturer && m.manufacturer !== 'Unknown').map(m => m.manufacturer))].join(', ');
+    const totalSize = layout.filter(m => m.size > 0).reduce((s, m) => s + m.size, 0);
+    layoutSection.innerHTML = `
+      <div style="display:flex;align-items:center;padding:6px 0 4px;border-top:1px solid var(--border-sm);margin-top:6px">
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Memory Hardware</span>
+      </div>
+      <div class="hw-info-grid">
+        ${types ? `<div class="hw-box"><div class="hw-lbl">Type</div><div class="hw-val" style="color:var(--accent2)">${escapeHtml(types)}</div></div>` : ''}
+        ${speeds ? `<div class="hw-box"><div class="hw-lbl">Speed</div><div class="hw-val">${escapeHtml(speeds)}</div></div>` : ''}
+        <div class="hw-box"><div class="hw-lbl">Slots Used</div><div class="hw-val">${usedSlots} / ${layout.length}</div></div>
+        ${totalSize > 0 ? `<div class="hw-box"><div class="hw-lbl">Total</div><div class="hw-val">${fmt(totalSize)}</div></div>` : ''}
+        ${mfrs ? `<div class="hw-box" style="grid-column:span 2"><div class="hw-lbl">Manufacturer</div><div class="hw-val" style="font-size:11px">${escapeHtml(mfrs)}</div></div>` : ''}
+      </div>`;
+  }
+
   if (!memExpanded) {
     if (memSysMode) fetchSysProcs().then(_renderMemProcList);
     else _renderMemProcList();
+  }
+}
+
+// ── Network detail modal ──────────────────────────
+async function _fetchNetDetail() {
+  try {
+    const r = await fetch('/api/system/network');
+    if (r.ok) _netDetailData = await r.json();
+  } catch {}
+}
+function openNetModal() {
+  document.getElementById('net-modal').classList.add('open');
+  _buildNetModal();
+  _tickNetModal();
+  netModalTimer = setInterval(_tickNetModal, 2000);
+  _fetchNetDetail().then(() => { _tickNetModal(); _renderIfaceList(); });
+  _netDetailRefreshTimer = setInterval(() => _fetchNetDetail().then(() => { _tickNetModal(); _renderIfaceList(); }), 12000);
+}
+function closeNetModal() {
+  document.getElementById('net-modal').classList.remove('open');
+  clearInterval(netModalTimer); clearInterval(_netDetailRefreshTimer);
+  netModalTimer = null; _netDetailRefreshTimer = null;
+}
+function _buildNetModal() {
+  document.getElementById('net-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Download
+          <span class="cur" style="color:var(--green)" id="nm-rx-cur">—</span>
+          <span class="chart-stats" id="nm-rx-stats"></span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
+        </div>
+        <div class="chart-hover-area" id="nm-rx-area">
+          <div class="chart-wrap" id="nm-rx-wrap"></div>
+          <div class="chart-xhair" id="nm-rx-xhair" style="background:var(--green)"></div>
+          <div class="chart-tip" id="nm-rx-tip"></div>
+        </div>
+      </div>
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Upload
+          <span class="cur" style="color:var(--cyan)" id="nm-tx-cur">—</span>
+          <span class="chart-stats" id="nm-tx-stats"></span>
+        </div>
+        <div class="chart-hover-area" id="nm-tx-area">
+          <div class="chart-wrap" id="nm-tx-wrap"></div>
+          <div class="chart-xhair" id="nm-tx-xhair" style="background:var(--cyan)"></div>
+          <div class="chart-tip" id="nm-tx-tip"></div>
+        </div>
+      </div>
+    </div>
+    <div class="res-stats-grid" id="nm-stats-row" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div id="nm-ifaces-section"><div style="padding:14px;text-align:center;color:var(--t4);font-size:11.5px">Loading interface data…</div></div>
+    <div id="nm-info-section"></div>`;
+  _attachChartHover('nm-rx-area', 'nm-rx-xhair', 'nm-rx-tip', 'sys_netrx', ' KB/s');
+  _attachChartHover('nm-tx-area', 'nm-tx-xhair', 'nm-tx-tip', 'sys_nettx', ' KB/s');
+}
+function _tickNetModal() {
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const rxKB = netHistory.rx.map(v => Math.round(v / 1024));
+  const txKB = netHistory.tx.map(v => Math.round(v / 1024));
+  const latestRx = netHistory.rx.length ? netHistory.rx[netHistory.rx.length - 1] : 0;
+  const latestTx = netHistory.tx.length ? netHistory.tx[netHistory.tx.length - 1] : 0;
+
+  function chartStats(arr, unit) {
+    if (!arr.length) return '';
+    const mn = Math.min(...arr), mx = Math.max(...arr);
+    const av = Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
+    return `min ${mn}${unit} · avg ${av}${unit} · max ${mx}${unit}`;
+  }
+
+  setText('nm-rx-cur', fmtSpeed(latestRx));
+  setText('nm-tx-cur', fmtSpeed(latestTx));
+  setText('nm-rx-stats', chartStats(rxKB, ' KB/s'));
+  setText('nm-tx-stats', chartStats(txKB, ' KB/s'));
+  Object.assign(_statsData, { sys_netrx: rxKB, sys_nettx: txKB });
+  set('nm-rx-wrap', renderChart(rxKB, 'var(--green)', 'nm_rx', ' KB/s'));
+  set('nm-tx-wrap', renderChart(txKB, 'var(--cyan)', 'nm_tx', ' KB/s'));
+  ['nm-rx-area', 'nm-tx-area'].forEach(id => { const e = el(id); if (e?._refreshTip) e._refreshTip(); });
+
+  const d = _netDetailData;
+  const totalRx = d?.stats?.reduce((s, st) => s + (st.rxBytes || 0), 0) || 0;
+  const totalTx = d?.stats?.reduce((s, st) => s + (st.txBytes || 0), 0) || 0;
+  const totalRxErr = d?.stats?.reduce((s, st) => s + (st.rxErrors || 0) + (st.rxDropped || 0), 0) || 0;
+  const totalTxErr = d?.stats?.reduce((s, st) => s + (st.txErrors || 0) + (st.txDropped || 0), 0) || 0;
+
+  set('nm-stats-row', `
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">Total Downloaded</div>
+      <div class="res-stat-val" style="color:var(--green);font-size:13px">${fmt(totalRx)}</div>
+      <div class="res-stat-sub">Since system boot</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">Total Uploaded</div>
+      <div class="res-stat-val" style="color:var(--cyan);font-size:13px">${fmt(totalTx)}</div>
+      <div class="res-stat-sub">Since system boot</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">RX Errors/Drops</div>
+      <div class="res-stat-val" style="color:${totalRxErr>0?'var(--red)':'var(--green)'};font-size:13px">${totalRxErr}</div>
+      <div class="res-stat-sub">Receive issues</div>
+    </div>
+    <div class="res-stat-box">
+      <div class="res-stat-lbl">TX Errors/Drops</div>
+      <div class="res-stat-val" style="color:${totalTxErr>0?'var(--red)':'var(--green)'};font-size:13px">${totalTxErr}</div>
+      <div class="res-stat-sub">Transmit issues</div>
+    </div>`);
+
+  if (!d) return;
+
+  set('nm-info-section', `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;margin-top:8px">
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Hostname</div>
+        <div class="res-stat-val" style="font-size:12px;word-break:break-all">${escapeHtml(d.hostname||'—')}</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">Default Gateway</div>
+        <div class="res-stat-val" style="font-size:12px;font-family:'JetBrains Mono',monospace">${escapeHtml(d.gateway||'—')}</div>
+      </div>
+      <div class="res-stat-box">
+        <div class="res-stat-lbl">DNS Servers</div>
+        <div class="res-stat-val" style="font-size:11px;font-family:'JetBrains Mono',monospace;line-height:1.4">${escapeHtml((d.dns||[]).slice(0,3).join('\n')||'—')}</div>
+      </div>
+    </div>`);
+}
+
+// ── Network interface list (stable — only rendered on data-load, not every tick) ──
+function _renderIfaceList() {
+  const container = document.getElementById('nm-ifaces-section');
+  if (!container) return;
+  const d = _netDetailData;
+  if (!d) { container.innerHTML = '<div style="padding:14px;text-align:center;color:var(--t4);font-size:11.5px">Loading interface data…</div>'; return; }
+  const ifaces = d.ifaces || [];
+  if (!ifaces.length) { container.innerHTML = '<div style="padding:12px 14px;color:var(--t4);font-size:11.5px">No active interfaces detected</div>'; return; }
+
+  const ifaceHtml = ifaces.map((i, idx) => {
+    const isUp = i.operstate === 'up';
+    const typeIcon = i.type === 'wireless' ? '📶' : i.type === 'virtual' ? '🔗' : '🔌';
+    const speedLabel = i.speed != null ? (i.speed >= 1000 ? (i.speed/1000).toFixed(0)+' Gbps' : i.speed+' Mbps') : null;
+    return `<div class="res-proc-row" style="grid-template-columns:minmax(100px,auto) 1fr auto;cursor:pointer;gap:10px" onclick="openIfaceDetailModal(${idx})">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:5px">
+          <span style="width:7px;height:7px;border-radius:50%;background:${isUp?'var(--green)':'var(--t4)'};flex-shrink:0;box-shadow:${isUp?'0 0 5px var(--green)':'none'}"></span>
+          ${typeIcon} ${escapeHtml(i.iface)}
+        </div>
+        <div style="font-size:10px;color:var(--t4);margin-top:1px">${escapeHtml(i.type||'—')}${speedLabel?' · '+speedLabel:''}</div>
+      </div>
+      <div style="min-width:0">
+        <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t1)">${escapeHtml(i.ip4||'—')}</div>
+        <div style="font-size:9.5px;color:var(--t4);font-family:'JetBrains Mono',monospace">${escapeHtml(i.mac||'—')}</div>
+      </div>
+      <div style="font-size:10px;color:var(--accent);white-space:nowrap">Details →</div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="res-sec-hdr" style="margin-top:6px">
+      <span class="res-sec-title">Network Interfaces</span>
+      <span style="font-size:10px;color:var(--t4)">${ifaces.length} active</span>
+    </div>
+    <div class="res-proc-scroll" style="border:1px solid var(--border-sm);border-radius:var(--r-xs)">${ifaceHtml}</div>`;
+}
+
+// ── Interface detail modal ─────────────────────────
+function openIfaceDetailModal(idx) {
+  _ifaceDetailIdx = idx;
+  const i = _netDetailData?.ifaces?.[idx];
+  if (!i) return;
+  closeNetModal();
+  document.getElementById('iface-detail-title').textContent = i.iface;
+  document.getElementById('iface-detail-modal').classList.add('open');
+  _buildIfaceDetailModal(i, idx);
+  _tickIfaceDetailModal();
+  ifaceDetailTimer = setInterval(_tickIfaceDetailModal, 2000);
+}
+function closeIfaceDetailModal() {
+  document.getElementById('iface-detail-modal').classList.remove('open');
+  clearInterval(ifaceDetailTimer); ifaceDetailTimer = null;
+  _ifaceDetailIdx = null;
+}
+function _buildIfaceDetailModal(i, idx) {
+  const isUp = i.operstate === 'up';
+  const typeIcon = i.type === 'wireless' ? '📶' : i.type === 'virtual' ? '🔗' : '🔌';
+  const speedLabel = i.speed != null ? (i.speed >= 1000 ? (i.speed/1000).toFixed(0)+' Gbps' : i.speed+' Mbps') : null;
+  document.getElementById('iface-detail-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-sm)">
+      <span style="font-size:26px">${typeIcon}</span>
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:700;color:var(--t1)">${escapeHtml(i.iface)}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${isUp?'var(--green)':'var(--t4)'};box-shadow:${isUp?'0 0 6px var(--green)':'none'}"></span>
+          <span style="font-size:12px;color:${isUp?'var(--green)':'var(--t3)'}">${escapeHtml(i.operstate||'Unknown')}</span>
+          ${speedLabel?`<span style="font-size:11px;color:var(--t4)">· ${speedLabel}</span>`:''}
+          ${i.duplex?`<span style="font-size:11px;color:var(--t4)">· ${escapeHtml(i.duplex)} duplex</span>`:''}
+        </div>
+      </div>
+      <button class="btn sm" onclick="closeIfaceDetailModal(); openNetModal()">← Back</button>
+    </div>
+    <div class="hw-info-grid" style="margin-bottom:12px">
+      ${i.ip4?`<div class="hw-box"><div class="hw-lbl">IPv4 Address</div><div class="hw-val">${escapeHtml(i.ip4)}</div></div>`:''}
+      ${i.ip4subnet?`<div class="hw-box"><div class="hw-lbl">Subnet Mask</div><div class="hw-val">${escapeHtml(i.ip4subnet)}</div></div>`:''}
+      ${i.mtu?`<div class="hw-box"><div class="hw-lbl">MTU</div><div class="hw-val">${i.mtu}</div></div>`:''}
+      <div class="hw-box"><div class="hw-lbl">DHCP</div><div class="hw-val">${i.dhcp?'Enabled':'Disabled'}</div></div>
+      ${i.mac?`<div class="hw-box" style="grid-column:span 2"><div class="hw-lbl">MAC Address</div><div class="hw-val">${escapeHtml(i.mac)}</div></div>`:''}
+      ${i.ip6?`<div class="hw-box" style="grid-column:span 3"><div class="hw-lbl">IPv6 Address</div><div class="hw-val" style="font-size:11px;word-break:break-all">${escapeHtml(i.ip6)}</div></div>`:''}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Download <span class="cur" id="id-rx-cur" style="color:var(--green)">—</span>
+          <span class="chart-stats" id="id-rx-stats"></span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min</span>
+        </div>
+        <div class="chart-hover-area" id="id-rx-area">
+          <div class="chart-wrap" id="id-rx-wrap"></div>
+          <div class="chart-xhair" id="id-rx-xhair" style="background:var(--green)"></div>
+          <div class="chart-tip" id="id-rx-tip"></div>
+        </div>
+      </div>
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Upload <span class="cur" id="id-tx-cur" style="color:var(--cyan)">—</span>
+          <span class="chart-stats" id="id-tx-stats"></span>
+        </div>
+        <div class="chart-hover-area" id="id-tx-area">
+          <div class="chart-wrap" id="id-tx-wrap"></div>
+          <div class="chart-xhair" id="id-tx-xhair" style="background:var(--cyan)"></div>
+          <div class="chart-tip" id="id-tx-tip"></div>
+        </div>
+      </div>
+    </div>
+    <div class="res-stats-grid" id="id-stats-row" style="grid-template-columns:repeat(auto-fill,minmax(115px,1fr))"></div>`;
+  _attachChartHover('id-rx-area','id-rx-xhair','id-rx-tip','iface_rx_'+idx,' KB/s');
+  _attachChartHover('id-tx-area','id-tx-xhair','id-tx-tip','iface_tx_'+idx,' KB/s');
+}
+function _tickIfaceDetailModal() {
+  const idx = _ifaceDetailIdx;
+  if (idx === null || idx === undefined) return;
+  const i = _netDetailData?.ifaces?.[idx];
+  if (!i) return;
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const hist = ifaceHistory[i.iface] || { rx: [], tx: [] };
+  const rxKB = hist.rx.map(v => Math.round(v/1024));
+  const txKB = hist.tx.map(v => Math.round(v/1024));
+  const latestRx = hist.rx.length ? hist.rx[hist.rx.length-1] : 0;
+  const latestTx = hist.tx.length ? hist.tx[hist.tx.length-1] : 0;
+  function cStats(arr, u) {
+    if (!arr.length) return '';
+    const mn=Math.min(...arr), mx=Math.max(...arr), av=Math.round(arr.reduce((s,v)=>s+v,0)/arr.length);
+    return `min ${mn}${u} · avg ${av}${u} · max ${mx}${u}`;
+  }
+  const rxKey = 'iface_rx_'+idx, txKey = 'iface_tx_'+idx;
+  setText('id-rx-cur', fmtSpeed(latestRx));
+  setText('id-tx-cur', fmtSpeed(latestTx));
+  setText('id-rx-stats', cStats(rxKB,' KB/s'));
+  setText('id-tx-stats', cStats(txKB,' KB/s'));
+  _statsData[rxKey] = rxKB; _statsData[txKey] = txKB;
+  set('id-rx-wrap', renderChart(rxKB,'var(--green)','id_rx',' KB/s'));
+  set('id-tx-wrap', renderChart(txKB,'var(--cyan)','id_tx',' KB/s'));
+  ['id-rx-area','id-tx-area'].forEach(id => { const e=el(id); if(e?._refreshTip) e._refreshTip(); });
+
+  const ifaceStats = {};
+  (_netDetailData?.stats || []).forEach(s => { ifaceStats[s.iface] = s; });
+  const st = ifaceStats[i.iface] || {};
+  const rErr = st.rxErrors||0, tErr = st.txErrors||0, rDrp = st.rxDropped||0, tDrp = st.txDropped||0;
+  set('id-stats-row', `
+    <div class="res-stat-box"><div class="res-stat-lbl">Total Received</div><div class="res-stat-val" style="color:var(--green);font-size:13px">${fmt(st.rxBytes||0)}</div><div class="res-stat-sub">Since boot</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Total Sent</div><div class="res-stat-val" style="color:var(--cyan);font-size:13px">${fmt(st.txBytes||0)}</div><div class="res-stat-sub">Since boot</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">RX Errors</div><div class="res-stat-val" style="color:${rErr>0?'var(--red)':'var(--green)'};font-size:13px">${rErr}</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">TX Errors</div><div class="res-stat-val" style="color:${tErr>0?'var(--red)':'var(--green)'};font-size:13px">${tErr}</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">RX Dropped</div><div class="res-stat-val" style="color:${rDrp>0?'var(--yellow)':'var(--green)'};font-size:13px">${rDrp}</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">TX Dropped</div><div class="res-stat-val" style="color:${tDrp>0?'var(--yellow)':'var(--green)'};font-size:13px">${tDrp}</div></div>`);
+}
+
+// ── Runtime modal ─────────────────────────────────
+async function _fetchRuntimeData() {
+  try { const r = await fetch('/api/system/runtime'); if (r.ok) _runtimeData = await r.json(); } catch {}
+}
+function openRuntimeModal() {
+  runtimeSysMode = false; runtimeExpanded = null;
+  document.getElementById('runtime-modal').classList.add('open');
+  _buildRuntimeModal(); _tickRuntimeModal();
+  runtimeModalTimer = setInterval(_tickRuntimeModal, 2000);
+  _fetchRuntimeData().then(_tickRuntimeModal);
+}
+function closeRuntimeModal() {
+  document.getElementById('runtime-modal').classList.remove('open');
+  clearInterval(runtimeModalTimer); runtimeModalTimer = null;
+}
+function _buildRuntimeModal() {
+  document.getElementById('runtime-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Load Average (1m)
+          <span class="cur" id="rm-load-cur">—</span>
+          <span class="chart-stats" id="rm-load-stats"></span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
+        </div>
+        <div class="chart-hover-area" id="rm-load-area">
+          <div class="chart-wrap" id="rm-load-wrap"></div>
+          <div class="chart-xhair" id="rm-load-xhair" style="background:var(--accent2)"></div>
+          <div class="chart-tip" id="rm-load-tip"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start">
+        <div class="res-stat-box" id="rm-pm3-running"><div class="res-stat-lbl">PM3 Running</div><div class="res-stat-val" style="color:var(--green)">—</div></div>
+        <div class="res-stat-box" id="rm-pm3-crashed"><div class="res-stat-lbl">PM3 Crashed</div><div class="res-stat-val" style="color:var(--red)">—</div></div>
+        <div class="res-stat-box" id="rm-sys-procs"><div class="res-stat-lbl">System Procs</div><div class="res-stat-val" style="color:var(--t2)">—</div></div>
+        <div class="res-stat-box" id="rm-sys-sleeping"><div class="res-stat-lbl">Sleeping</div><div class="res-stat-val" style="color:var(--t3)">—</div></div>
+      </div>
+    </div>
+    <div class="res-stats-grid" id="rm-stats-row" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin-bottom:8px"></div>
+    <div id="rm-uptime-section"></div>
+    <div class="res-sec-hdr">
+      <span class="res-sec-title">Processes</span>
+      <div style="display:flex;gap:7px;align-items:center">
+        <div class="res-mode-toggle">
+          <button class="rmt-btn active" id="rm-mode-pm3" onclick="setRuntimeMode(false)">⚡ PM3</button>
+          <button class="rmt-btn" id="rm-mode-sys" onclick="setRuntimeMode(true)">🖥 System</button>
+        </div>
+        <button class="res-sort-btn" id="rm-sort-btn" onclick="toggleRuntimeSort()">↓ Uptime</button>
+      </div>
+    </div>
+    <div class="res-proc-scroll" id="rm-proc-list"></div>`;
+  _attachChartHover('rm-load-area', 'rm-load-xhair', 'rm-load-tip', 'sys_loadavg', '');
+}
+function setRuntimeMode(isSystem) {
+  runtimeSysMode = isSystem; runtimeExpanded = null;
+  const pm3Btn = document.getElementById('rm-mode-pm3');
+  const sysBtn = document.getElementById('rm-mode-sys');
+  if (pm3Btn) pm3Btn.classList.toggle('active', !isSystem);
+  if (sysBtn) sysBtn.classList.toggle('active', isSystem);
+  runtimeSortBy = isSystem ? 'cpu' : 'uptime';
+  const sortBtn = document.getElementById('rm-sort-btn');
+  if (sortBtn) sortBtn.textContent = (runtimeSortDesc?'↓ ':'↑ ') + (isSystem ? 'CPU' : 'Uptime');
+  _renderRuntimeProcList();
+}
+function toggleRuntimeSort() {
+  runtimeSortDesc = !runtimeSortDesc;
+  const btn = document.getElementById('rm-sort-btn');
+  if (btn) btn.textContent = (runtimeSortDesc?'↓ ':'↑ ') + (runtimeSysMode ? 'CPU' : 'Uptime');
+  _renderRuntimeProcList();
+}
+function toggleRuntimeExpand(key) {
+  runtimeExpanded = runtimeExpanded === key ? null : key;
+  _renderRuntimeProcList();
+}
+function _renderRuntimeProcList() {
+  const container = document.getElementById('rm-proc-list');
+  if (!container) return;
+  if (runtimeSysMode) {
+    if (!_sysProcs) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">Loading…</div>'; fetchSysProcs().then(_renderRuntimeProcList); return; }
+    const list = [..._sysProcs].sort((a,b)=>runtimeSortDesc?b.cpu-a.cpu:a.cpu-b.cpu).slice(0,50);
+    container.innerHTML = list.map(p => {
+      const key = 'sys_'+p.pid, isExp = runtimeExpanded===key;
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleRuntimeExpand('${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
+        <div class="rp-val" style="color:var(--accent)">${p.cpu}%</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${Math.min(100,Math.round(p.cpu*2))}%;background:var(--accent)"></div></div>
+        <div class="rp-sub">${p.memRss} MB</div>
+      </div>${_sysDetailHtml('runtime',p)}`;
+    }).join('');
+  } else {
+    const list = Object.values(processes).sort((a,b)=>runtimeSortDesc?(b.uptime||0)-(a.uptime||0):(a.uptime||0)-(b.uptime||0));
+    if (!list.length) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">No PM3 processes</div>'; return; }
+    container.innerHTML = list.map(p => {
+      const key = 'pm3_'+p.name, isExp = runtimeExpanded===key;
+      const sCol = p.status==='running'?'var(--green)':p.status==='crashed'?'var(--red)':'var(--t3)';
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleRuntimeExpand('${key}')">
+        <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script"><span style="color:${sCol}">${p.status}</span></div></div>
+        <div class="rp-val" style="font-size:11px">${formatUptime(p.uptime)}</div>
+        <div class="rp-bar"><div class="rp-bar-fill" style="width:${Math.min(100,Math.round((p.cpu||0)*1.5))}%;background:var(--accent)"></div></div>
+        <div class="rp-sub">${p.memory?p.memory+' MB':'—'}</div>
+      </div>${_pm3DetailHtml('runtime',p)}`;
+    }).join('');
+  }
+}
+function _tickRuntimeModal() {
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const loadHist = sysHistory.loadAvg;
+  const curLoad = _lastSysData?.loadavg?.[0] ?? (loadHist.length?loadHist[loadHist.length-1]:0);
+  function chartStats(arr, u) {
+    if (!arr.length) return '';
+    const mn=Math.min(...arr).toFixed(2), mx=Math.max(...arr).toFixed(2), av=(arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(2);
+    return `min ${mn}${u} · avg ${av}${u} · max ${mx}${u}`;
+  }
+  setText('rm-load-cur', typeof curLoad === 'number' ? curLoad.toFixed(2) : curLoad);
+  setText('rm-load-stats', chartStats(loadHist, ''));
+  _statsData.sys_loadavg = loadHist;
+  set('rm-load-wrap', renderChart(loadHist, 'var(--accent2)', 'rm_load', ''));
+  const la = el('rm-load-area'); if (la?._refreshTip) la._refreshTip();
+
+  const pm3List = Object.values(processes);
+  const pm3Running = pm3List.filter(p=>p.status==='running').length;
+  const pm3Crashed = pm3List.filter(p=>p.status==='crashed').length;
+  const rd = _runtimeData;
+  const runBox = el('rm-pm3-running'); if (runBox) runBox.querySelector('.res-stat-val').textContent = pm3Running;
+  const crsBox = el('rm-pm3-crashed'); if (crsBox) crsBox.querySelector('.res-stat-val').textContent = pm3Crashed;
+  const spEl = el('rm-sys-procs'); if (spEl) spEl.querySelector('.res-stat-val').textContent = rd?.system?.all ?? '—';
+  const slEl = el('rm-sys-sleeping'); if (slEl) slEl.querySelector('.res-stat-val').textContent = rd?.system?.sleeping ?? '—';
+
+  set('rm-stats-row', `
+    <div class="res-stat-box"><div class="res-stat-lbl">PM3 Managed</div><div class="res-stat-val">${pm3List.length}</div><div class="res-stat-sub">${pm3Running} running</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Total Restarts</div><div class="res-stat-val" style="color:var(--yellow)">${pm3List.reduce((s,p)=>s+(p.restartCount||0),0)}</div><div class="res-stat-sub">All time</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Total Issues</div><div class="res-stat-val" style="color:${issues.length?'var(--red)':'var(--green)'}">${issues.length}</div><div class="res-stat-sub">Tracked errors</div></div>
+    ${rd?.system?`<div class="res-stat-box"><div class="res-stat-lbl">Blocked</div><div class="res-stat-val" style="color:${rd.system.blocked>0?'var(--red)':'var(--t3)'}">${rd.system.blocked}</div><div class="res-stat-sub">I/O wait</div></div>`:''}
+    ${rd?.pm3?.longestRunning?`<div class="res-stat-box"><div class="res-stat-lbl">Longest Running</div><div class="res-stat-val" style="font-size:11px;color:var(--green)">${escapeHtml(rd.pm3.longestRunning.name)}</div><div class="res-stat-sub">${formatUptime(rd.pm3.longestRunning.uptime)}</div></div>`:''}`);
+
+  if (rd?.uptime) {
+    const u = rd.uptime;
+    set('rm-uptime-section', `
+      <div style="display:flex;align-items:center;padding:5px 0 4px;border-top:1px solid var(--border-sm);margin:4px 0">
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Uptime &amp; Timeline</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:8px">
+        <div class="res-stat-box"><div class="res-stat-lbl">System Uptime</div><div class="res-stat-val" style="font-size:13px;color:var(--green)">${formatUptime(u.system)}</div><div class="res-stat-sub" style="font-size:8.5px">${new Date(u.bootTime*1000).toLocaleString()}</div></div>
+        <div class="res-stat-box"><div class="res-stat-lbl">PM3 Daemon</div><div class="res-stat-val" style="font-size:13px;color:var(--accent)">${formatUptime(u.daemon)}</div><div class="res-stat-sub" style="font-size:8.5px">${new Date(u.daemonStart).toLocaleString()}</div></div>
+        ${rd.pm3?.avgUptime?`<div class="res-stat-box"><div class="res-stat-lbl">Avg Process Uptime</div><div class="res-stat-val" style="font-size:13px">${formatUptime(rd.pm3.avgUptime)}</div><div class="res-stat-sub">Running processes</div></div>`:''}
+      </div>`);
+  }
+  if (!runtimeExpanded) _renderRuntimeProcList();
+}
+
+// ── Storage modal ─────────────────────────────────
+async function _fetchStorageData() {
+  try { const r = await fetch('/api/system/storage'); if (r.ok) _storageData = await r.json(); } catch {}
+}
+function openStorageModal() {
+  document.getElementById('storage-modal').classList.add('open');
+  _buildStorageModal(); _tickStorageModal();
+  storageModalTimer = setInterval(_tickStorageModal, 2000);
+  _fetchStorageData().then(() => { _tickStorageModal(); _renderDiskList(); });
+}
+function closeStorageModal() {
+  document.getElementById('storage-modal').classList.remove('open');
+  clearInterval(storageModalTimer); storageModalTimer = null;
+}
+function _buildStorageModal() {
+  document.getElementById('storage-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Disk Read
+          <span class="cur" id="sm2-rd-cur" style="color:var(--accent)">—</span>
+          <span class="chart-stats" id="sm2-rd-stats"></span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window</span>
+        </div>
+        <div class="chart-hover-area" id="sm2-rd-area">
+          <div class="chart-wrap" id="sm2-rd-wrap"></div>
+          <div class="chart-xhair" id="sm2-rd-xhair" style="background:var(--accent)"></div>
+          <div class="chart-tip" id="sm2-rd-tip"></div>
+        </div>
+      </div>
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Disk Write
+          <span class="cur" id="sm2-wr-cur" style="color:var(--yellow)">—</span>
+          <span class="chart-stats" id="sm2-wr-stats"></span>
+        </div>
+        <div class="chart-hover-area" id="sm2-wr-area">
+          <div class="chart-wrap" id="sm2-wr-wrap"></div>
+          <div class="chart-xhair" id="sm2-wr-xhair" style="background:var(--yellow)"></div>
+          <div class="chart-tip" id="sm2-wr-tip"></div>
+        </div>
+      </div>
+    </div>
+    <div class="res-stats-grid" id="sm2-overview-row" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))"></div>
+    <div id="sm2-fs-section"><div style="padding:14px;text-align:center;color:var(--t4);font-size:11.5px">Loading storage data…</div></div>
+    <div id="sm2-disks-section"></div>`;
+  _attachChartHover('sm2-rd-area','sm2-rd-xhair','sm2-rd-tip','disk_read',' MB/s');
+  _attachChartHover('sm2-wr-area','sm2-wr-xhair','sm2-wr-tip','disk_write',' MB/s');
+}
+function _tickStorageModal() {
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+
+  const rdMB = diskHistory.read.map(v => parseFloat((v/1048576).toFixed(2)));
+  const wrMB = diskHistory.write.map(v => parseFloat((v/1048576).toFixed(2)));
+  const latestRd = diskHistory.read.length ? diskHistory.read[diskHistory.read.length-1] : 0;
+  const latestWr = diskHistory.write.length ? diskHistory.write[diskHistory.write.length-1] : 0;
+
+  function cStats(arr, u) {
+    if (!arr.length) return '';
+    const mn=Math.min(...arr).toFixed(2), mx=Math.max(...arr).toFixed(2), av=(arr.reduce((s,v)=>s+v,0)/arr.length).toFixed(2);
+    return `min ${mn}${u} · avg ${av}${u} · max ${mx}${u}`;
+  }
+  setText('sm2-rd-cur', fmtSpeed(latestRd));
+  setText('sm2-wr-cur', fmtSpeed(latestWr));
+  setText('sm2-rd-stats', cStats(rdMB, ' MB/s'));
+  setText('sm2-wr-stats', cStats(wrMB, ' MB/s'));
+  Object.assign(_statsData, { disk_read: rdMB, disk_write: wrMB });
+  set('sm2-rd-wrap', renderChart(rdMB, 'var(--accent)', 'sm2_rd', ' MB/s'));
+  set('sm2-wr-wrap', renderChart(wrMB, 'var(--yellow)', 'sm2_wr', ' MB/s'));
+  ['sm2-rd-area','sm2-wr-area'].forEach(id => { const e=el(id); if(e?._refreshTip) e._refreshTip(); });
+
+  const d = _storageData;
+  if (!d) return;
+  const totalSize = d.fs.reduce((s,f)=>s+f.size,0);
+  const totalUsed = d.fs.reduce((s,f)=>s+f.used,0);
+  const totalPct = totalSize ? Math.round(totalUsed/totalSize*100) : 0;
+  const rdSec = d.readSec || latestRd, wrSec = d.writeSec || latestWr;
+  const pCol = totalPct>85?'var(--red)':totalPct>65?'var(--yellow)':'var(--t1)';
+
+  set('sm2-overview-row', `
+    <div class="res-stat-box"><div class="res-stat-lbl">Total Capacity</div><div class="res-stat-val" style="font-size:13px">${fmt(totalSize)}</div><div class="res-stat-sub">${d.disks.length} drive${d.disks.length!==1?'s':''}</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Used Space</div><div class="res-stat-val" style="color:${pCol};font-size:13px">${fmt(totalUsed)}</div><div class="res-stat-sub">${totalPct}% of total</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Free Space</div><div class="res-stat-val" style="color:var(--green);font-size:13px">${fmt(Math.max(0,totalSize-totalUsed))}</div><div class="res-stat-sub">${100-totalPct}% available</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Read Speed</div><div class="res-stat-val" style="color:var(--accent);font-size:13px">${fmtSpeed(rdSec)}</div><div class="res-stat-sub">Throughput</div></div>
+    <div class="res-stat-box"><div class="res-stat-lbl">Write Speed</div><div class="res-stat-val" style="color:var(--yellow);font-size:13px">${fmtSpeed(wrSec)}</div><div class="res-stat-sub">Throughput</div></div>`);
+
+  const fsHtml = d.fs.length ? d.fs.map(f => {
+    const pct = f.use || Math.round(f.used/f.size*100);
+    const col = pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--accent)';
+    return `<div style="padding:9px 12px;border-bottom:1px solid var(--border-sm)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <div>
+          <span style="font-weight:700;font-size:12px;color:var(--t1)">${escapeHtml(f.mount)}</span>
+          <span style="font-size:10px;color:var(--t4);margin-left:6px">${escapeHtml(f.fs)}</span>
+          ${f.type?`<span style="font-size:10px;color:var(--t4)"> · ${escapeHtml(f.type)}</span>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--t3)">
+          <span style="color:${col};font-weight:700">${fmt(f.used)}</span> / ${fmt(f.size)} · <span style="color:${col}">${pct}%</span>
+        </div>
+      </div>
+      <div style="height:5px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:9.5px;color:var(--t4);margin-top:3px">${fmt(f.available)} free${f.rw===false?' · read-only':''}</div>
+    </div>`;
+  }).join('') : '<div style="padding:14px;color:var(--t4);font-size:11.5px;text-align:center">No filesystems detected</div>';
+
+  set('sm2-fs-section', `
+    <div class="res-sec-hdr" style="margin-top:6px">
+      <span class="res-sec-title">Filesystems</span>
+      <span style="font-size:10px;color:var(--t4)">${d.fs.length} mounted</span>
+    </div>
+    <div style="border:1px solid var(--border-sm);border-radius:var(--r-xs);overflow:hidden">${fsHtml}</div>`);
+
+}
+
+// ── Drive list (stable — only rendered on data-load, not every tick) ─────────
+function _renderDiskList() {
+  const container = document.getElementById('sm2-disks-section');
+  if (!container) return;
+  const d = _storageData;
+  if (!d || !d.disks || !d.disks.length) { container.innerHTML = ''; return; }
+  const diskHtml = d.disks.map((dk, idx) => {
+    const sCl = dk.smartStatus==='Ok'||dk.smartStatus==='Passed' ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
+    const tCl = dk.temperature!=null ? (dk.temperature>55?'var(--red)':dk.temperature>45?'var(--yellow)':'var(--green)') : 'var(--t4)';
+    const smartLabel = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Unavailable' : dk.smartStatus;
+    return `<div class="res-proc-row" style="grid-template-columns:1fr auto;cursor:pointer" onclick="openDriveDetailModal(${idx})">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1)">${escapeHtml(dk.name||'Unknown')}</div>
+        <div style="font-size:10px;color:var(--t4);margin-top:2px">${escapeHtml(dk.type||'—')} · ${escapeHtml(dk.interfaceType||'—')}${dk.vendor?' · '+escapeHtml(dk.vendor):''}</div>
+        ${dk.temperature!=null?`<div style="font-size:10px;color:${tCl};margin-top:1px">🌡 ${dk.temperature}°C</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace">${fmt(dk.size)}</div>
+        <div style="font-size:10px;color:${sCl};font-weight:600;margin-top:2px">SMART: ${escapeHtml(smartLabel)}</div>
+        <div style="font-size:10px;color:var(--accent);margin-top:2px">Details →</div>
+      </div>
+    </div>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="res-sec-hdr" style="margin-top:4px">
+      <span class="res-sec-title">Physical Drives</span>
+      <span style="font-size:10px;color:var(--t4)">${d.disks.length} detected</span>
+    </div>
+    <div class="res-proc-scroll" style="border:1px solid var(--border-sm);border-radius:var(--r-xs)">${diskHtml}</div>`;
+}
+
+// ── Drive detail modal ─────────────────────────────
+function openDriveDetailModal(idx) {
+  _driveDetailIdx = idx;
+  const dk = _storageData?.disks?.[idx];
+  if (!dk) return;
+  closeStorageModal();
+  document.getElementById('drive-detail-title').textContent = dk.name || 'Drive';
+  document.getElementById('drive-detail-modal').classList.add('open');
+  _buildDriveDetailModal(dk);
+  _tickDriveDetailModal();
+  driveDetailTimer = setInterval(_tickDriveDetailModal, 2000);
+}
+function closeDriveDetailModal() {
+  document.getElementById('drive-detail-modal').classList.remove('open');
+  clearInterval(driveDetailTimer); driveDetailTimer = null;
+  _driveDetailIdx = null;
+}
+function _buildDriveDetailModal(dk) {
+  const sCl = dk.smartStatus==='Ok'||dk.smartStatus==='Passed' ? 'var(--green)' : dk.smartStatus && dk.smartStatus!=='unknown' ? 'var(--yellow)' : 'var(--t4)';
+  const tCl = dk.temperature!=null ? (dk.temperature>55?'var(--red)':dk.temperature>45?'var(--yellow)':'var(--green)') : 'var(--t4)';
+  const smartLabel = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Unavailable' : dk.smartStatus;
+  const smartNote = !dk.smartStatus || dk.smartStatus==='unknown' ? 'Install smartmontools for health data' : '';
+  document.getElementById('drive-detail-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-sm)">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--t1)">${escapeHtml(dk.name||'Unknown Drive')}</div>
+        <div style="font-size:11px;color:var(--t4);margin-top:3px">${escapeHtml(dk.type||'—')} · ${escapeHtml(dk.interfaceType||'—')}${dk.vendor?' · '+escapeHtml(dk.vendor):''}</div>
+      </div>
+      <button class="btn sm" onclick="closeDriveDetailModal(); openStorageModal()">← Back</button>
+    </div>
+    <div class="hw-info-grid" style="margin-bottom:12px">
+      ${dk.type?`<div class="hw-box"><div class="hw-lbl">Drive Type</div><div class="hw-val">${escapeHtml(dk.type)}</div></div>`:''}
+      ${dk.interfaceType?`<div class="hw-box"><div class="hw-lbl">Interface</div><div class="hw-val">${escapeHtml(dk.interfaceType)}</div></div>`:''}
+      ${dk.vendor?`<div class="hw-box"><div class="hw-lbl">Vendor</div><div class="hw-val">${escapeHtml(dk.vendor)}</div></div>`:''}
+      <div class="hw-box"><div class="hw-lbl">Capacity</div><div class="hw-val">${fmt(dk.size)}</div></div>
+      ${dk.temperature!=null?`<div class="hw-box"><div class="hw-lbl">Temperature</div><div class="hw-val" style="color:${tCl}">${dk.temperature}°C</div></div>`:''}
+      ${dk.powerOnHours!=null?`<div class="hw-box"><div class="hw-lbl">Power-On Time</div><div class="hw-val">${Math.round(dk.powerOnHours)}h<div style="font-size:9px;color:var(--t4);font-weight:400">${Math.round(dk.powerOnHours/24)} days</div></div></div>`:''}
+      <div class="hw-box"><div class="hw-lbl">SMART Health</div><div class="hw-val" style="color:${sCl}">${escapeHtml(smartLabel)}${smartNote?`<div style="font-size:9px;color:var(--t4);font-weight:400;margin-top:2px">${smartNote}</div>`:''}</div></div>
+      ${dk.firmwareRevision?`<div class="hw-box"><div class="hw-lbl">Firmware</div><div class="hw-val">${escapeHtml(dk.firmwareRevision)}</div></div>`:''}
+      ${dk.serialNum?`<div class="hw-box" style="grid-column:span 2"><div class="hw-lbl">Serial Number</div><div class="hw-val" style="font-size:11px;word-break:break-all">${escapeHtml(dk.serialNum)}</div></div>`:''}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Read Activity <span class="cur" id="dv-rd-cur" style="color:var(--accent)">—</span>
+          <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min · system-wide</span>
+        </div>
+        <div class="chart-hover-area" id="dv-rd-area">
+          <div class="chart-wrap" id="dv-rd-wrap"></div>
+          <div class="chart-xhair" id="dv-rd-xhair" style="background:var(--accent)"></div>
+          <div class="chart-tip" id="dv-rd-tip"></div>
+        </div>
+      </div>
+      <div class="chart-block" style="margin-bottom:0">
+        <div class="chart-label">Write Activity <span class="cur" id="dv-wr-cur" style="color:var(--yellow)">—</span></div>
+        <div class="chart-hover-area" id="dv-wr-area">
+          <div class="chart-wrap" id="dv-wr-wrap"></div>
+          <div class="chart-xhair" id="dv-wr-xhair" style="background:var(--yellow)"></div>
+          <div class="chart-tip" id="dv-wr-tip"></div>
+        </div>
+      </div>
+    </div>
+    <div id="dv-fs-section"></div>`;
+  _attachChartHover('dv-rd-area','dv-rd-xhair','dv-rd-tip','disk_read',' MB/s');
+  _attachChartHover('dv-wr-area','dv-wr-xhair','dv-wr-tip','disk_write',' MB/s');
+}
+function _tickDriveDetailModal() {
+  const el = id => document.getElementById(id);
+  const set = (id, v) => { const e = el(id); if (e) e.innerHTML = v; };
+  const setText = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+  const rdMB = diskHistory.read.map(v => parseFloat((v/1048576).toFixed(2)));
+  const wrMB = diskHistory.write.map(v => parseFloat((v/1048576).toFixed(2)));
+  const latestRd = diskHistory.read.length ? diskHistory.read[diskHistory.read.length-1] : 0;
+  const latestWr = diskHistory.write.length ? diskHistory.write[diskHistory.write.length-1] : 0;
+  setText('dv-rd-cur', fmtSpeed(latestRd));
+  setText('dv-wr-cur', fmtSpeed(latestWr));
+  Object.assign(_statsData, { disk_read: rdMB, disk_write: wrMB });
+  set('dv-rd-wrap', renderChart(rdMB,'var(--accent)','dv_rd',' MB/s'));
+  set('dv-wr-wrap', renderChart(wrMB,'var(--yellow)','dv_wr',' MB/s'));
+  ['dv-rd-area','dv-wr-area'].forEach(id => { const e=el(id); if(e?._refreshTip) e._refreshTip(); });
+  const fsSec = el('dv-fs-section');
+  const d = _storageData;
+  if (fsSec && d?.fs?.length) {
+    const fsHtml = d.fs.map(f => {
+      const pct = f.use || Math.round(f.used/f.size*100);
+      const col = pct>90?'var(--red)':pct>70?'var(--yellow)':'var(--accent)';
+      return `<div style="padding:8px 12px;border-bottom:1px solid var(--border-sm)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div><span style="font-weight:700;font-size:12px;color:var(--t1)">${escapeHtml(f.mount)}</span><span style="font-size:10px;color:var(--t4);margin-left:6px">${escapeHtml(f.fs)}${f.type?' · '+escapeHtml(f.type):''}</span></div>
+          <div style="font-size:11px;color:var(--t3)"><span style="color:${col};font-weight:700">${fmt(f.used)}</span> / ${fmt(f.size)} · <span style="color:${col}">${pct}%</span></div>
+        </div>
+        <div style="height:4px;background:rgba(0,0,0,0.08);border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${col};border-radius:2px;transition:width 0.5s"></div></div>
+      </div>`;
+    }).join('');
+    fsSec.innerHTML = `
+      <div class="res-sec-hdr" style="margin-top:6px"><span class="res-sec-title">Filesystems</span></div>
+      <div style="border:1px solid var(--border-sm);border-radius:var(--r-xs);overflow:hidden">${fsHtml}</div>`;
   }
 }
 
@@ -2815,6 +3712,11 @@ document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target==
 document.getElementById('columns-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeColumnsModal();});
 document.getElementById('cpu-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeCpuModal();});
 document.getElementById('mem-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMemModal();});
+document.getElementById('net-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNetModal();});
+document.getElementById('runtime-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeRuntimeModal();});
+document.getElementById('storage-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStorageModal();});
+document.getElementById('drive-detail-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDriveDetailModal();});
+document.getElementById('iface-detail-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeIfaceDetailModal();});
 document.getElementById('f-script').addEventListener('keydown',e=>{if(e.key==='Enter')submitStart();});
 document.getElementById('stdin-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); sendStdinCmd(); return; }
@@ -2838,13 +3740,23 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (statsModalTimer) { clearInterval(statsModalTimer); statsModalTimer = null; }
     if (editModalTimer)  { clearInterval(editModalTimer);  editModalTimer  = null; }
-    if (cpuModalTimer)   { clearInterval(cpuModalTimer);   cpuModalTimer   = null; }
-    if (memModalTimer)   { clearInterval(memModalTimer);   memModalTimer   = null; }
+    if (cpuModalTimer)     { clearInterval(cpuModalTimer);     cpuModalTimer     = null; }
+    if (memModalTimer)     { clearInterval(memModalTimer);     memModalTimer     = null; }
+    if (netModalTimer)     { clearInterval(netModalTimer);     netModalTimer     = null; }
+    if (runtimeModalTimer) { clearInterval(runtimeModalTimer); runtimeModalTimer = null; }
+    if (storageModalTimer)   { clearInterval(storageModalTimer);   storageModalTimer   = null; }
+    if (driveDetailTimer)    { clearInterval(driveDetailTimer);    driveDetailTimer    = null; }
+    if (ifaceDetailTimer)    { clearInterval(ifaceDetailTimer);    ifaceDetailTimer    = null; }
   } else {
     if (statsModalName && !statsModalTimer) statsModalTimer = setInterval(_tickStatsModal, 2000);
     if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
-    if (document.getElementById('cpu-modal')?.classList.contains('open') && !cpuModalTimer) cpuModalTimer = setInterval(_tickCpuModal, 2000);
-    if (document.getElementById('mem-modal')?.classList.contains('open') && !memModalTimer) memModalTimer = setInterval(_tickMemModal, 2000);
+    if (document.getElementById('cpu-modal')?.classList.contains('open')          && !cpuModalTimer)     cpuModalTimer     = setInterval(_tickCpuModal,         2000);
+    if (document.getElementById('mem-modal')?.classList.contains('open')          && !memModalTimer)     memModalTimer     = setInterval(_tickMemModal,         2000);
+    if (document.getElementById('net-modal')?.classList.contains('open')          && !netModalTimer)     netModalTimer     = setInterval(_tickNetModal,         2000);
+    if (document.getElementById('runtime-modal')?.classList.contains('open')      && !runtimeModalTimer) runtimeModalTimer = setInterval(_tickRuntimeModal,    2000);
+    if (document.getElementById('storage-modal')?.classList.contains('open')      && !storageModalTimer) storageModalTimer = setInterval(_tickStorageModal,    2000);
+    if (document.getElementById('drive-detail-modal')?.classList.contains('open') && !driveDetailTimer)  driveDetailTimer  = setInterval(_tickDriveDetailModal, 2000);
+    if (document.getElementById('iface-detail-modal')?.classList.contains('open') && !ifaceDetailTimer)  ifaceDetailTimer  = setInterval(_tickIfaceDetailModal, 2000);
     // Refresh process data after returning to tab
     if (Date.now() - _lastSocketSystemTs > 3000) refreshProcesses();
     // Flush any log lines that accumulated while RAF was paused in the background
