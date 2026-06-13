@@ -767,7 +767,7 @@
               onclick="setIssueFilter('all')">
               <div class="sp-val" id="stat-iss-total"
                 style="color:var(--t2)">0</div>
-              <div class="sp-label">Total (max 200)</div>
+              <div class="sp-label" id="stat-iss-limit-label">Total (max 200)</div>
             </div>
           </div>
 
@@ -980,6 +980,9 @@
               onchange="loadModalLogs()" style="width:180px;padding:5px 10px">
               <option value>Select process…</option>
             </select>
+            <button class="pab pab-start"   id="logs-modal-start-btn"   style="display:none;padding:4px 10px;font-size:11.5px" onclick="logsModalProcAction('start')"  >▶ Start</button>
+            <button class="pab pab-stop"    id="logs-modal-stop-btn"    style="display:none;padding:4px 10px;font-size:11.5px" onclick="logsModalProcAction('stop')"   >■ Stop</button>
+            <button class="pab pab-restart" id="logs-modal-restart-btn" style="display:none;padding:4px 10px;font-size:11.5px" onclick="logsModalProcAction('restart')">↺ Restart</button>
             <button class="btn sm" onclick="clearModalLogView()">Clear</button>
             <div class="modal-close" onclick="closeLogsModal()">×</div>
           </div>
@@ -1208,6 +1211,7 @@ let runtimeExpanded = null;
 const diskHistory = { read: [], write: [] };
 const DISK_HISTORY_MAX = 60;
 let _toolsStatus = null;
+let _maxIssuesCfg = 200;
 
 socket.on('init', data => {
   processes = data.processes || {};
@@ -1225,7 +1229,7 @@ socket.on('process:update', proc => {
   processes[proc.name] = proc;
   recordHistory(proc);
   renderProcessRow(proc); updateProcStats();
-  if (proc.name === modalLogProcess) updateStdinBar();
+  if (proc.name === modalLogProcess) { updateStdinBar(); updateLogsModalButtons(); }
   if (proc.name === statsModalName) _tickStatsModal();
 });
 socket.on('process:delete', data => {
@@ -1250,7 +1254,7 @@ let _lastSocketSystemTs = 0;
 socket.on('system:update', data => { _lastSocketSystemTs = Date.now(); updateSysMetrics(data); });
 socket.on('issue:new', issue => {
   issues.unshift(issue);
-  if (issues.length > 200) issues = issues.slice(0, 200);
+  if (_maxIssuesCfg !== -1 && issues.length > _maxIssuesCfg) issues = issues.slice(0, _maxIssuesCfg);
   renderIssues();
   const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
   if (activeTab !== 'issues') {
@@ -1284,16 +1288,26 @@ fetchSystem(); setInterval(fetchSystem, 5000);
 // Load initial data via HTTP — works even if Socket.IO can't connect
 async function loadInitialData() {
   try {
-    const [procsRes, issuesRes, toolsRes] = await Promise.all([
+    const [procsRes, issuesRes, toolsRes, cfgRes] = await Promise.all([
       fetch('/api/processes'),
       fetch('/api/issues'),
       fetch('/api/system/tools').catch(() => null),
+      fetch('/api/config').catch(() => null),
     ]);
     processes = await procsRes.json();
     issues    = await issuesRes.json();
+    if (cfgRes?.ok) {
+      const cfgData = await cfgRes.json();
+      const mi = cfgData.config?.maxIssues;
+      if (mi != null) { _maxIssuesCfg = mi; _updateIssueLimitLabel(); }
+    }
     renderProcesses(); renderIssues(); updateProcStats(); updateIssueStats();
     if (toolsRes?.ok) { _toolsStatus = await toolsRes.json(); _showToolsNotifications(); }
   } catch {}
+}
+function _updateIssueLimitLabel() {
+  const el = document.getElementById('stat-iss-limit-label');
+  if (el) el.textContent = _maxIssuesCfg === -1 ? 'Total' : `Total (max ${_maxIssuesCfg})`;
 }
 loadInitialData();
 
@@ -1654,6 +1668,33 @@ function updateStdinBar() {
   badge.style.display = canWrite ? '' : 'none';
 }
 
+function updateLogsModalButtons() {
+  const startBtn   = document.getElementById('logs-modal-start-btn');
+  const stopBtn    = document.getElementById('logs-modal-stop-btn');
+  const restartBtn = document.getElementById('logs-modal-restart-btn');
+  if (!startBtn) return;
+
+  const proc = modalLogProcess && processes[modalLogProcess];
+  if (!proc) {
+    startBtn.style.display   = 'none';
+    stopBtn.style.display    = 'none';
+    restartBtn.style.display = 'none';
+    return;
+  }
+
+  const active = proc.status === 'running' || proc.status === 'starting' || proc.status === 'restarting';
+  startBtn.style.display   = active ? 'none' : '';
+  stopBtn.style.display    = active ? ''     : 'none';
+  restartBtn.style.display = '';
+}
+
+async function logsModalProcAction(action) {
+  if (!modalLogProcess) return;
+  await procAction(action, modalLogProcess);
+  // Update buttons after a brief moment (socket update may lag slightly)
+  setTimeout(updateLogsModalButtons, 300);
+}
+
 async function sendStdinCmd() {
   const input = document.getElementById('stdin-input');
   const data  = input.value;
@@ -1724,6 +1765,7 @@ function closeLogsModal() {
   modalLogLines.length = 0;
   _logRafQueue.length = 0;
   _resetLogPause();
+  updateLogsModalButtons();
   document.getElementById('logs-modal-proc-name').textContent = 'No process selected';
   document.getElementById('logs-modal-title-name').textContent = 'Logs';
   document.getElementById('stdin-bar').style.display   = 'none';
@@ -1734,11 +1776,12 @@ function closeLogsModal() {
 }
 async function loadModalLogs() {
   const name = document.getElementById('logs-modal-select').value;
-  if (!name) { modalLogProcess = null; updateStdinBar(); return; }
+  if (!name) { modalLogProcess = null; updateStdinBar(); updateLogsModalButtons(); return; }
   modalLogProcess = name;
   document.getElementById('logs-modal-proc-name').textContent = name;
   document.getElementById('logs-modal-title-name').textContent = name;
   updateStdinBar();
+  updateLogsModalButtons();
   _resetLogPause();
   _lastLogSocketTs = 0;
   if (_logPollTimer) clearInterval(_logPollTimer);
@@ -1991,6 +2034,7 @@ async function loadConfig() {
     const d = await r.json();
     configValues = d.config;
     configSchema = d.schema;
+    if (d.config?.maxIssues != null) { _maxIssuesCfg = d.config.maxIssues; _updateIssueLimitLabel(); }
     renderConfig();
   } catch(e) {
     const hint = e.message.includes('JSON') ? ' — restart the daemon: pm3 kill && pm3 list' : '';
@@ -2205,7 +2249,8 @@ function renderChart(values, color, chartId, unit, chartH) {
   unit = unit || '';
   if (!values.length) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
     <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
-  const max = Math.max(...values, 1);
+  const dataMax = Math.max(...values, 1);
+  const max = unit === '%' ? 100 : dataMax;
   const pts = values.map((v, i) => ({
     x: Math.round((i / Math.max(values.length-1, 1)) * cW),
     y: Math.round(H - PAD_B - (v/max) * (H-PAD_T-PAD_B)),

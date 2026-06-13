@@ -181,6 +181,11 @@ function _spawnProcess(procRecord) {
 
   // Handle exit
   child.on('exit', (code, signal) => {
+    // If a new child has been spawned under this name, ignore this exit event
+    if (runtime[name] && runtime[name].proc !== child) {
+      return;
+    }
+
     const procs2 = storage.loadProcesses();
     if (!procs2[name]) return;
 
@@ -328,16 +333,46 @@ function restartProcess(name) {
   const procs = storage.loadProcesses();
   if (!procs[name]) return { error: `Process "${name}" not found` };
 
+  // Capture the old child before stopping, so we can wait for its exit
+  const oldRuntime = runtime[name];
+  const oldChild   = oldRuntime ? oldRuntime.proc : null;
+  const wasActive  = oldChild && oldChild.exitCode === null && oldChild.signalCode === null;
+
+  // Tear down monitors / watchers and send SIGTERM
   stopProcess(name);
-  setTimeout(() => {
+
+  function _doSpawn() {
     const latest = storage.loadProcesses();
-    if (latest[name]) {
-      latest[name].restartCount = (latest[name].restartCount || 0) + 1;
-      latest[name].status = STATUS.RESTARTING;
-      storage.saveProcesses(latest);
-      _spawnProcess(latest[name]);
-    }
-  }, 500);
+    if (!latest[name]) return;
+    latest[name].restartCount = (latest[name].restartCount || 0) + 1;
+    latest[name].status = STATUS.RESTARTING;
+    storage.saveProcesses(latest);
+    emit('process:update', latest[name]);
+    _spawnProcess(latest[name]);
+  }
+
+  if (wasActive) {
+    // Wait for the old child to fully exit before spawning the replacement.
+    // A 5-second watchdog sends SIGKILL if SIGTERM was ignored, then spawns.
+    let spawned = false;
+    const watchdog = setTimeout(() => {
+      if (spawned) return;
+      try { oldChild.kill('SIGKILL'); } catch {}
+    }, 5000);
+
+    const onExitOrError = () => {
+      if (spawned) return;
+      spawned = true;
+      clearTimeout(watchdog);
+      _doSpawn();
+    };
+
+    oldChild.once('exit',  onExitOrError);
+    oldChild.once('error', onExitOrError);
+  } else {
+    // Process was already stopped/crashed — spawn immediately
+    _doSpawn();
+  }
 
   return procs[name];
 }
