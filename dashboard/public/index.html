@@ -1825,6 +1825,52 @@ function appendModalLog(line, type, skipBuffer) {
   }
 }
 
+// Convert xterm SGR ANSI escape codes into styled HTML spans (XSS-safe).
+function ansiToHtml(str) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // 16-color base palette (0-7 standard, 8-15 bright)
+  const BASE = [
+    [0,0,0],[205,0,0],[0,205,0],[205,205,0],[0,0,238],[205,0,205],[0,205,205],[229,229,229],
+    [127,127,127],[255,0,0],[0,255,0],[255,255,0],[92,92,255],[255,0,255],[0,255,255],[255,255,255]
+  ];
+  const cube = [0,95,135,175,215,255];
+  const color256 = n => {
+    if (n < 16) return BASE[n];
+    if (n < 232) { n -= 16; return [cube[(n/36|0)%6], cube[(n/6|0)%6], cube[n%6]]; }
+    const v = 8 + (n - 232) * 10; return [v, v, v];
+  };
+  let out = '', open = false, fg = null, bold = false;
+  const closeSpan = () => { if (open) { out += '</span>'; open = false; } };
+  const openSpan = () => {
+    closeSpan();
+    if (fg == null && !bold) return;
+    let css = '';
+    if (fg != null) css += 'color:rgb(' + fg.join(',') + ');';
+    if (bold) css += 'font-weight:700';
+    out += '<span style="' + css + '">'; open = true;
+  };
+  const re = /\x1b\[([0-9;]*)m/g;
+  let last = 0, m;
+  while ((m = re.exec(str))) {
+    out += esc(str.slice(last, m.index));
+    last = re.lastIndex;
+    const codes = m[1].split(';').map(Number);
+    for (let i = 0; i < codes.length; i++) {
+      const c = codes[i];
+      if (c === 0) { fg = null; bold = false; }
+      else if (c === 1) bold = true;
+      else if (c === 22) bold = false;
+      else if ((c >= 30 && c <= 37) || (c >= 90 && c <= 97)) fg = color256(c >= 90 ? c - 90 + 8 : c - 30);
+      else if (c === 38 && codes[i+1] === 5) { fg = color256(codes[i+2]); i += 2; }
+      else if (c === 39) fg = null;
+    }
+    openSpan();
+  }
+  out += esc(str.slice(last));
+  closeSpan();
+  return out;
+}
+
 function _flushLogQueue() {
   _logRafPending = false;
   if (!_logRafQueue.length) return;
@@ -1833,8 +1879,8 @@ function _flushLogQueue() {
   for (const { displayLine, type } of _logRafQueue) {
     const span = document.createElement('span');
     span.className = type === 'err' ? 'log-err' : 'log-out';
-    if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
-    span.textContent = displayLine + '\n';
+    if (type === 'stdin') { span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic'; span.textContent = displayLine + '\n'; }
+    else span.innerHTML = ansiToHtml(displayLine) + '\n';
     frag.appendChild(span);
   }
   _logRafQueue.length = 0;
@@ -1856,8 +1902,8 @@ function reRenderModalLogs() {
     if (search && !displayLine.toLowerCase().includes(search)) continue;
     const span = document.createElement('span');
     span.className = type === 'err' ? 'log-err' : 'log-out';
-    if (type === 'stdin') span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic';
-    span.textContent = displayLine + '\n';
+    if (type === 'stdin') { span.style.cssText = 'color:rgba(52,211,153,0.8);font-style:italic'; span.textContent = displayLine + '\n'; }
+    else span.innerHTML = ansiToHtml(displayLine) + '\n';
     frag.appendChild(span);
   }
   body.textContent = '';
