@@ -2277,36 +2277,69 @@ function recordHistory(proc) {
 }
 
 // ── SVG sparkline chart ───────────────────────────
+// Geometry is shared with _attachChartHover: the data occupies x = 0..CHART_CW, and the
+// remaining CHART_PAD_R units are the y-label gutter. The crosshair maths has to use the
+// same fraction or it drifts right-wards across the chart.
+const CHART_W = 660, CHART_PAD_R = 36;
+const CHART_CW = CHART_W - CHART_PAD_R;
+const CHART_DATA_FRAC = CHART_CW / CHART_W;
+
+// Round for display without lying about small values: an idle network chart whose max is
+// 0.4 KB/s must not label every gridline "0".
+function _chartNum(v, unit) {
+  if (!Number.isFinite(v)) return '—';
+  if (unit === '%') return v.toFixed(v < 10 ? 1 : 0);
+  if (Math.abs(v) >= 10) return String(Math.round(v));
+  if (Math.abs(v) >= 1)  return v.toFixed(1);
+  return v === 0 ? '0' : v.toFixed(2);
+}
+
 function _smoothPath(pts) {
   if (pts.length < 2) return `M${pts[0].x},${pts[0].y}`;
-  let d = `M${pts[0].x},${pts[0].y}`;
+  const f = n => n.toFixed(2);
+  let d = `M${f(pts[0].x)},${f(pts[0].y)}`;
   for (let i = 1; i < pts.length; i++) {
     const p0 = pts[Math.max(0, i-2)], p1 = pts[i-1], p2 = pts[i], p3 = pts[Math.min(pts.length-1, i+1)];
-    const cp1x = (p1.x + (p2.x-p0.x)/6).toFixed(1), cp1y = (p1.y + (p2.y-p0.y)/6).toFixed(1);
-    const cp2x = (p2.x - (p3.x-p1.x)/6).toFixed(1), cp2y = (p2.y - (p3.y-p1.y)/6).toFixed(1);
-    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    // Catmull-rom tangents, but the control points are clamped to each segment's own y
+    // range. Unclamped they overshoot on spikes, drawing the line above the 100% gridline
+    // and the fill below the baseline, i.e. showing values that were never measured.
+    const lo = Math.min(p1.y, p2.y), hi = Math.max(p1.y, p2.y);
+    const clamp = y => Math.max(lo, Math.min(hi, y));
+    const cp1x = p1.x + (p2.x-p0.x)/6, cp1y = clamp(p1.y + (p2.y-p0.y)/6);
+    const cp2x = p2.x - (p3.x-p1.x)/6, cp2y = clamp(p2.y - (p3.y-p1.y)/6);
+    d += ` C${f(cp1x)},${f(cp1y)} ${f(cp2x)},${f(cp2y)} ${f(p2.x)},${f(p2.y)}`;
   }
   return d;
 }
 
+// x of sample i in viewBox units. Single source of truth for plotting and the crosshair.
+function _chartSampleX(i, n) {
+  return (i / Math.max(n-1, 1)) * CHART_CW;
+}
+
 function renderChart(values, color, chartId, unit, chartH) {
-  const W = 660, H = chartH || 84, PAD_R = 36, PAD_T = 6, PAD_B = 6;
-  const cW = W - PAD_R;
+  const W = CHART_W, H = chartH || 84, PAD_T = 6, PAD_B = 6;
+  const cW = CHART_CW;
   unit = unit || '';
+  // A single null from a missed poll used to turn max into NaN and blank the whole chart.
+  // Map it to 0 rather than dropping it, so the time axis stays aligned.
+  values = values.map(v => Number.isFinite(+v) ? +v : 0);
   if (!values.length) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
     <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
   const dataMax = Math.max(...values, 1);
   const max = unit === '%' ? 100 : dataMax;
+  // No rounding: with ~90 samples across 624 units the spacing is ~7 units, so rounding
+  // moves points off the crosshair's computed position.
   const pts = values.map((v, i) => ({
-    x: Math.round((i / Math.max(values.length-1, 1)) * cW),
-    y: Math.round(H - PAD_B - (v/max) * (H-PAD_T-PAD_B)),
+    x: _chartSampleX(i, values.length),
+    y: H - PAD_B - (Math.max(0, Math.min(v, max))/max) * (H-PAD_T-PAD_B),
   }));
   const linePath = _smoothPath(pts);
-  const areaPath = linePath + ` L${pts[pts.length-1].x},${H-PAD_B} L${pts[0].x},${H-PAD_B} Z`;
+  const areaPath = linePath + ` L${pts[pts.length-1].x.toFixed(2)},${H-PAD_B} L${pts[0].x.toFixed(2)},${H-PAD_B} Z`;
   const gid = `cg_${chartId}`;
   const gridSvg = [0.25, 0.5, 0.75, 1].map(p => {
-    const y = Math.round(H - PAD_B - p*(H-PAD_T-PAD_B));
-    const lbl = Math.round(max*p) + unit;
+    const y = H - PAD_B - p*(H-PAD_T-PAD_B);
+    const lbl = _chartNum(max*p, unit) + unit;
     return `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>
 <text x="${cW+4}" y="${y+3.5}" font-size="8" style="fill:var(--t4)" font-family="Inter,sans-serif">${lbl}</text>`;
   }).join('');
@@ -2409,6 +2442,18 @@ function _buildStatsModal() {
   _attachChartHover('sm-nettx-area', 'sm-nettx-xhair', 'sm-nettx-tip', 'nettx', ' KB/s');
 }
 
+// Where the plotted data actually sits, in .chart-hover-area-local pixels. The <svg> is
+// inset by .chart-wrap's border + padding, and only its left CHART_DATA_FRAC holds data
+// (the rest is the y-label gutter). Measuring the svg keeps this correct for every wrap
+// padding variant instead of hardcoding one.
+function _chartPlotBox(area) {
+  const ar  = area.getBoundingClientRect();
+  const svg = area.querySelector('svg');
+  if (!svg || !ar.width) return { left: 0, width: ar.width };
+  const sr = svg.getBoundingClientRect();
+  return { left: sr.left - ar.left, width: sr.width * CHART_DATA_FRAC };
+}
+
 function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   const area  = document.getElementById(areaId);
   const xhair = document.getElementById(xhairId);
@@ -2416,17 +2461,28 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   if (!area) return;
   let lockedPct = null;
 
+  // pointer x -> fraction along the data axis (0 = oldest sample, 1 = newest)
+  function pctFromEvent(e) {
+    const ar = area.getBoundingClientRect();
+    const box = _chartPlotBox(area);
+    if (!box.width) return 0;
+    return Math.max(0, Math.min(1, (e.clientX - ar.left - box.left) / box.width));
+  }
+
   function showAt(pct) {
     const data = _statsData[key] || [];
     if (!data.length) return;
     const rect = area.getBoundingClientRect();
-    const x = pct * rect.width;
-    const idx = Math.min(Math.round(pct * (data.length-1)), data.length-1);
+    const box  = _chartPlotBox(area);
+    const idx  = Math.min(Math.round(pct * (data.length-1)), data.length-1);
+    // Snap the bar to the sample it is reporting, otherwise the line and the value
+    // disagree by up to half a sample spacing.
+    const x = box.left + box.width * (idx / Math.max(data.length-1, 1));
     xhair.style.left = x + 'px';
     xhair.style.display = 'block';
     xhair.classList.toggle('locked', lockedPct !== null);
     tip.style.display = 'block';
-    tip.textContent = data[idx] + unit;
+    tip.textContent = _chartNum(data[idx], unit) + unit;
     tip.classList.toggle('locked', lockedPct !== null);
     requestAnimationFrame(() => {
       const half = tip.offsetWidth / 2;
@@ -2441,8 +2497,7 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   area.addEventListener('pointermove', e => {
     if (e.pointerType === 'touch') return;
     if (lockedPct !== null) return;
-    const rect = area.getBoundingClientRect();
-    showAt(Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width)));
+    showAt(pctFromEvent(e));
   });
 
   area.addEventListener('pointerleave', e => {
@@ -2455,8 +2510,7 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   // Click or touch to lock/move position
   area.addEventListener('pointerdown', e => {
     e.preventDefault();
-    const rect = area.getBoundingClientRect();
-    lockedPct = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+    lockedPct = pctFromEvent(e);
     showAt(lockedPct);
   }, { passive: false });
 }
