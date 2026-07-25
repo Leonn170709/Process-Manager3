@@ -6,18 +6,43 @@ is actually made of**: JS heap vs native, plus entry counts for structures you n
 It is a **no-op when the app is not running under PM3**, so it is safe to leave in
 production code and safe to run the app standalone.
 
+## Quick start — use `PM3_AGENT`
+
+PM3 sets `PM3_AGENT` in every child's environment to the absolute path of this module.
+Load it from there:
+
 ```js
-const pm3 = require('pm3/agent').attach({ name: 'my-app' });
-pm3.track('cache', () => cache);
+const pm3 = process.env.PM3_AGENT
+  ? require(process.env.PM3_AGENT).attach({ name: 'my-app' })
+  : null;
+
+pm3?.track('cache', () => cache);
 ```
 
 That is the whole integration. No port is opened, no timer is started, nothing is sent
-unless PM3 asks.
+unless PM3 asks. Run the same file with plain `node app.js` and `pm3` is simply `null` —
+the app behaves exactly as if the lines were not there.
 
-> **Resolving `pm3/agent`:** this works when `pm3` is a dependency of your app
-> (`node_modules/pm3`). With a *global* `npm install -g pm3` your app cannot resolve it —
-> use the absolute path instead, e.g.
-> `require('/home/you/Dokumente/GitHub/Process-Manager3/agent')`.
+### Why not `require('pm3/agent')`?
+
+Because it breaks on the most common install. `npm install -g pm3` puts the **CLI** on your
+`PATH`, but Node never searches the global `node_modules` root when resolving a
+`require()`, so `require('pm3/agent')` throws `MODULE_NOT_FOUND` — and if you wrapped it in
+a `try/catch`, your app would silently report nothing while looking perfectly healthy.
+
+`PM3_AGENT` carries the resolved absolute path, so it works identically for a global
+install, a local `node_modules` install, and `npm link`, with no per-project setup and no
+hardcoded paths.
+
+If `pm3` **is** a local dependency of your app and you want the module even when running
+standalone, this variant also works — `PM3_AGENT` still wins when present:
+
+```js
+const pm3 = require(process.env.PM3_AGENT || 'pm3/agent').attach({ name: 'my-app' });
+```
+
+Only use that form when you are sure the bare specifier resolves; otherwise it throws
+outside PM3.
 
 ---
 
@@ -39,7 +64,7 @@ by PM3) it returns an agent with `enabled === false` whose `track()` calls are r
 but never reported anywhere.
 
 ```js
-const pm3 = require('pm3/agent').attach({ name: 'kitbot' });
+const pm3 = require(process.env.PM3_AGENT).attach({ name: 'kitbot' });
 console.log(pm3.enabled);   // true under PM3, false when run directly
 ```
 
@@ -151,10 +176,15 @@ Plus:
 | `tracked[]` | Per registered structure: `{ name, count, bytes? }`. `bytes` only when explicitly measured. |
 | `name`, `ts` | The label passed to `attach()`, and when the report was taken. |
 
-**`native` is derived by PM3, not by the agent**, as `rss - heapTotal - external`. PM3
-shows it as `n/a` when that subtraction goes negative — which happens legitimately, e.g.
-when V8 has reserved more heap than is resident. A large `native` points at native addons
-or allocator fragmentation.
+**`native` is derived by PM3, not by the agent**, and comes in three tiers:
+
+| Shown as | Meaning |
+|---|---|
+| `42 MB` | Exact: `rss - heapTotal - external`, valid because the reserved heap fits inside RSS. |
+| `≤ 42 MB` | Upper bound: `heapTotal` exceeded RSS (V8 reserved more heap than is resident), so PM3 subtracts `heapUsed` instead. The true figure is lower. A `≤` is never decoration — do not read it as a measurement. |
+| `n/a` | `external` alone exceeds RSS. No subtraction is meaningful, but the conclusion is: the memory is in **buffers/ArrayBuffers, not native addons**. |
+
+A large `native` points at native addons or allocator fragmentation.
 
 ---
 

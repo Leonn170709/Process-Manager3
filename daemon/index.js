@@ -143,6 +143,7 @@ app.post('/api/processes/start', (req, res) => {
   if (!config.script) return res.status(400).json({ error: 'script is required' });
   try {
     const proc = pm.startProcess(config);
+    if (proc && proc.error) return res.status(400).json(proc);   // e.g. a malformed env override
     res.json(proc);
   } catch (err) {
     res.status(500).json({ error: err.message });

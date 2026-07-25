@@ -57,7 +57,15 @@ function attach(opts) {
       const row = { name, count };
       if (deepName === name) {
         // Allocates a buffer as large as the structure. On demand only, one at a time.
-        try { row.bytes = v8.serialize(getter()).length; } catch { row.bytes = null; }
+        // Structured clone refuses functions, so anything holding one as an own property
+        // cannot be sized at all — a Map of pending Timeouts (each keeps its callback) or
+        // a class instance referencing a logger. That is not a failure to report as a bare
+        // null: keep the reason so the dashboard can say which structure and why.
+        try { row.bytes = v8.serialize(getter()).length; }
+        catch (err) {
+          row.bytes = null;
+          row.bytesError = String(err && err.message || err).split('\n')[0].slice(0, 120);
+        }
       }
       tracked.push(row);
     }

@@ -365,6 +365,7 @@
     .mem-split-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px; }
     .mem-split-val { font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-top:2px; }
     .mem-note { font-size:10px;color:var(--t4);font-style:italic;margin:2px 0 6px; }
+    .mem-track-hdr { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px; }
     .mem-track-row { display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--border-sm);font-size:11px; }
     .mem-track-name { font-family:'JetBrains Mono',monospace;color:var(--t2);flex:1; }
     .mem-track-count { font-family:'JetBrains Mono',monospace;color:var(--accent2); }
@@ -537,6 +538,7 @@
     .toast.success { border-left:3px solid var(--green); }
     .toast.error   { border-left:3px solid var(--red); }
     .toast.info    { border-left:3px solid var(--accent); }
+    .toast.warn    { border-left:3px solid var(--yellow); }
 
     /* ── Empty state ─────────────────────────────── */
     .empty { text-align:center;padding:44px 20px;color:var(--t3); }
@@ -2806,6 +2808,44 @@ function _pm3DetailHtml(modal, p) {
     </div>`);
 }
 
+// ── Tracked-structure sorting ─────────────────────
+// Sticky across the 2 s re-render, shared by both places the tracked list appears.
+let trackSortKey = 'entries';   // 'name' | 'entries' | 'bytes'
+let trackSortDesc = true;
+
+function setTrackSort(key) {
+  // Clicking the active key flips direction; switching keys picks the sensible default
+  // (A–Z for names, biggest-first for numbers).
+  if (trackSortKey === key) trackSortDesc = !trackSortDesc;
+  else { trackSortKey = key; trackSortDesc = key !== 'name'; }
+  _renderMemProcList();                       // no-ops when the memory modal is closed
+  if (procMemName) _tickProcMemModal();
+}
+
+function _sortTracked(tracked) {
+  const dir = trackSortDesc ? -1 : 1;
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+  return [...tracked].sort((a, b) => {
+    if (trackSortKey === 'name') return byName(a, b) * dir;
+    if (trackSortKey === 'bytes') {
+      // Unmeasured structures sink to the bottom in both directions — they have no size
+      // to rank, and floating them to the top would bury the ones that do.
+      if (a.bytes == null && b.bytes == null) return byName(a, b);
+      if (a.bytes == null) return 1;
+      if (b.bytes == null) return -1;
+      return (a.bytes - b.bytes) * dir;
+    }
+    return ((a.count ?? -1) - (b.count ?? -1)) * dir;
+  });
+}
+
+function _trackSortToggle() {
+  const arrow = k => trackSortKey === k ? (trackSortDesc ? ' ↓' : ' ↑') : '';
+  const btn = (k, label) => `<button class="rmt-btn${trackSortKey === k ? ' active' : ''}"
+    onclick="event.stopPropagation();setTrackSort('${k}')">${label}${arrow(k)}</button>`;
+  return `<div class="res-mode-toggle">${btn('name', 'Name')}${btn('entries', 'Entries')}${btn('bytes', 'Size')}</div>`;
+}
+
 // Per-process split + named structures, shown when a row in "Processes by RAM" expands.
 function _memSplitDetailHtml(p) {
   const d = p.memDetail;
@@ -2816,11 +2856,18 @@ function _memSplitDetailHtml(p) {
   }
   const box = (lbl, val, col) => `<div class="mem-split-box"><div class="mem-split-lbl">${lbl}</div><div class="mem-split-val"${col?` style="color:${col}"`:''}>${val}</div></div>`;
   const tracked = d.tracked && d.tracked.length ? `
-    <div class="rpd-lbl" style="margin:8px 0 2px">Tracked structures — counts and sizes only, never contents</div>
-    ${d.tracked.map(t => `<div class="mem-track-row">
+    <div class="mem-track-hdr">
+      <span class="rpd-lbl">Tracked structures — counts and sizes only, never contents${
+        d.tracked.some(t => t.bytesAt) ? ' · <span style="opacity:.75">* = size measured earlier, hover for age</span>' : ''}</span>
+      ${_trackSortToggle()}
+    </div>
+    ${_sortTracked(d.tracked).map(t => `<div class="mem-track-row">
       <span class="mem-track-name">${escapeHtml(t.name)}</span>
       <span class="mem-track-count">${t.count == null ? '—' : t.count.toLocaleString()} entries</span>
-      <span class="mem-track-count" style="color:var(--t3)">${t.bytes == null ? '' : _mbTxt(t.bytes)}</span>
+      <span class="mem-track-count" style="color:var(--t3)"${
+        t.bytesAt ? ` title="measured ${_agoTxt(t.bytesAt)} — not a live figure"`
+        : t.bytesError ? ` title="cannot be sized: ${escapeHtml(t.bytesError)}"` : ''}>${
+        t.bytes != null ? _bytesTxt(t.bytes) + (t.bytesAt ? ' *' : '') : t.bytesError ? 'n/a' : ''}</span>
       <button class="btn sm" title="v8.serialize allocates a buffer as large as the structure — one at a time, on demand"
         onclick="event.stopPropagation();measureStructure('${encodeURIComponent(p.name)}','${encodeURIComponent(t.name)}',this)">Measure size</button>
     </div>`).join('')}` : (d.source === 'agent'
@@ -2832,7 +2879,7 @@ function _memSplitDetailHtml(p) {
       ${box('heapUsed', _mbTxt(d.heapUsed), 'var(--accent2)')}
       ${box('external', _mbTxt(d.external), 'var(--cyan)')}
       ${box('arrayBuffers', _mbTxt(d.arrayBuffers))}
-      ${box('native', d.native == null ? 'n/a' : _mbTxt(d.native), 'var(--yellow)')}
+      ${box('native', d.native == null ? 'n/a' : (d.nativeBound === 'upper' ? '≤ ' : '') + _mbTxt(d.native), 'var(--yellow)')}
     </div>
     <div class="mem-note">source: ${d.source === 'agent' ? 'pm3 agent (in-process)' : 'inspector (CDP)'}${
       d.loopLagMs != null ? ` · event-loop lag ${d.loopLagMs} ms` : ''}${
@@ -2914,8 +2961,10 @@ function _tickProcMemModal() {
        { label: 'external', color: 'var(--cyan)',    values: procMemHist.external }];
   document.getElementById('pm-chart').innerHTML = renderStackedChart(series, 'pm_split');
   document.getElementById('pm-legend').innerHTML = memLegend(series);
-  document.getElementById('pm-chart-note').textContent = procMemHist.nativeKnown
-    ? '' : 'native is not derivable for this process, so the chart shows heap and external only';
+  document.getElementById('pm-chart-note').textContent =
+    !procMemHist.nativeKnown ? 'external alone exceeds RSS, so this memory is in buffers rather than native addons — the chart shows heap and external only'
+    : d && !d.error && d.nativeBound === 'upper' ? 'native band is an upper bound — V8 has reserved more heap than is resident'
+    : '';
 
   const statusPill = `<span class="status-pill status-${p.status}" style="font-size:9px">${p.status}</span>`;
   body.innerHTML = `
@@ -2949,7 +2998,11 @@ async function measureStructure(name, structure, btn) {
       body: JSON.stringify({ structure }),
     }).then(r => r.json());
     if (r.error) { toast(r.error, 'error'); btn.textContent = 'Measure size'; btn.disabled = false; return; }
-    toast(`${structure}: ${r.bytes == null ? 'not measurable' : _mbTxt(r.bytes)}`, 'info');
+    // bytes == null means the serializer refused the structure, which is a property of what
+    // it holds (a function somewhere inside), not a transient error — say so.
+    toast(r.bytes == null
+      ? `${structure}: not measurable — ${r.bytesError || 'the serializer refused this structure'}`
+      : `${structure}: ${_bytesTxt(r.bytes)}`, r.bytes == null ? 'warn' : 'info');
     _renderMemProcList();
   } catch (e) {
     toast('Measure failed: ' + e.message, 'error');
@@ -3235,6 +3288,20 @@ function _buildMemModal() {
 // ── Memory split helpers ──────────────────────────
 const _mb = b => (b == null || !Number.isFinite(b)) ? null : Math.round(b / 1048576);
 function _mbTxt(b) { const v = _mb(b); return v == null ? '—' : v + ' MB'; }
+// Structure sizes span bytes to gigabytes, and whole-MB rounding made two very different
+// structures both read "1 MB" while Size-sorting ranked them correctly — which looks broken.
+function _bytesTxt(b) {
+  if (b == null || !Number.isFinite(b)) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
+}
+// Age of a carried-forward deep-size reading.
+function _agoTxt(ts) {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s/60)}m ago` : `${Math.round(s/3600)}h ago`;
+}
 
 // The row subtitle in "Processes by RAM". Memory only — CPU has no business here.
 // With no in-process detail there is no heap/native to show, and inventing one is worse
@@ -3246,9 +3313,10 @@ function memSubtitle(p) {
   }
   // Second term = whichever of external/native actually dominates, so the subtitle names
   // the culprit instead of always showing a number that happens to be small.
+  // "≤" is load-bearing: an upper bound must never read as a measurement.
   const other = (d.external || 0) > (d.native ?? 0)
     ? `external ${_mb(d.external)} MB`
-    : (d.native == null ? 'native n/a' : `native ${_mb(d.native)} MB`);
+    : (d.native == null ? 'native n/a' : `native ${d.nativeBound === 'upper' ? '≤ ' : ''}${_mb(d.native)} MB`);
   return `<div class="rp-sub">heap ${_mb(d.heapUsed)} MB · ${other}</div>`;
 }
 
@@ -3342,6 +3410,9 @@ function _tickMemModal() {
 
   const sum = k => withDetail.reduce((s, p) => s + (p.memDetail[k] || 0), 0);
   const anyNativeMissing = withDetail.some(p => p.memDetail.native == null);
+  // A sum that includes an upper bound is itself only an upper bound.
+  const nativeSumTxt = anyNativeMissing ? 'partial'
+    : (withDetail.some(p => p.memDetail.nativeBound === 'upper') ? '≤ ' : '') + _mbTxt(sum('native'));
   const sbox = (lbl, val, c) => `<div class="mem-split-box"><div class="mem-split-lbl">${lbl}</div><div class="mem-split-val"${c?` style="color:${c}"`:''}>${val}</div></div>`;
   set('mm-split-grid', withDetail.length ? [
     sbox('rss', _mbTxt(sum('rss'))),
@@ -3349,7 +3420,7 @@ function _tickMemModal() {
     sbox('heapUsed', _mbTxt(sum('heapUsed')), 'var(--accent2)'),
     sbox('external', _mbTxt(sum('external')), 'var(--cyan)'),
     sbox('arrayBuffers', _mbTxt(sum('arrayBuffers'))),
-    sbox('native', anyNativeMissing ? 'partial' : _mbTxt(sum('native')), 'var(--yellow)'),
+    sbox('native', nativeSumTxt, 'var(--yellow)'),
   ].join('') : '');
 
   if (m) {
@@ -4228,11 +4299,23 @@ function openEditModal(name) {
         <span class="toggle-label" id="edit-ar-label">${arOn ? 'Enabled' : 'Disabled'}</span>
       </div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Environment variables</label>
+      <textarea class="form-input" id="edit-env" rows="6" spellcheck="false"
+        style="font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.55;resize:vertical;white-space:pre"
+        placeholder="MALLOC_ARENA_MAX=2&#10;NODE_ENV=production">${escapeHtml(_envToText(proc.env))}</textarea>
+      <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'JetBrains Mono',monospace">
+        One <span style="color:var(--accent)">KEY=value</span> per line · overrides only, the rest is
+        inherited from the daemon · <span style="color:var(--yellow)">applied on the next restart</span>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn" id="edit-save-restart-btn" title="Save, then restart the process so env changes take effect">💾 Save &amp; restart</button>
       <button class="btn primary" id="edit-save-btn">💾 Save</button>
     </div>`;
   body.querySelector('#edit-save-btn').addEventListener('click', () => saveEdit(name));
+  body.querySelector('#edit-save-restart-btn').addEventListener('click', () => saveEdit(name, true));
   document.getElementById('edit-modal').classList.add('open');
   document.getElementById('edit-name').focus();
   editModalTimer = setInterval(_tickEditModal, 2000);
@@ -4249,7 +4332,34 @@ function closeEditModal() {
   editModalTimer = null;
   editModalName = null;
 }
-async function saveEdit(originalName) {
+// Env overrides round-trip through a textarea because that is what people paste: a couple of
+// lines out of an ecosystem file, a .env, or a shell export.
+function _envToText(env) {
+  return Object.entries(env || {}).map(([k, v]) => `${k}=${v}`).join('\n');
+}
+function _parseEnvText(text) {
+  const env = {};
+  const lines = String(text || '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) line = line.slice(7).trim();
+    const eq = line.indexOf('=');
+    if (eq < 1) return { error: `Line ${i + 1}: expected KEY=value` };
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    // Quotes around a pasted value are shell syntax, not part of the value — a child process
+    // given MALLOC_ARENA_MAX="2" sees the quotes and ignores the setting.
+    if (val.length > 1 && ((val[0] === '"' && val.endsWith('"')) || (val[0] === "'" && val.endsWith("'")))) {
+      val = val.slice(1, -1);
+    }
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return { error: `Line ${i + 1}: "${key}" is not a valid variable name` };
+    env[key] = val;
+  }
+  return { env };
+}
+
+async function saveEdit(originalName, restartAfter = false) {
   const newName     = document.getElementById('edit-name').value.trim();
   const _mr = parseInt(document.getElementById('edit-max-restarts').value);
   const maxRestarts = isNaN(_mr) ? 15 : Math.max(-1, _mr);
@@ -4257,11 +4367,15 @@ async function saveEdit(originalName) {
   const memoryLimit = isNaN(_mem) || _mem <= 0 ? null : _mem;
   const autorestart = document.getElementById('edit-autorestart').checked;
   if (!newName) { toast('Name is required', 'error'); return; }
+  const parsedEnv = _parseEnvText(document.getElementById('edit-env').value);
+  if (parsedEnv.error) { toast(parsedEnv.error, 'error'); return; }
+  const env = parsedEnv.env;
+  const envChanged = _envToText(env) !== _envToText((processes[originalName] || {}).env);
   try {
     const r = await fetch(`/api/processes/${encodeURIComponent(originalName)}`, {
       method: 'PATCH',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name: newName, maxRestarts, memoryLimit, autorestart }),
+      body: JSON.stringify({ name: newName, maxRestarts, memoryLimit, autorestart, env }),
     });
     const d = await r.json();
     if (d.error) { toast(d.error, 'error'); return; }
@@ -4272,8 +4386,16 @@ async function saveEdit(originalName) {
     }
     processes[d.name] = d;
     renderProcessRow(d);
-    toast('Saved', 'success');
     closeEditModal();
+    if (restartAfter) {
+      await procAction('restart', d.name);
+      return;
+    }
+    // A saved env override changes nothing until the process is respawned, and silently
+    // saying "Saved" is how someone ends up wondering why the variable never took effect.
+    toast(envChanged && d.status === 'running'
+      ? `Saved — restart ${d.name} to apply the new environment`
+      : 'Saved', envChanged && d.status === 'running' ? 'warn' : 'success');
   } catch(e) { toast(e.message, 'error'); }
 }
 

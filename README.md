@@ -190,9 +190,16 @@ Adding the agent to your app also gives you **named structures**: entry counts f
 maps, caches and queues you care about, plus event-loop lag and GC statistics.
 
 ```js
-const pm3 = require('pm3/agent').attach({ name: 'my-app' });
-pm3.track('cache', () => cache);
+// PM3 sets PM3_AGENT to the agent's absolute path in every child it spawns
+const pm3 = process.env.PM3_AGENT
+  ? require(process.env.PM3_AGENT).attach({ name: 'my-app' })
+  : null;
+
+pm3?.track('cache', () => cache);
 ```
+
+Load it via `PM3_AGENT`, not `require('pm3/agent')` — a global `npm i -g pm3` puts the CLI
+on `PATH` but leaves the package unresolvable, so the bare specifier throws.
 
 See **[agent/README.md](agent/README.md)** for the full API. The agent is a no-op outside
 PM3, so it is safe to leave in production code.

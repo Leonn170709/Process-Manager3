@@ -12,6 +12,13 @@ const storage = require('../storage');
 const issueTracker = require('../issues');
 const memDetail = require('./memDetail');
 
+// Absolute path to the agent entry point, handed to every child as PM3_AGENT.
+// `npm i -g pm3` puts the CLI on PATH but does not make the package require-able — Node
+// never searches the global node_modules root — so `require('pm3/agent')` fails and the
+// app silently degrades to a no-op. An absolute path in the environment works for global
+// installs, local installs and npm link alike, with no per-project setup.
+const AGENT_PATH = require.resolve('../agent');
+
 // In-memory process map: id -> { proc, config, stats, watcher }
 const runtime = {};
 
@@ -62,6 +69,24 @@ function parseCommand(script) {
   return { cmd: parts[0], args: [] };
 }
 
+// Env overrides are validated, not merely coerced: spawn() throws on a name containing '='
+// or a NUL byte, and it would throw at restart time — long after the bad record was saved and
+// the dashboard said "Saved". Rejecting here keeps a process that starts today startable.
+function _sanitizeEnv(raw) {
+  if (raw == null) return { env: {} };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { error: 'env must be an object' };
+  const env = {};
+  for (const [rawKey, rawVal] of Object.entries(raw)) {
+    const key = String(rawKey);
+    if (!key || /[=\0]/.test(key)) return { error: `Invalid environment variable name: "${key}"` };
+    if (rawVal == null) continue;                      // an absent value means "not set"
+    const val = String(rawVal);
+    if (val.includes('\0')) return { error: `Value of ${key} contains a NUL byte` };
+    env[key] = val;
+  }
+  return { env };
+}
+
 // --- Start process ---
 function startProcess(config, savedConfig = {}) {
   const procs = storage.loadProcesses();
@@ -72,7 +97,11 @@ function startProcess(config, savedConfig = {}) {
   const { cmd, args } = parseCommand(config.script);
   const extraArgs = config.args || savedConfig.args || [];
   const cwd = resolveCwd(config.cwd || savedConfig.cwd, config.script);
-  const env = Object.assign({}, process.env, config.env || savedConfig.env || {});
+  // Only the OVERRIDES are stored on the record; the daemon's own environment is merged in at
+  // spawn time (see _spawnProcess) so a restart picks up the daemon's current env, and so
+  // ~/.pm3/processes.json never grows a copy of every variable the daemon happened to have.
+  const { env, error: envError } = _sanitizeEnv(config.env || savedConfig.env || {});
+  if (envError) return { error: envError };
   const autorestart = config.autorestart !== undefined ? config.autorestart : true;
   const maxRestarts = config.maxRestarts || savedConfig.maxRestarts || 15;
   const memoryLimit = config.memoryLimit || savedConfig.memoryLimit || null;
@@ -85,7 +114,7 @@ function startProcess(config, savedConfig = {}) {
     cmd,
     args: [...args, ...extraArgs],
     cwd,
-    env: config.env || savedConfig.env || {},
+    env,
     autorestart,
     maxRestarts,
     memoryLimit,
@@ -115,7 +144,12 @@ function _spawnProcess(procRecord) {
   try {
     child = spawn(cmd, args, {
       cwd,
-      env,
+      // The record holds overrides only, so the daemon's environment is merged in here — a
+      // child spawned with just the overrides would run without PATH, HOME or TZ. Overrides
+      // win over inherited values, which is the whole point of setting one.
+      // PM3_AGENT is added at spawn time rather than stored on the record, so a machine's
+      // install path never gets baked into ~/.pm3/processes.json.
+      env: { ...process.env, ...env, PM3_AGENT: AGENT_PATH },
       detached: false,
       // 4th fd = IPC channel for the opt-in memory agent. A child that never listens on
       // it is unaffected (verified: a plain script still exits immediately), and the
@@ -538,6 +572,16 @@ function updateProcess(name, updates) {
   // Simple field updates (take effect on next restart)
   for (const key of ['maxRestarts', 'memoryLimit', 'autorestart']) {
     if (updates[key] !== undefined) procs[name][key] = updates[key];
+  }
+
+  // Env is replaced wholesale rather than merged: the editor shows the complete set of
+  // overrides, so a key the user deleted must actually disappear. A running process keeps the
+  // environment it was spawned with — Linux gives no way to change it — so this lands on the
+  // next restart, which is what the dashboard tells the user.
+  if (updates.env !== undefined) {
+    const { env, error } = _sanitizeEnv(updates.env);
+    if (error) return { error };
+    procs[name].env = env;
   }
 
   // Rename

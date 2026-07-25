@@ -32,9 +32,13 @@ new Function('exports', `
   const escapeHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const _mb = b => (b == null || !Number.isFinite(b)) ? null : Math.round(b / 1048576);
   function _mbTxt(b) { const v = _mb(b); return v == null ? '—' : v + ' MB'; }
+  let trackSortKey = 'entries', trackSortDesc = true;
+  ${grab('_sortTracked')}
+  ${grab('_trackSortToggle')}
   ${grab('memSubtitle')}
   ${grab('_memSplitDetailHtml')}
-  Object.assign(exports, { memSubtitle, _memSplitDetailHtml });
+  Object.assign(exports, { memSubtitle, _memSplitDetailHtml, _sortTracked, _trackSortToggle,
+    setSort: (k, desc) => { trackSortKey = k; trackSortDesc = desc; } });
 `)(ui);
 
 const MB = n => n * 1048576;
@@ -90,22 +94,40 @@ const MB = n => n * 1048576;
   assert(!/native<\/div><div class="mem-split-val"[^>]*>\d/.test(detail2), 'native box rendered without inputs');
 }
 
-// --- 3. native is blanked, not zeroed, when the identity does not hold ---------------
+// --- 3a. V8 slack → an upper bound, never presented as a measurement -----------------
 {
-  // Measured case: V8 reserved 186 MB of heap while RSS is 143 MB → rss-heapTotal-external < 0.
+  // Measured case: V8 reserved 186 MB of heap while RSS is 143 MB, so
+  // rss-heapTotal-external < 0 but rss-heapUsed-external = 21 MB is a valid upper bound.
   const p = {
     name: 'leaky', memory: 143, status: 'running',
     memDetail: {
       rss: MB(143), heapTotal: MB(186), heapUsed: MB(120), external: MB(2), arrayBuffers: MB(1),
-      native: null, nativeNote: 'V8 has reserved more heap than is resident — native not derivable', source: 'cdp',
+      native: MB(21), nativeBound: 'upper', source: 'cdp',
+      nativeNote: 'upper bound — V8 has reserved more heap than is resident, so the true figure is lower',
     },
   };
-  // The subtitle may name whichever of external/native dominates, but it must never
-  // print a native figure when native could not be derived.
   const sub = ui.memSubtitle(p);
-  assert(!/native \d/.test(sub), `derived native rendered from a broken identity: ${sub}`);
+  assert(/native ≤ 21 MB/.test(sub), `an upper bound must be marked with ≤: ${sub}`);
   const d = ui._memSplitDetailHtml(p);
-  assert(/n\/a/.test(d) && /not derivable/.test(d), d);
+  assert(/≤ 21 MB/.test(d) && /upper bound/.test(d), d);
+}
+
+// --- 3b. external > rss → no native figure at all, but still an answer ---------------
+{
+  const p = {
+    name: 'buffers', memory: 52, status: 'running',
+    memDetail: {
+      rss: MB(52), heapTotal: MB(6), heapUsed: MB(3), external: MB(1147), arrayBuffers: MB(1140),
+      native: null, nativeBound: null, source: 'cdp',
+      nativeNote: 'external alone exceeds RSS — this memory is in buffers/ArrayBuffers, not in native addons',
+    },
+  };
+  const sub = ui.memSubtitle(p);
+  assert(!/native \d/.test(sub) && !/native ≤/.test(sub), `invented a native figure: ${sub}`);
+  assert(/external 1147 MB/.test(sub), `should name the real culprit: ${sub}`);
+  const d = ui._memSplitDetailHtml(p);
+  assert(/n\/a/.test(d), d);
+  assert(/in buffers\/ArrayBuffers, not in native addons/.test(d), 'should still answer "JS or native"');
   assert(!/native<\/div>\s*<div class="mem-split-val"[^>]*>0 MB/.test(d), 'null native rendered as 0 MB');
 }
 
@@ -121,6 +143,43 @@ const MB = n => n * 1048576;
   const d = ui._memSplitDetailHtml(p);
   assert(/sessions/.test(d) && /35[.,  ]?000 entries/.test(d), d);   // locale-agnostic grouping
   assert(/never contents/.test(d), 'the counts-only guarantee should be stated in the UI');
+}
+
+// --- 5. tracked-structure sorting toggles -------------------------------------------
+{
+  const rows = [
+    { name: 'queue',    count: 70,    bytes: 4096 },
+    { name: 'sessions', count: 35000 },              // never measured
+    { name: 'apiCache', count: 900,   bytes: 9000000 },
+  ];
+  const names = list => list.map(t => t.name);
+
+  ui.setSort('name', false);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['apiCache', 'queue', 'sessions'], 'A–Z');
+  ui.setSort('name', true);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['sessions', 'queue', 'apiCache'], 'Z–A');
+
+  ui.setSort('entries', true);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['sessions', 'apiCache', 'queue'], 'most entries first');
+  ui.setSort('entries', false);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['queue', 'apiCache', 'sessions'], 'fewest entries first');
+
+  // Unmeasured structures have no size to rank — they sink in BOTH directions rather
+  // than pretending to be the smallest.
+  ui.setSort('bytes', true);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['apiCache', 'queue', 'sessions'], 'biggest measured first');
+  ui.setSort('bytes', false);
+  assert.deepStrictEqual(names(ui._sortTracked(rows)), ['queue', 'apiCache', 'sessions'], 'smallest measured first, unmeasured still last');
+
+  // Sorting must not mutate the source array (it is re-rendered from live data every 2 s).
+  assert.deepStrictEqual(names(rows), ['queue', 'sessions', 'apiCache'], '_sortTracked mutated its input');
+
+  // The active toggle is marked and carries a direction arrow.
+  ui.setSort('bytes', true);
+  const toggle = ui._trackSortToggle();
+  assert(/class="rmt-btn active"[^>]*onclick="[^"]*setTrackSort\('bytes'\)/.test(toggle), toggle);
+  assert(/Size ↓/.test(toggle) && /Name<\/button>/.test(toggle), toggle);
+  assert(/event\.stopPropagation\(\)/.test(toggle), 'must not bubble into the row toggle and collapse it');
 }
 
 console.log('ok - memory UI checks pass');

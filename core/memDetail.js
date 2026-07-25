@@ -39,7 +39,13 @@ try {
 } catch {}
 
 function _st(name) {
-  if (!state[name]) state[name] = { agent: false, wsUrl: null, sigusr1Sent: false, pending: new Map(), msgId: 0 };
+  if (!state[name]) state[name] = {
+    agent: false, wsUrl: null, sigusr1Sent: false, pending: new Map(), msgId: 0,
+    // Last measured deep size per structure, { [name]: { bytes, ts } }. Deep size is a
+    // manual, point-in-time reading; without keeping it, the next 12 s poll would wipe it
+    // and there would be nothing left to sort by size on.
+    bytes: {},
+  };
   return state[name];
 }
 
@@ -125,8 +131,8 @@ function _cdpEvaluate(wsUrl, expression, timeoutMs = 4000) {
     const finish = v => {
       if (done) return;
       done = true;
-      // Close the session the moment the read completes — the inspector stays listening
-      // on loopback for the life of the child, so hold no session open on top of it.
+      // Drop the session the moment the read completes; the caller then closes the
+      // inspector itself, so the port is only listening for the duration of one read.
       try { ws.close(); } catch {}
       resolve(v);
     };
@@ -151,10 +157,15 @@ function _cdpEvaluate(wsUrl, expression, timeoutMs = 4000) {
   });
 }
 
-// `require` is not defined in the inspector's evaluation context, but process.mainModule
-// is (for a CommonJS entry point). Closing from inside is the only way to shut the port
-// again — CDP has no command for it — so an ESM-only child keeps its inspector open.
-const CLOSE_EXPR = '(function(){try{(typeof require==="function"?require:process.mainModule.require)("inspector").close()}catch(e){}})()';
+// Closing from inside is the only way to shut the port again — CDP has no command for it.
+// `require` is not defined in the inspector's evaluation context and `process.mainModule`
+// is undefined for an ESM entry point, so prefer process.getBuiltinModule (Node >= 22.3),
+// which works in both CJS and ESM. The rest is the fallback chain for older Node.
+const CLOSE_EXPR = `(function(){try{(
+  typeof process.getBuiltinModule==="function" ? process.getBuiltinModule("inspector")
+: typeof require==="function"                  ? require("inspector")
+: process.mainModule.require("inspector")
+).close()}catch(e){}})()`;
 
 function _waitForUrl(st, ms) {
   return new Promise(resolve => {
@@ -194,21 +205,50 @@ async function _askCdp(name, child, cfg) {
 
 function _sample(name, source, r) {
   const m = r.mem;
-  // native = rss - heapTotal - external, but heapTotal is *reserved* address space and
-  // routinely exceeds resident RSS on a heap-heavy process (measured: heapTotal 186 MB
-  // vs rss 143 MB). The identity then yields a negative, which means "not derivable
-  // here", not "zero native memory" — report null and say so rather than print a 0.
-  const raw = m.rss - m.heapTotal - (m.external || 0);
-  const native = raw >= 0 ? raw : null;
-  const nativeNote = native !== null ? null
-    : m.heapTotal > m.rss ? 'V8 has reserved more heap than is resident — native not derivable'
-    : 'external exceeds RSS (buffers not all resident) — native not derivable';
+  const ext = m.external || 0;
+  // native memory, in three tiers of confidence.
+  //
+  // `rss - heapTotal - external` is exact only when the whole reserved heap is resident.
+  // heapTotal is *reserved* address space, so on a heap-heavy process it exceeds RSS and
+  // the subtraction goes negative (measured: 7/19 samples on a JS-leak process).
+  // Substituting heapUsed — the part of the heap that is definitely live — subtracts less
+  // and yields a conservative UPPER BOUND, which covered every such sample (0/19 negative).
+  //
+  // When `external` alone exceeds RSS neither works, because external counts Buffer bytes
+  // that need not be resident. That is not a failure to answer: it means the memory is in
+  // buffers, not in native addons, which is exactly what Phase 0 is asked to determine.
+  const exact = m.rss - m.heapTotal - ext;
+  const upper = m.rss - m.heapUsed - ext;
+  let native, nativeBound, nativeNote;
+  if (exact >= 0) {
+    native = exact; nativeBound = 'exact'; nativeNote = null;
+  } else if (upper >= 0) {
+    native = upper; nativeBound = 'upper';
+    nativeNote = 'upper bound — V8 has reserved more heap than is resident, so the true figure is lower';
+  } else {
+    native = null; nativeBound = null;
+    nativeNote = 'external alone exceeds RSS — this memory is in buffers/ArrayBuffers, not in native addons';
+  }
+  // Carry previously measured deep sizes forward, tagged with when they were taken —
+  // a size from five minutes ago is still useful, but it must not pose as live data.
+  // A structure the serializer refuses is remembered the same way: the reason is a property
+  // of what it holds, so it stays true until the app changes, and the UI should keep saying
+  // so rather than showing an empty cell one poll later.
+  const seen = _st(name).bytes;
+  const tracked = r.tracked ? r.tracked.map(t => {
+    if (t.bytes != null) { seen[t.name] = { bytes: t.bytes, ts: Date.now() }; return t; }
+    if (t.bytesError) { seen[t.name] = { error: t.bytesError, ts: Date.now() }; return t; }
+    const prev = seen[t.name];
+    if (!prev) return t;
+    return prev.error ? { ...t, bytesError: prev.error } : { ...t, bytes: prev.bytes, bytesAt: prev.ts };
+  }) : null;
+
   const d = {
     source, ts: r.ts || Date.now(),
     rss: m.rss, heapTotal: m.heapTotal, heapUsed: m.heapUsed,
     external: m.external || 0, arrayBuffers: m.arrayBuffers || 0,
-    native, nativeNote,
-    tracked: r.tracked || null,
+    native, nativeBound, nativeNote,
+    tracked,
     loopLagMs: r.loopLagMs ?? null,
     gc: r.gc || null,
     handles: r.handles ?? null,
