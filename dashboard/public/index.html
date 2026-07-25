@@ -37,6 +37,9 @@
       --log-border: rgba(255,255,255,0.10);
       --log-text: rgba(200,220,255,0.75);
       --log-err: rgba(252,165,165,0.9);
+      /* Hover readouts sit directly on top of chart bands, so their background is opaque —
+         a translucent pill let the plot show through and the numbers became unreadable. */
+      --tip-bg: #f7f9ff;
     }
 
     /* ── Dark theme ──────────────────────────────── */
@@ -59,6 +62,7 @@
       --log-border: rgba(255,255,255,0.07);
       --log-text: rgba(180,200,240,0.7);
       --log-err: rgba(248,113,113,0.85);
+      --tip-bg: #131a2b;
     }
 
     /* ── Backgrounds ─────────────────────────────── */
@@ -600,12 +604,17 @@
       opacity:0.45;z-index:10;transition:opacity 0.1s;
     }
     .chart-xhair.locked { opacity:0.85;width:2px;border-radius:1px; }
+    /* Stacked charts report every band at once, so the pill becomes a small table. */
+    .chart-tip.multi { padding:6px 9px;border-radius:9px;font-weight:500; }
+    .chart-tip.multi .cht-row { display:flex;align-items:center;gap:6px;line-height:1.55; }
+    .chart-tip.multi .cht-dot { width:7px;height:7px;border-radius:2px;flex:none;opacity:0.85; }
+    .chart-tip.multi .cht-lbl { color:var(--t3); }
+    .chart-tip.multi .cht-val { margin-left:auto;padding-left:10px;font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums; }
+    .chart-tip.multi .cht-total { margin-top:3px;padding-top:3px;border-top:1px solid var(--border-sm); }
     .chart-tip {
       position:absolute;top:6px;pointer-events:none;display:none;
       padding:3px 10px;border-radius:20px;
-      background:var(--g1);
-      backdrop-filter:blur(44px) saturate(2.4) brightness(1.04);
-      -webkit-backdrop-filter:blur(44px) saturate(2.4) brightness(1.04);
+      background:var(--tip-bg);
       border:1px solid var(--border-sm);
       box-shadow:inset 0 1px 0 var(--spec-sm),var(--shadow);
       font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;
@@ -2551,7 +2560,11 @@ function _chartPlotBox(area) {
   return { left: sr.left - ar.left, width: sr.width * CHART_DATA_FRAC };
 }
 
-function _attachChartHover(areaId, xhairId, tipId, key, unit) {
+// Pointer tracking, snapping, locking and tip placement — shared by every hover chart.
+// `probe(pct)` reports what sits under the pointer as { idx, count, text | html }, or null
+// when there is nothing to show yet. Only the readout differs between chart kinds, so only
+// that part is passed in.
+function _bindChartHover(areaId, xhairId, tipId, probe) {
   const area  = document.getElementById(areaId);
   const xhair = document.getElementById(xhairId);
   const tip   = document.getElementById(tipId);
@@ -2567,19 +2580,19 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
   }
 
   function showAt(pct) {
-    const data = _statsData[key] || [];
-    if (!data.length) return;
+    const hit = probe(pct);
+    if (!hit) return;
     const rect = area.getBoundingClientRect();
     const box  = _chartPlotBox(area);
-    const idx  = Math.min(Math.round(pct * (data.length-1)), data.length-1);
     // Snap the bar to the sample it is reporting, otherwise the line and the value
     // disagree by up to half a sample spacing.
-    const x = box.left + box.width * (idx / Math.max(data.length-1, 1));
+    const x = box.left + box.width * (hit.idx / Math.max(hit.count-1, 1));
     xhair.style.left = x + 'px';
     xhair.style.display = 'block';
     xhair.classList.toggle('locked', lockedPct !== null);
     tip.style.display = 'block';
-    tip.textContent = _chartNum(data[idx], unit) + unit;
+    if (hit.html != null) tip.innerHTML = hit.html; else tip.textContent = hit.text;
+    tip.classList.toggle('multi', hit.html != null);
     tip.classList.toggle('locked', lockedPct !== null);
     requestAnimationFrame(() => {
       const half = tip.offsetWidth / 2;
@@ -2610,6 +2623,41 @@ function _attachChartHover(areaId, xhairId, tipId, key, unit) {
     lockedPct = pctFromEvent(e);
     showAt(lockedPct);
   }, { passive: false });
+}
+
+// Single-series charts read straight out of the stats broadcast.
+function _attachChartHover(areaId, xhairId, tipId, key, unit) {
+  return _bindChartHover(areaId, xhairId, tipId, pct => {
+    const data = _statsData[key] || [];
+    if (!data.length) return null;
+    const idx = Math.min(Math.round(pct * (data.length-1)), data.length-1);
+    return { idx, count: data.length, text: _chartNum(data[idx], unit) + unit };
+  });
+}
+
+// Stacked charts report every band at the hovered sample plus the total, because on a
+// stacked chart the band you are pointing at is the only one whose value you can't read off
+// the axis. `getSeries()` is called per probe so the tip follows live data rather than a
+// snapshot taken when the chart was built.
+function _attachStackedHover(areaId, xhairId, tipId, getSeries, unit) {
+  unit = unit || ' MB';
+  return _bindChartHover(areaId, xhairId, tipId, pct => {
+    const series = getSeries() || [];
+    const count = Math.max(...series.map(s => (s.values || []).length), 0);
+    if (!count) return null;
+    const idx = Math.min(Math.round(pct * (count-1)), count-1);
+    let total = 0;
+    const rows = series.map(s => {
+      const v = Number.isFinite(+(s.values || [])[idx]) ? +s.values[idx] : 0;
+      total += v;
+      return `<div class="cht-row"><span class="cht-dot" style="background:${s.color}"></span>`
+           + `<span class="cht-lbl">${escapeHtml(s.label)}</span>`
+           + `<span class="cht-val">${_chartNum(v, unit) + unit}</span></div>`;
+    }).join('');
+    return { idx, count, html: rows
+      + `<div class="cht-row cht-total"><span class="cht-dot" style="background:transparent"></span>`
+      + `<span class="cht-lbl">total</span><span class="cht-val">${_chartNum(total, unit) + unit}</span></div>` };
+  });
 }
 
 function _tickStatsModal() {
@@ -2859,7 +2907,11 @@ function _memSplitDetailHtml(p) {
     <div class="mem-track-hdr">
       <span class="rpd-lbl">Tracked structures — counts and sizes only, never contents${
         d.tracked.some(t => t.bytesAt) ? ' · <span style="opacity:.75">* = size measured earlier, hover for age</span>' : ''}</span>
-      ${_trackSortToggle()}
+      <div style="display:flex;align-items:center;gap:7px">
+        ${_trackSortToggle()}
+        <button class="btn sm" title="Measures every structure in turn, never in parallel — v8.serialize allocates a buffer as large as the structure it measures"
+          onclick="event.stopPropagation();measureAllStructures('${encodeURIComponent(p.name)}',this)">📐 Measure all</button>
+      </div>
     </div>
     ${_sortTracked(d.tracked).map(t => `<div class="mem-track-row">
       <span class="mem-track-name">${escapeHtml(t.name)}</span>
@@ -2908,10 +2960,15 @@ async function openProcMemModal(name) {
         <span class="chart-stats" id="pm-legend"></span>
         <span style="font-size:9px;color:var(--t4);margin-left:auto">up to 1 h · sampled every 12 s</span>
       </div>
-      <div class="chart-wrap" id="pm-chart"></div>
+      <div class="chart-hover-area" id="pm-chart-area">
+        <div class="chart-wrap" id="pm-chart"></div>
+        <div class="chart-xhair" id="pm-chart-xhair" style="background:var(--yellow)"></div>
+        <div class="chart-tip"   id="pm-chart-tip"></div>
+      </div>
       <div class="mem-note" id="pm-chart-note"></div>
     </div>
     <div id="pm-detail"></div>`;
+  _attachStackedHover('pm-chart-area', 'pm-chart-xhair', 'pm-chart-tip', () => _procMemSeries());
   document.getElementById('proc-mem-modal').classList.add('open');
 
   // Seed from the daemon's rolling history so the chart has context immediately
@@ -2941,6 +2998,15 @@ function _pushProcMemSample(s) {
     if (procMemHist[k].length > 300) procMemHist[k].shift();
   }
 }
+// native is only a band when it is actually derivable — plotting a null as 0 would draw a
+// number that was never measured. Shared by the renderer and the hover readout so the two
+// can never disagree about which bands exist.
+function _procMemSeries() {
+  const bands = [{ label: 'heapUsed', color: 'var(--accent2)', values: procMemHist.heapUsed },
+                 { label: 'external', color: 'var(--cyan)',    values: procMemHist.external }];
+  if (procMemHist.nativeKnown) bands.push({ label: 'native', color: 'var(--yellow)', values: procMemHist.native });
+  return bands;
+}
 function _tickProcMemModal() {
   if (!procMemName || _measuringStructure) return;
   const p = processes[procMemName];
@@ -2951,15 +3017,10 @@ function _tickProcMemModal() {
   const d = p.memDetail;
   if (d && !d.error) _pushProcMemSample({ t: d.ts, heapUsed: d.heapUsed, external: d.external, native: d.native });
 
-  // native is only a band when it is actually derivable — plotting a null as 0 would
-  // draw a number that was never measured.
-  const series = procMemHist.nativeKnown
-    ? [{ label: 'heapUsed', color: 'var(--accent2)', values: procMemHist.heapUsed },
-       { label: 'external', color: 'var(--cyan)',    values: procMemHist.external },
-       { label: 'native',   color: 'var(--yellow)',  values: procMemHist.native }]
-    : [{ label: 'heapUsed', color: 'var(--accent2)', values: procMemHist.heapUsed },
-       { label: 'external', color: 'var(--cyan)',    values: procMemHist.external }];
+  const series = _procMemSeries();
   document.getElementById('pm-chart').innerHTML = renderStackedChart(series, 'pm_split');
+  const pmArea = document.getElementById('pm-chart-area');
+  if (pmArea?._refreshTip) pmArea._refreshTip();
   document.getElementById('pm-legend').innerHTML = memLegend(series);
   document.getElementById('pm-chart-note').textContent =
     !procMemHist.nativeKnown ? 'external alone exceeds RSS, so this memory is in buffers rather than native addons — the chart shows heap and external only'
@@ -2986,10 +3047,54 @@ function _tickProcMemModal() {
 }
 
 // Deep size is opt-in per structure: v8.serialize allocates a copy as large as the data.
+// One request per structure, awaited in turn. Deliberately not Promise.all: the agent
+// serialises the structure to measure it, so N in parallel would mean N full copies alive at
+// once — on a process whose memory you are already worried about. Sequential also gives a
+// progress count and keeps a single slow structure from stalling the rest invisibly.
+async function measureAllStructures(name, btn) {
+  name = decodeURIComponent(name);
+  const names = ((processes[name] || {}).memDetail?.tracked || []).map(t => t.name);
+  if (!names.length) { toast('No tracked structures to measure', 'error'); return; }
+  const label = btn.textContent;
+  btn.disabled = true;
+  // Freeze the 2 s re-render for the whole run: it rebuilds this button's DOM, which would
+  // drop the progress text and the click target mid-loop.
+  _measuringStructure = true;
+  _measureAllRunning = true;
+  let sized = 0, refused = 0, failed = 0;
+  try {
+    for (let i = 0; i < names.length; i++) {
+      if (!btn.isConnected) return;            // modal closed mid-run — stop quietly
+      btn.textContent = `Measuring ${i + 1}/${names.length}…`;
+      try {
+        const r = await fetch(`/api/processes/${encodeURIComponent(name)}/memory/deep`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ structure: names[i] }),
+        }).then(r => r.json());
+        if (r.error) failed++;
+        else if (r.bytes == null) refused++;
+        else sized++;
+      } catch { failed++; }
+    }
+    toast(`Measured ${sized}/${names.length}`
+      + (refused ? ` · ${refused} not measurable` : '')
+      + (failed ? ` · ${failed} failed` : ''), failed ? 'warn' : 'success');
+  } finally {
+    _measureAllRunning = false;
+    _measuringStructure = false;
+    btn.disabled = false;
+    btn.textContent = label;
+    _renderMemProcList();
+  }
+}
+
 async function measureStructure(name, structure, btn) {
   // Both arrive encodeURIComponent'd: escapeHtml leaves single quotes alone, and a
   // structure name comes from the app, not from PM3.
   name = decodeURIComponent(name); structure = decodeURIComponent(structure);
+  // A single measure during a measure-all run would clear the shared render freeze when it
+  // finished, unfreezing the list while the run is still going.
+  if (_measureAllRunning) { toast('A measure-all run is in progress', 'warn'); return; }
   btn.disabled = true; btn.textContent = 'Measuring…';
   _measuringStructure = true;
   try {
@@ -3264,7 +3369,11 @@ function _buildMemModal() {
         <span class="chart-stats" id="mm-split-legend"></span>
         <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window · sampled every 12 s</span>
       </div>
-      <div class="chart-wrap" id="mm-split-wrap"></div>
+      <div class="chart-hover-area" id="mm-split-area">
+        <div class="chart-wrap" id="mm-split-wrap"></div>
+        <div class="chart-xhair" id="mm-split-xhair" style="background:var(--yellow)"></div>
+        <div class="chart-tip"   id="mm-split-tip"></div>
+      </div>
       <div class="mem-note" id="mm-split-note"></div>
     </div>
     <div class="mem-split-grid" id="mm-split-grid"></div>
@@ -3284,6 +3393,7 @@ function _buildMemModal() {
     </div>
     <div class="res-proc-scroll" id="mm-proc-list"></div>`;
   _attachChartHover('mm-mem-area', 'mm-mem-xhair', 'mm-mem-tip', 'sys_mem', '%');
+  _attachStackedHover('mm-split-area', 'mm-split-xhair', 'mm-split-tip', MEM_SPLIT_SERIES);
 }
 // ── Memory split helpers ──────────────────────────
 const _mb = b => (b == null || !Number.isFinite(b)) ? null : Math.round(b / 1048576);
@@ -3327,6 +3437,7 @@ function toggleMemSort() {
   _renderMemProcList();
 }
 let _measuringStructure = false;
+let _measureAllRunning = false;
 function _renderMemProcList() {
   const container = document.getElementById('mm-proc-list');
   if (!container) return;
@@ -3401,6 +3512,8 @@ function _tickMemModal() {
   const series = MEM_SPLIT_SERIES();
   set('mm-split-wrap', renderStackedChart(series, 'mm_split'));
   set('mm-split-legend', memLegend(series));
+  const splitArea = el('mm-split-area');
+  if (splitArea?._refreshTip) splitArea._refreshTip();
   const running = Object.values(processes).filter(p => p.status === 'running');
   const withDetail = running.filter(p => p.memDetail && !p.memDetail.error);
   const missing = running.length - withDetail.length;
