@@ -157,9 +157,45 @@ Click the **CPU Load** card in the System tab to open a detailed view:
 Click the **Memory** card in the System tab to open a detailed view:
 
 - **3-minute sparkline** — rolling memory % history
+- **JS heap vs native chart** — stacked `heapUsed` / `external` / `native` across all managed processes, so a JS leak and a native leak are distinguishable at a glance
+- **Split summary** — rss · heapTotal · heapUsed · external · arrayBuffers · derived native
 - **Segmented usage bar** — shows Used (active), Cached, and Buffers as distinct colour bands with a legend
 - **Stat boxes** — Total RAM, Used (active), Available, Cached, Buffers, Swap used / total
-- **Process list** — sortable by RAM usage. Same **⚡ PM3 / 🖥 System** toggle and click-to-expand rows as the CPU modal
+- **Process list** — sortable by RAM usage. Same **⚡ PM3 / 🖥 System** toggle and click-to-expand rows as the CPU modal. Rows show the process's own memory split (`heap 84 MB · native 310 MB`), and expanding one reveals the full split plus any structures the app registered with the agent
+
+The modal contains **no CPU data at all** — CPU lives in the CPU modal and memory in this one.
+
+### Per-process memory modal
+
+Click the **RAM cell** of any row in the Processes table to open a standalone memory view
+for that one process:
+
+- **JS heap vs native chart** — stacked `heapUsed` / `external` / `native`, seeded with up
+  to an hour of history so you can see the trend immediately
+- **Full split** — rss · heapTotal · heapUsed · external · arrayBuffers · native, plus
+  event-loop lag, GC count/pause time and active handles when the agent is attached
+- **Tracked structures** — entry counts for everything the app registered, with a
+  per-structure **Measure size** button
+
+Every other stat cell (CPU, Net, Sockets) still opens the combined Stats modal.
+
+### Per-process memory split
+
+For every managed **Node** process PM3 reads `process.memoryUsage()` from inside the
+process, either via the [opt-in agent](agent/README.md) (preferred) or by briefly opening
+the Node inspector over CDP. Anything else — a shell script, a Python worker — shows RSS
+with an explicit *"heap detail unavailable"* note rather than a guessed breakdown.
+
+Adding the agent to your app also gives you **named structures**: entry counts for the
+maps, caches and queues you care about, plus event-loop lag and GC statistics.
+
+```js
+const pm3 = require('pm3/agent').attach({ name: 'my-app' });
+pm3.track('cache', () => cache);
+```
+
+See **[agent/README.md](agent/README.md)** for the full API. The agent is a no-op outside
+PM3, so it is safe to leave in production code.
 
 ---
 

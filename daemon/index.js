@@ -120,6 +120,23 @@ app.get('/api/processes/:name', (req, res) => {
   res.json(pm.getProcessInfo(name));
 });
 
+// Memory split + rolling history (Phase 0)
+app.get('/api/processes/:name/memory', (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  res.json(pm.getMemDetail(name));
+});
+
+// Deep size of one tracked structure — on demand only: v8.serialize allocates a buffer
+// as large as the structure it measures.
+app.post('/api/processes/:name/memory/deep', async (req, res) => {
+  const name = pm.resolveProcess(req.params.name);
+  if (!name) return res.status(404).json({ error: 'Process not found' });
+  const structure = req.body && req.body.structure;
+  if (!structure) return res.status(400).json({ error: 'structure is required' });
+  res.json(await pm.deepSizeStructure(name, String(structure)));
+});
+
 // Start process
 app.post('/api/processes/start', (req, res) => {
   const config = req.body;
@@ -713,6 +730,12 @@ let _netDetailTs = 0;
 setInterval(() => {
   pm.updateStats();
 }, 2000);
+
+// --- In-process memory detail: its own slow schedule (agent IPC / CDP round-trip is
+// far heavier than pidusage, and the dashboard reads it off the stats broadcast) ---
+setInterval(() => {
+  pm.pollMemDetail().catch(() => {});
+}, pm.memPollInterval);
 
 // --- System metrics broadcast ---
 setInterval(async () => {

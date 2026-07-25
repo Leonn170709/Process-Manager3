@@ -357,6 +357,17 @@
     .sys-metric.clickable:hover .sm-hint { opacity:1; }
     .sm-hint { font-size:9.5px;color:var(--accent);margin-top:4px;opacity:0;transition:opacity 0.2s;font-weight:600;letter-spacing:0.2px; }
     .res-modal { width:900px;max-height:90vh; }
+    /* The memory subtitle carries "heap 1183 MB · native 39 MB", not "12% CPU" — the
+       shared 72px last column clipped it. Memory modal only; the CPU list keeps 72px. */
+    #mm-proc-list .res-proc-row { grid-template-columns:minmax(120px,1.4fr) 60px 1fr 240px; }
+    .mem-split-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0; }
+    .mem-split-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:7px 9px; }
+    .mem-split-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px; }
+    .mem-split-val { font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-top:2px; }
+    .mem-note { font-size:10px;color:var(--t4);font-style:italic;margin:2px 0 6px; }
+    .mem-track-row { display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--border-sm);font-size:11px; }
+    .mem-track-name { font-family:'JetBrains Mono',monospace;color:var(--t2);flex:1; }
+    .mem-track-count { font-family:'JetBrains Mono',monospace;color:var(--accent2); }
     .res-stats-grid { display:grid;gap:6px;margin:10px 0 8px; }
     .res-stat-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:9px 12px; }
     .res-stat-box.clickable { cursor:pointer;transition:background 0.15s,border-color 0.15s,transform 0.12s; }
@@ -465,6 +476,11 @@
       box-shadow:inset 0 1.5px 0 var(--spec), var(--shadow-lg);
       animation:modalIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
     }
+    /* Memory modal only — the split chart plus the per-process breakdown needs the width.
+       Must come after .modal: same specificity, so source order decides (which is why
+       .res-modal's 900px above never took effect — left alone deliberately, changing it
+       would resize the drive/interface/runtime modals). */
+    .mem-modal-wide { width:1200px;max-width:96vw;max-height:90vh; }
     .modal::-webkit-scrollbar { width:4px; }
     .modal::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.25);border-radius:2px; }
     @keyframes modalIn { from{transform:scale(0.88) translateY(24px);opacity:0}to{transform:scale(1) translateY(0);opacity:1} }
@@ -1073,12 +1089,23 @@
 
     <!-- MEMORY DETAIL MODAL -->
     <div class="modal-overlay" id="mem-modal">
-      <div class="modal res-modal">
+      <div class="modal mem-modal-wide">
         <div class="modal-hdr">
           <div class="modal-title">💾 Memory Details</div>
           <div class="modal-close" onclick="closeMemModal()">×</div>
         </div>
         <div class="modal-body" id="mem-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- PER-PROCESS MEMORY MODAL (RAM cell in the process table) -->
+    <div class="modal-overlay" id="proc-mem-modal">
+      <div class="modal mem-modal-wide">
+        <div class="modal-hdr">
+          <div class="modal-title" id="proc-mem-title">💾 Memory</div>
+          <div class="modal-close" onclick="closeProcMemModal()">×</div>
+        </div>
+        <div class="modal-body" id="proc-mem-body"></div>
       </div>
     </div>
 
@@ -1241,6 +1268,7 @@ let _statsRafPending = false;
 socket.on('stats:update', procs => {
   processes = procs;
   Object.values(procs).forEach(p => recordHistory(p));
+  recordMemSplit(procs);
   if (!_statsRafPending) {
     _statsRafPending = true;
     requestAnimationFrame(() => {
@@ -1486,7 +1514,7 @@ const COL_RENDERERS = {
   name:         p => `<td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>`,
   status:       p => `<td><span class="status-pill status-${p.status}">${p.status}</span></td>`,
   cpu:          p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.cpu!=null?p.cpu+'%':'—'}</td>`,
-  memory:       p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.memory?p.memory+' MB':'—'}</td>`,
+  memory:       p => `<td class="mono stat-cell" title="View memory breakdown" onclick="event.stopPropagation();openProcMemModal('${encodeURIComponent(p.name)}')">${p.memory?p.memory+' MB':'—'}</td>`,
   netRx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--green);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netRx!=null?fmtSpeed(p.netRx):'—'}</td>`,
   netTx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--cyan);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netTx!=null?fmtSpeed(p.netTx):'—'}</td>`,
   connections:  p => `<td class="mono stat-cell" title="View stats" style="color:var(--t3)" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.connections!=null?p.connections:'—'}</td>`,
@@ -2265,6 +2293,34 @@ function _procHash(p) {
   return `${p.status}|${p.cpu}|${p.memory}|${p.netRx}|${p.netTx}|${p.connections}|${p.restartCount}`;
 }
 
+// ── Memory split history (Phase 0) ────────────────
+// Summed across managed processes, driven by the stats broadcast. The daemon refreshes
+// the underlying split on its own 12 s schedule, so this steps rather than curves —
+// that is the real sampling rate, not a smoothing artefact.
+const memSplitHistory = { heapUsed: [], external: [], native: [] };
+function recordMemSplit(procs) {
+  let heapUsed = 0, external = 0, native = 0;
+  for (const p of Object.values(procs)) {
+    const d = p.memDetail;
+    if (!d || d.error || p.status !== 'running') continue;
+    heapUsed += d.heapUsed || 0;
+    external += d.external || 0;
+    native   += d.native || 0;    // null natives simply don't contribute
+  }
+  const MB = b => Math.round(b / 1048576 * 10) / 10;
+  memSplitHistory.heapUsed.push(MB(heapUsed));
+  memSplitHistory.external.push(MB(external));
+  memSplitHistory.native.push(MB(native));
+  for (const k of ['heapUsed', 'external', 'native']) {
+    if (memSplitHistory[k].length > HISTORY_MAX) memSplitHistory[k].shift();
+  }
+}
+const MEM_SPLIT_SERIES = () => [
+  { label: 'heapUsed', color: 'var(--accent2)', values: memSplitHistory.heapUsed },
+  { label: 'external', color: 'var(--cyan)',    values: memSplitHistory.external },
+  { label: 'native',   color: 'var(--yellow)',  values: memSplitHistory.native },
+];
+
 // ── History recording ─────────────────────────────
 function recordHistory(proc) {
   if (!procHistory[proc.name]) procHistory[proc.name] = { cpu: [], mem: [], conn: [], netRx: [], netTx: [] };
@@ -2352,6 +2408,45 @@ function renderChart(values, color, chartId, unit, chartH) {
     <path d="${areaPath}" fill="url(#${gid})"/>
     <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
+}
+
+// Stacked variant of renderChart: same geometry, same smoothing, cumulative bands.
+// A JS leak and a native leak look nothing alike on this chart — that is its whole job.
+// series = [{ label, color, values }] in stacking order, bottom band first. Values in MB.
+function renderStackedChart(series, chartId, chartH) {
+  const W = CHART_W, H = chartH || 84, PAD_T = 6, PAD_B = 6;
+  const cW = CHART_CW;
+  const n = Math.max(...series.map(s => s.values.length), 0);
+  if (!n) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
+    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
+
+  // Cumulative totals, so each band sits on top of the ones below it.
+  const num = v => Number.isFinite(+v) ? +v : 0;
+  const cum = [];
+  series.forEach((s, si) => {
+    cum[si] = [];
+    for (let i = 0; i < n; i++) cum[si][i] = (si ? cum[si-1][i] : 0) + num(s.values[i]);
+  });
+  const max = Math.max(...cum[cum.length-1], 1);
+  const yOf = v => H - PAD_B - (Math.max(0, Math.min(v, max))/max) * (H-PAD_T-PAD_B);
+
+  // Painted top band first so the lower bands draw over it — no transparency stacking.
+  let bands = '';
+  for (let si = series.length - 1; si >= 0; si--) {
+    const pts = cum[si].map((v, i) => ({ x: _chartSampleX(i, n), y: yOf(v) }));
+    const line = _smoothPath(pts);
+    bands += `<path d="${line} L${pts[n-1].x.toFixed(2)},${H-PAD_B} L${pts[0].x.toFixed(2)},${H-PAD_B} Z" fill="${series[si].color}" fill-opacity="0.55"/>
+<path d="${line}" fill="none" stroke="${series[si].color}" stroke-width="1.4" stroke-linejoin="round"/>`;
+  }
+  const grid = [0.25, 0.5, 0.75, 1].map(p => {
+    const y = H - PAD_B - p*(H-PAD_T-PAD_B);
+    return `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>
+<text x="${cW+4}" y="${y+3.5}" font-size="8" style="fill:var(--t4)" font-family="Inter,sans-serif">${_chartNum(max*p, '')}M</text>`;
+  }).join('');
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">${grid}${bands}</svg>`;
+}
+function memLegend(series) {
+  return series.map(s => `<span style="margin-right:10px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};opacity:0.8;margin-right:3px"></span>${s.label}</span>`).join('');
 }
 
 // ── Stats modal ───────────────────────────────────
@@ -2683,27 +2778,185 @@ function _procDetailHtml(modal, key, detailHtml) {
 function _pm3DetailHtml(modal, p) {
   const key = 'pm3_' + p.name;
   const issueCount = issueCountForProc(p.name);
+  const isMem = modal === 'mem';
+  // Strictly disjoint modals: the memory modal never shows CPU, the CPU modal never
+  // shows RAM. Each owns its own metric and nothing of the other's.
+  const metricCells = isMem
+    ? `<div><span class="rpd-lbl">Mem limit</span><span class="rpd-val">${p.memoryLimit ? p.memoryLimit + ' MB' : 'none'}</span></div>`
+    : `<div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu != null ? p.cpu + '%' : '—'}</span></div>`;
   return _procDetailHtml(modal, key, `
     <div class="rpd-grid">
       <div><span class="rpd-lbl">PID</span><span class="rpd-val">${p.pid || '—'}</span></div>
       <div><span class="rpd-lbl">Status</span><span class="rpd-val"><span class="status-pill status-${p.status}" style="font-size:9px">${p.status}</span></span></div>
       <div><span class="rpd-lbl">Uptime</span><span class="rpd-val">${formatUptime(p.uptime)}</span></div>
       <div><span class="rpd-lbl">Restarts</span><span class="rpd-val">${p.restartCount} / ${p.maxRestarts === -1 ? '∞' : p.maxRestarts}</span></div>
-      <div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu != null ? p.cpu + '%' : '—'}</span></div>
-      <div><span class="rpd-lbl">RAM</span><span class="rpd-val">${p.memory ? p.memory + ' MB' : '—'}</span></div>
-      <div><span class="rpd-lbl">Mem limit</span><span class="rpd-val">${p.memoryLimit ? p.memoryLimit + ' MB' : 'none'}</span></div>
+      ${metricCells}
       <div><span class="rpd-lbl">Issues</span><span class="rpd-val" style="color:${issueCount ? 'var(--red)' : 'var(--t3)'}">${issueCount}</span></div>
       <div><span class="rpd-lbl">Auto-restart</span><span class="rpd-val">${p.autorestart ? 'yes' : 'no'}</span></div>
       <div><span class="rpd-lbl">Net ↓</span><span class="rpd-val" style="color:var(--green)">${p.netRx != null ? fmtSpeed(p.netRx) : '—'}</span></div>
       <div><span class="rpd-lbl">Net ↑</span><span class="rpd-val" style="color:var(--cyan)">${p.netTx != null ? fmtSpeed(p.netTx) : '—'}</span></div>
       <div><span class="rpd-lbl">Sockets</span><span class="rpd-val">${p.connections != null ? p.connections : '—'}</span></div>
     </div>
+    ${isMem ? _memSplitDetailHtml(p) : ''}
     <div class="rpd-lbl" style="margin-bottom:3px">Script</div>
     <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
     <div style="display:flex;gap:7px">
       <button class="btn sm primary" onclick="event.stopPropagation();openStatsFromRes('${escapeHtml(p.name)}')">📊 Full stats</button>
       <button class="btn sm" onclick="event.stopPropagation();openLogsFromRes('${escapeHtml(p.name)}')">📋 Logs</button>
     </div>`);
+}
+
+// Per-process split + named structures, shown when a row in "Processes by RAM" expands.
+function _memSplitDetailHtml(p) {
+  const d = p.memDetail;
+  if (!d || d.error) {
+    return `<div class="mem-note">heap detail unavailable — ${escapeHtml(d?.error || 'not a Node process, or inspector unavailable')}.
+      RSS is ${p.memory != null ? p.memory + ' MB' : 'unknown'}; the split cannot be derived without reading it from inside the process.
+      Add <code>require('pm3/agent').attach()</code> to the app for full detail.</div>`;
+  }
+  const box = (lbl, val, col) => `<div class="mem-split-box"><div class="mem-split-lbl">${lbl}</div><div class="mem-split-val"${col?` style="color:${col}"`:''}>${val}</div></div>`;
+  const tracked = d.tracked && d.tracked.length ? `
+    <div class="rpd-lbl" style="margin:8px 0 2px">Tracked structures — counts and sizes only, never contents</div>
+    ${d.tracked.map(t => `<div class="mem-track-row">
+      <span class="mem-track-name">${escapeHtml(t.name)}</span>
+      <span class="mem-track-count">${t.count == null ? '—' : t.count.toLocaleString()} entries</span>
+      <span class="mem-track-count" style="color:var(--t3)">${t.bytes == null ? '' : _mbTxt(t.bytes)}</span>
+      <button class="btn sm" title="v8.serialize allocates a buffer as large as the structure — one at a time, on demand"
+        onclick="event.stopPropagation();measureStructure('${encodeURIComponent(p.name)}','${encodeURIComponent(t.name)}',this)">Measure size</button>
+    </div>`).join('')}` : (d.source === 'agent'
+      ? `<div class="mem-note">No structures registered. Call <code>pm3.track('name', () => value)</code> in the app to name them.</div>` : '');
+  return `
+    <div class="mem-split-grid" style="grid-template-columns:repeat(6,1fr)">
+      ${box('rss', _mbTxt(d.rss))}
+      ${box('heapTotal', _mbTxt(d.heapTotal))}
+      ${box('heapUsed', _mbTxt(d.heapUsed), 'var(--accent2)')}
+      ${box('external', _mbTxt(d.external), 'var(--cyan)')}
+      ${box('arrayBuffers', _mbTxt(d.arrayBuffers))}
+      ${box('native', d.native == null ? 'n/a' : _mbTxt(d.native), 'var(--yellow)')}
+    </div>
+    <div class="mem-note">source: ${d.source === 'agent' ? 'pm3 agent (in-process)' : 'inspector (CDP)'}${
+      d.loopLagMs != null ? ` · event-loop lag ${d.loopLagMs} ms` : ''}${
+      d.gc ? ` · ${d.gc.count} GCs, ${d.gc.totalMs} ms total` : ''}${
+      d.handles != null ? ` · ${d.handles} active handles` : ''}${
+      d.nativeNote ? ` · ${escapeHtml(d.nativeNote)}` : ''}
+      <br>Native memory can be reported but never attributed — no JS-level tool can see inside a native addon's allocations.</div>
+    ${tracked}`;
+}
+
+// ── Per-process memory modal (RAM cell in the process table) ──────────────
+// Standalone view for one process: its own split history, the full breakdown, and any
+// structures the app registered with the agent. The CPU/Net/Sockets cells still open the
+// combined Stats modal — only RAM breaks out into its own view.
+let procMemName = null, procMemTimer = null, procMemLastTs = 0;
+let procMemHist = { heapUsed: [], external: [], native: [], nativeKnown: true };
+
+async function openProcMemModal(name) {
+  procMemName = decodeURIComponent(name);
+  procMemLastTs = 0;
+  procMemHist = { heapUsed: [], external: [], native: [], nativeKnown: true };
+  document.getElementById('proc-mem-title').textContent = `💾 Memory — ${procMemName}`;
+  document.getElementById('proc-mem-body').innerHTML = `
+    <div class="chart-block" style="margin-bottom:8px">
+      <div class="chart-label">JS heap vs native
+        <span class="chart-stats" id="pm-legend"></span>
+        <span style="font-size:9px;color:var(--t4);margin-left:auto">up to 1 h · sampled every 12 s</span>
+      </div>
+      <div class="chart-wrap" id="pm-chart"></div>
+      <div class="mem-note" id="pm-chart-note"></div>
+    </div>
+    <div id="pm-detail"></div>`;
+  document.getElementById('proc-mem-modal').classList.add('open');
+
+  // Seed from the daemon's rolling history so the chart has context immediately
+  // instead of drawing itself over the next few minutes.
+  try {
+    const { history } = await fetch(`/api/processes/${encodeURIComponent(procMemName)}/memory`).then(r => r.json());
+    for (const s of (history || [])) _pushProcMemSample(s);
+  } catch {}
+  _tickProcMemModal();
+  procMemTimer = setInterval(_tickProcMemModal, 2000);
+}
+function closeProcMemModal() {
+  document.getElementById('proc-mem-modal').classList.remove('open');
+  clearInterval(procMemTimer);
+  procMemTimer = null;
+  procMemName = null;
+}
+function _pushProcMemSample(s) {
+  if (!s || s.t === procMemLastTs) return;
+  procMemLastTs = s.t || Date.now();
+  const MB = b => Math.round((b || 0) / 1048576 * 10) / 10;
+  procMemHist.heapUsed.push(MB(s.heapUsed));
+  procMemHist.external.push(MB(s.external));
+  procMemHist.native.push(MB(s.native));
+  if (s.native == null) procMemHist.nativeKnown = false;
+  for (const k of ['heapUsed', 'external', 'native']) {
+    if (procMemHist[k].length > 300) procMemHist[k].shift();
+  }
+}
+function _tickProcMemModal() {
+  if (!procMemName || _measuringStructure) return;
+  const p = processes[procMemName];
+  const body = document.getElementById('pm-detail');
+  if (!body) return;
+  if (!p) { body.innerHTML = '<div class="mem-note">Process no longer exists.</div>'; return; }
+
+  const d = p.memDetail;
+  if (d && !d.error) _pushProcMemSample({ t: d.ts, heapUsed: d.heapUsed, external: d.external, native: d.native });
+
+  // native is only a band when it is actually derivable — plotting a null as 0 would
+  // draw a number that was never measured.
+  const series = procMemHist.nativeKnown
+    ? [{ label: 'heapUsed', color: 'var(--accent2)', values: procMemHist.heapUsed },
+       { label: 'external', color: 'var(--cyan)',    values: procMemHist.external },
+       { label: 'native',   color: 'var(--yellow)',  values: procMemHist.native }]
+    : [{ label: 'heapUsed', color: 'var(--accent2)', values: procMemHist.heapUsed },
+       { label: 'external', color: 'var(--cyan)',    values: procMemHist.external }];
+  document.getElementById('pm-chart').innerHTML = renderStackedChart(series, 'pm_split');
+  document.getElementById('pm-legend').innerHTML = memLegend(series);
+  document.getElementById('pm-chart-note').textContent = procMemHist.nativeKnown
+    ? '' : 'native is not derivable for this process, so the chart shows heap and external only';
+
+  const statusPill = `<span class="status-pill status-${p.status}" style="font-size:9px">${p.status}</span>`;
+  body.innerHTML = `
+    <div class="rpd-grid">
+      <div><span class="rpd-lbl">PID</span><span class="rpd-val">${p.pid || '—'}</span></div>
+      <div><span class="rpd-lbl">Status</span><span class="rpd-val">${statusPill}</span></div>
+      <div><span class="rpd-lbl">Uptime</span><span class="rpd-val">${formatUptime(p.uptime)}</span></div>
+      <div><span class="rpd-lbl">RSS (OS)</span><span class="rpd-val">${p.memory != null ? p.memory + ' MB' : '—'}</span></div>
+      <div><span class="rpd-lbl">Mem limit</span><span class="rpd-val">${p.memoryLimit > 0 ? p.memoryLimit + ' MB' : 'none'}</span></div>
+      <div><span class="rpd-lbl">Restarts</span><span class="rpd-val">${p.restartCount} / ${p.maxRestarts === -1 ? '∞' : p.maxRestarts}</span></div>
+    </div>
+    ${_memSplitDetailHtml(p)}
+    <div class="rpd-lbl" style="margin:8px 0 3px">Script</div>
+    <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
+    <div style="display:flex;gap:7px">
+      <button class="btn sm primary" onclick="closeProcMemModal();openStatsModal('${escapeHtml(p.name)}')">📊 Full stats</button>
+      <button class="btn sm" onclick="closeProcMemModal();openLogsFor('${escapeHtml(p.name)}')">📋 Logs</button>
+    </div>`;
+}
+
+// Deep size is opt-in per structure: v8.serialize allocates a copy as large as the data.
+async function measureStructure(name, structure, btn) {
+  // Both arrive encodeURIComponent'd: escapeHtml leaves single quotes alone, and a
+  // structure name comes from the app, not from PM3.
+  name = decodeURIComponent(name); structure = decodeURIComponent(structure);
+  btn.disabled = true; btn.textContent = 'Measuring…';
+  _measuringStructure = true;
+  try {
+    const r = await fetch(`/api/processes/${encodeURIComponent(name)}/memory/deep`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ structure }),
+    }).then(r => r.json());
+    if (r.error) { toast(r.error, 'error'); btn.textContent = 'Measure size'; btn.disabled = false; return; }
+    toast(`${structure}: ${r.bytes == null ? 'not measurable' : _mbTxt(r.bytes)}`, 'info');
+    _renderMemProcList();
+  } catch (e) {
+    toast('Measure failed: ' + e.message, 'error');
+    btn.textContent = 'Measure size'; btn.disabled = false;
+  } finally {
+    _measuringStructure = false;
+  }
 }
 function setCoreView(mode) { coreView = mode; _tickCpuModal(); }
 function openStatsFromRes(name) { closeCpuModal(); closeMemModal(); openStatsModal(name); }
@@ -2716,8 +2969,9 @@ function _sysDetailHtml(modal, p) {
       <div><span class="rpd-lbl">Parent PID</span><span class="rpd-val">${p.parentPid || '—'}</span></div>
       <div><span class="rpd-lbl">User</span><span class="rpd-val">${escapeHtml(p.user)}</span></div>
       <div><span class="rpd-lbl">State</span><span class="rpd-val">${escapeHtml(p.state)}</span></div>
-      <div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu}%</span></div>
-      <div><span class="rpd-lbl">RSS</span><span class="rpd-val">${p.memRss} MB</span></div>
+      ${modal === 'mem'
+        ? `<div><span class="rpd-lbl">RSS</span><span class="rpd-val">${p.memRss} MB</span></div>`
+        : `<div><span class="rpd-lbl">CPU</span><span class="rpd-val">${p.cpu}%</span></div>`}
       <div><span class="rpd-lbl">Nice</span><span class="rpd-val">${p.nice}</span></div>
       <div><span class="rpd-lbl">Priority</span><span class="rpd-val">${p.priority}</span></div>
     </div>
@@ -2747,7 +3001,7 @@ function _renderCpuProcList() {
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
         <div class="rp-val" style="color:${col}">${p.cpu}%</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="rp-sub">${p.memRss} MB</div>
+        <div class="rp-sub">${escapeHtml(p.state)} · nice ${p.nice}</div>
       </div>${_sysDetailHtml('cpu', p)}`;
     }).join('');
   } else {
@@ -2764,7 +3018,7 @@ function _renderCpuProcList() {
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.script || '')}</div></div>
         <div class="rp-val" style="color:${col}">${p.cpu}%</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="rp-sub">${p.memory ? p.memory + ' MB' : '—'}</div>
+        <div class="rp-sub">up ${formatUptime(p.uptime)}</div>
       </div>${_pm3DetailHtml('cpu', p)}`;
     }).join('');
   }
@@ -2952,6 +3206,15 @@ function _buildMemModal() {
         <div class="chart-tip"   id="mm-mem-tip"></div>
       </div>
     </div>
+    <div class="chart-block" style="margin-bottom:8px">
+      <div class="chart-label">PM3 Processes — JS heap vs native
+        <span class="chart-stats" id="mm-split-legend"></span>
+        <span style="font-size:9px;color:var(--t4);margin-left:auto">3 min window · sampled every 12 s</span>
+      </div>
+      <div class="chart-wrap" id="mm-split-wrap"></div>
+      <div class="mem-note" id="mm-split-note"></div>
+    </div>
+    <div class="mem-split-grid" id="mm-split-grid"></div>
     <div id="mm-big-bar-wrap" style="margin:0 0 4px"></div>
     <div class="res-stats-grid" id="mm-stats-row" style="grid-template-columns:repeat(3,1fr)"></div>
     <div class="res-stats-grid" id="mm-stats-row2" style="grid-template-columns:repeat(3,1fr);margin-top:0"></div>
@@ -2969,15 +3232,41 @@ function _buildMemModal() {
     <div class="res-proc-scroll" id="mm-proc-list"></div>`;
   _attachChartHover('mm-mem-area', 'mm-mem-xhair', 'mm-mem-tip', 'sys_mem', '%');
 }
+// ── Memory split helpers ──────────────────────────
+const _mb = b => (b == null || !Number.isFinite(b)) ? null : Math.round(b / 1048576);
+function _mbTxt(b) { const v = _mb(b); return v == null ? '—' : v + ' MB'; }
+
+// The row subtitle in "Processes by RAM". Memory only — CPU has no business here.
+// With no in-process detail there is no heap/native to show, and inventing one is worse
+// than saying so: fall back to plain RSS plus the reason.
+function memSubtitle(p) {
+  const d = p.memDetail;
+  if (!d || d.error) {
+    return `<div class="rp-sub" title="${escapeHtml(d?.error || 'no in-process detail')}">${p.memory != null ? p.memory + ' MB RSS' : '—'} · heap detail unavailable</div>`;
+  }
+  // Second term = whichever of external/native actually dominates, so the subtitle names
+  // the culprit instead of always showing a number that happens to be small.
+  const other = (d.external || 0) > (d.native ?? 0)
+    ? `external ${_mb(d.external)} MB`
+    : (d.native == null ? 'native n/a' : `native ${_mb(d.native)} MB`);
+  return `<div class="rp-sub">heap ${_mb(d.heapUsed)} MB · ${other}</div>`;
+}
+
 function toggleMemSort() {
   memSortDesc = !memSortDesc;
   const btn = document.getElementById('mm-sort-btn');
   if (btn) btn.textContent = memSortDesc ? '↓ Highest' : '↑ Lowest';
   _renderMemProcList();
 }
+let _measuringStructure = false;
 function _renderMemProcList() {
   const container = document.getElementById('mm-proc-list');
   if (!container) return;
+  // innerHTML replacement resets scrollTop; restore it so the 2 s refresh doesn't yank
+  // the user back to the top of the list while they are reading an expanded row.
+  const scroll = container.scrollTop;
+  const restore = () => { container.scrollTop = scroll; };
+  setTimeout(restore, 0);
   if (memSysMode) {
     if (!_sysProcs) { container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--t4);font-size:11.5px">Loading…</div>'; return; }
     const list = [..._sysProcs].sort((a, b) => memSortDesc ? b.memRss - a.memRss : a.memRss - b.memRss).slice(0, 60);
@@ -2992,7 +3281,7 @@ function _renderMemProcList() {
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
         <div class="rp-val" style="color:${col}">${p.memRss} MB</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="rp-sub">${p.cpu}% CPU</div>
+        <div class="rp-sub">heap detail unavailable</div>
       </div>${_sysDetailHtml('mem', p)}`;
     }).join('');
   } else {
@@ -3009,7 +3298,7 @@ function _renderMemProcList() {
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.script || '')}</div></div>
         <div class="rp-val" style="color:${col}">${p.memory} MB</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="rp-sub">${p.cpu != null ? p.cpu + '%' : '—'} CPU</div>
+        ${memSubtitle(p)}
       </div>${_pm3DetailHtml('mem', p)}`;
     }).join('');
   }
@@ -3038,6 +3327,30 @@ function _tickMemModal() {
   set('mm-mem-wrap', renderChart(hist, col, 'mm_mem', '%'));
   const memArea = el('mm-mem-area');
   if (memArea?._refreshTip) memArea._refreshTip();
+
+  // ── PM3 process split (Phase 0). Read off the stats broadcast — the daemon does the
+  // expensive in-process read on its own 12 s schedule, never on this 2 s tick.
+  const series = MEM_SPLIT_SERIES();
+  set('mm-split-wrap', renderStackedChart(series, 'mm_split'));
+  set('mm-split-legend', memLegend(series));
+  const running = Object.values(processes).filter(p => p.status === 'running');
+  const withDetail = running.filter(p => p.memDetail && !p.memDetail.error);
+  const missing = running.length - withDetail.length;
+  setText('mm-split-note', missing
+    ? `${withDetail.length} of ${running.length} processes reporting · ${missing} without heap detail (not Node, or inspector unavailable) — their RSS is not in this chart`
+    : running.length ? `${running.length} process${running.length>1?'es':''} reporting in-process detail` : 'No running processes');
+
+  const sum = k => withDetail.reduce((s, p) => s + (p.memDetail[k] || 0), 0);
+  const anyNativeMissing = withDetail.some(p => p.memDetail.native == null);
+  const sbox = (lbl, val, c) => `<div class="mem-split-box"><div class="mem-split-lbl">${lbl}</div><div class="mem-split-val"${c?` style="color:${c}"`:''}>${val}</div></div>`;
+  set('mm-split-grid', withDetail.length ? [
+    sbox('rss', _mbTxt(sum('rss'))),
+    sbox('heapTotal', _mbTxt(sum('heapTotal'))),
+    sbox('heapUsed', _mbTxt(sum('heapUsed')), 'var(--accent2)'),
+    sbox('external', _mbTxt(sum('external')), 'var(--cyan)'),
+    sbox('arrayBuffers', _mbTxt(sum('arrayBuffers'))),
+    sbox('native', anyNativeMissing ? 'partial' : _mbTxt(sum('native')), 'var(--yellow)'),
+  ].join('') : '');
 
   if (m) {
     const usedPct = m.percent;
@@ -3120,7 +3433,9 @@ function _tickMemModal() {
       </div>`;
   }
 
-  if (!memExpanded) {
+  // Refreshes even with a row expanded — the expanded row now carries live split numbers.
+  // _renderMemProcList preserves scrollTop, and a measurement in flight is left alone.
+  if (!_measuringStructure) {
     if (memSysMode) fetchSysProcs().then(_renderMemProcList);
     else _renderMemProcList();
   }
@@ -3979,6 +4294,7 @@ document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target==
 document.getElementById('columns-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeColumnsModal();});
 document.getElementById('cpu-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeCpuModal();});
 document.getElementById('mem-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMemModal();});
+document.getElementById('proc-mem-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeProcMemModal();});
 document.getElementById('net-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNetModal();});
 document.getElementById('runtime-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeRuntimeModal();});
 document.getElementById('storage-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeStorageModal();});
@@ -4009,6 +4325,7 @@ document.addEventListener('visibilitychange', () => {
     if (editModalTimer)  { clearInterval(editModalTimer);  editModalTimer  = null; }
     if (cpuModalTimer)     { clearInterval(cpuModalTimer);     cpuModalTimer     = null; }
     if (memModalTimer)     { clearInterval(memModalTimer);     memModalTimer     = null; }
+    if (procMemTimer)      { clearInterval(procMemTimer);      procMemTimer      = null; }
     if (netModalTimer)     { clearInterval(netModalTimer);     netModalTimer     = null; }
     if (runtimeModalTimer) { clearInterval(runtimeModalTimer); runtimeModalTimer = null; }
     if (storageModalTimer)   { clearInterval(storageModalTimer);   storageModalTimer   = null; }
@@ -4019,6 +4336,7 @@ document.addEventListener('visibilitychange', () => {
     if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
     if (document.getElementById('cpu-modal')?.classList.contains('open')          && !cpuModalTimer)     cpuModalTimer     = setInterval(_tickCpuModal,         2000);
     if (document.getElementById('mem-modal')?.classList.contains('open')          && !memModalTimer)     memModalTimer     = setInterval(_tickMemModal,         2000);
+    if (procMemName && !procMemTimer) procMemTimer = setInterval(_tickProcMemModal, 2000);
     if (document.getElementById('net-modal')?.classList.contains('open')          && !netModalTimer)     netModalTimer     = setInterval(_tickNetModal,         2000);
     if (document.getElementById('runtime-modal')?.classList.contains('open')      && !runtimeModalTimer) runtimeModalTimer = setInterval(_tickRuntimeModal,    2000);
     if (document.getElementById('storage-modal')?.classList.contains('open')      && !storageModalTimer) storageModalTimer = setInterval(_tickStorageModal,    2000);

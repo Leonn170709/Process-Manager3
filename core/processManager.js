@@ -10,6 +10,7 @@ const chokidar = require('chokidar');
 const { STATUS, SEVERITY } = require('../config/constants');
 const storage = require('../storage');
 const issueTracker = require('../issues');
+const memDetail = require('./memDetail');
 
 // In-memory process map: id -> { proc, config, stats, watcher }
 const runtime = {};
@@ -108,6 +109,7 @@ function startProcess(config, savedConfig = {}) {
 
 function _spawnProcess(procRecord) {
   const { name, cmd, args, cwd, env } = procRecord;
+  memDetail.forget(name);   // new pid ⇒ new inspector URL, and the agent must say hello again
 
   let child;
   try {
@@ -115,7 +117,10 @@ function _spawnProcess(procRecord) {
       cwd,
       env,
       detached: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      // 4th fd = IPC channel for the opt-in memory agent. A child that never listens on
+      // it is unaffected (verified: a plain script still exits immediately), and the
+      // agent unrefs the channel so it cannot hold a child open either.
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     });
   } catch (err) {
     _handleCrash(procRecord, null, `Spawn failed: ${err.message}`, SEVERITY.CRITICAL);
@@ -163,12 +168,21 @@ function _spawnProcess(procRecord) {
     });
   });
 
+  // Memory agent IPC (ignored by children that don't use it)
+  child.on('message', msg => { memDetail.onAgentMessage(name, msg); });
+
   // Log stderr
   child.stderr.on('data', data => {
     const ts = new Date().toISOString();
     const text = data.toString();
+    // SIGUSR1 makes Node print its real inspector URL here — that is how the CDP
+    // fallback learns the port belonging to this specific pid.
+    memDetail.noteStderr(name, text);
     text.trimEnd().split('\n').forEach(rawLine => {
       if (!rawLine) return;
+      // Node's own "Debugger listening/attached/ending" chatter is provoked by PM3's
+      // memory probe, not written by the app — keep it out of the app's error log.
+      if (memDetail.isInspectorNoise(rawLine)) return;
       const line = `[${ts}] [ERR] ${rawLine}`;
       storage.appendLog(name, 'err', line);
       emit('log', { name, line, type: 'err' });
@@ -193,6 +207,7 @@ function _spawnProcess(procRecord) {
     procs2[name].exitCode = code;
     procs2[name].cpu = 0;
     procs2[name].memory = 0;
+    procs2[name].memDetail = null;
     procs2[name].connections = 0;
     procs2[name].netRx = 0;
     procs2[name].netTx = 0;
@@ -312,6 +327,7 @@ function stopProcess(name) {
   procs[name].status = STATUS.STOPPED;
   procs[name].cpu = 0;
   procs[name].memory = 0;
+  procs[name].memDetail = null;
   procs[name].connections = 0;
   procs[name].netRx = 0;
   procs[name].netTx = 0;
@@ -419,6 +435,9 @@ async function updateStats() {
         procs[name].cpu = parseFloat(s.cpu.toFixed(1));
         procs[name].memory = Math.round(s.memory / 1024 / 1024);
         procs[name].uptime = s.elapsed ? Math.floor(s.elapsed / 1000) : 0;
+        // Refreshed on memDetail's own 12 s schedule, carried on every 2 s broadcast
+        // so the dashboard never has to poll for it.
+        procs[name].memDetail = memDetail.get(name);
         changed = true;
       }
     }
@@ -528,6 +547,7 @@ function updateProcess(name, updates) {
     procs[newName] = { ...procs[name], name: newName };
     delete procs[name];
     if (runtime[name]) { runtime[newName] = runtime[name]; delete runtime[name]; }
+    memDetail.rename(name, newName);
     // Best-effort log file rename
     try {
       const oldOut = storage.getLogPath(name, 'out');
@@ -580,6 +600,12 @@ module.exports = {
   getProcessInfo,
   getAllProcesses,
   updateStats,
+  pollMemDetail: () => memDetail.pollAll(runtime),
+  getMemDetail: name => ({ detail: memDetail.get(name), history: memDetail.getHistory(name) }),
+  deepSizeStructure: (name, structure) =>
+    runtime[name] ? memDetail.deepSize(name, runtime[name], structure)
+                  : Promise.resolve({ error: `Process "${name}" is not running` }),
+  memPollInterval: memDetail.POLL_MS,
   resurrect,
   resolveProcess,
   updateProcess,
