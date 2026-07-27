@@ -1,6 +1,6 @@
 'use strict';
 
-// Keep the daemon alive on unexpected errors — log them but never crash.
+// Keep the daemon alive on unexpected errors - log them but never crash.
 process.on('uncaughtException',  err  => console.error('[PM3] Uncaught exception:',  err));
 process.on('unhandledRejection', reason => console.error('[PM3] Unhandled rejection:', reason));
 
@@ -127,7 +127,7 @@ app.get('/api/processes/:name/memory', (req, res) => {
   res.json(pm.getMemDetail(name));
 });
 
-// Deep size of one tracked structure — on demand only: v8.serialize allocates a buffer
+// Deep size of one tracked structure - on demand only: v8.serialize allocates a buffer
 // as large as the structure it measures.
 app.post('/api/processes/:name/memory/deep', async (req, res) => {
   const name = pm.resolveProcess(req.params.name);
@@ -334,7 +334,7 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
-// Detailed network info (interfaces, DNS, gateway) — cached 5 s
+// Detailed network info (interfaces, DNS, gateway) - cached 5 s
 app.get('/api/system/network', async (req, res) => {
   try {
     if (_netDetailCache && Date.now() - _netDetailTs < 5000) return res.json(_netDetailCache);
@@ -380,7 +380,7 @@ app.get('/api/system/network', async (req, res) => {
   }
 });
 
-// Memory layout (DDR type, speed, slots) — returns cached hardware info
+// Memory layout (DDR type, speed, slots) - returns cached hardware info
 app.get('/api/system/mem-layout', async (req, res) => {
   try {
     const layout = await _getMemLayout();
@@ -390,7 +390,7 @@ app.get('/api/system/mem-layout', async (req, res) => {
   }
 });
 
-// Process stats summary — cached 5 s (si.processes() scans /proc, can be slow)
+// Process stats summary - cached 5 s (si.processes() scans /proc, can be slow)
 let _procStatsCache = null;
 let _procStatsTs = 0;
 async function _getProcStats() {
@@ -403,7 +403,7 @@ async function _getProcStats() {
   return _procStatsCache;
 }
 
-// Runtime overview — PM3 stats, system process counts, uptime
+// Runtime overview - PM3 stats, system process counts, uptime
 app.get('/api/system/runtime', async (req, res) => {
   try {
     const procStats = await _getProcStats();
@@ -554,7 +554,7 @@ app.get('/api/system/tools', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Storage detail — filesystems + physical drives + I/O rates (cached 4 s)
+// Storage detail - filesystems + physical drives + I/O rates (cached 4 s)
 let _storageCache = null;
 let _storageTs = 0;
 const _FS_SKIP_TYPES = new Set(['tmpfs','devtmpfs','efivarfs','squashfs','overlay','proc','sysfs','cgroup2','pstore','securityfs','devpts','fusectl','binfmt_misc','ramfs','autofs','hugetlbfs','mqueue','debugfs','tracefs','configfs']);
@@ -685,7 +685,7 @@ io.on('connection', socket => {
   });
 });
 
-// CPU static info (physical cores, model, cache, etc.) — fetched once and cached
+// CPU static info (physical cores, model, cache, etc.) - fetched once and cached
 let _cpuStaticInfo = null;
 async function _getCpuStatic() {
   if (!_cpuStaticInfo) _cpuStaticInfo = await si.cpu();
@@ -693,7 +693,7 @@ async function _getCpuStatic() {
 }
 _getCpuStatic().catch(() => {});
 
-// CPU temperature — polled and cached (unsupported on some platforms)
+// CPU temperature - polled and cached (unsupported on some platforms)
 let _cpuTempCache = null;
 let _cpuTempTs = 0;
 async function _getCpuTemp() {
@@ -704,7 +704,7 @@ async function _getCpuTemp() {
 }
 _getCpuTemp().catch(() => {});
 
-// CPU current clock speed — polled and cached
+// CPU current clock speed - polled and cached
 let _cpuFreqCache = null;
 let _cpuFreqTs = 0;
 async function _getCpuFreq() {
@@ -714,7 +714,7 @@ async function _getCpuFreq() {
   return _cpuFreqCache;
 }
 
-// Memory layout (DDR type, speed, slots) — fetched once at startup (hardware doesn't change)
+// Memory layout (DDR type, speed, slots) - fetched once at startup (hardware doesn't change)
 let _memLayoutCache = null;
 async function _getMemLayout() {
   if (_memLayoutCache) return _memLayoutCache;
@@ -723,7 +723,7 @@ async function _getMemLayout() {
 }
 _getMemLayout().catch(() => {});
 
-// Network detail cache (interfaces, DNS, gateway) — cached 8 s
+// Network detail cache (interfaces, DNS, gateway) - cached 8 s
 let _netDetailCache = null;
 let _netDetailTs = 0;
 
@@ -808,13 +808,13 @@ fs.writeFileSync(PATHS.pid, String(process.pid), 'utf8');
 
 // Graceful shutdown. The daemon takes its processes down with it: nothing it spawned is
 // killed by the OS when it exits, so exiting first would leave every managed app running
-// as an orphan — still bound to its port, invisible to PM3, and duplicated the next time
+// as an orphan - still bound to its port, invisible to PM3, and duplicated the next time
 // the daemon starts.
 let shuttingDown = false;
 function shutdown(signal) {
   if (shuttingDown) return;            // a second Ctrl-C must not race the first
   shuttingDown = true;
-  console.log(`[PM3] ${signal} received — stopping managed processes...`);
+  console.log(`[PM3] ${signal} received - stopping managed processes...`);
   const done = () => {
     try { fs.unlinkSync(PATHS.pid); } catch {}
     process.exit(0);

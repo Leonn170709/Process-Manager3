@@ -13,8 +13,8 @@ const issueTracker = require('../issues');
 const memDetail = require('./memDetail');
 
 // Absolute path to the agent entry point, handed to every child as PM3_AGENT.
-// `npm i -g pm3` puts the CLI on PATH but does not make the package require-able — Node
-// never searches the global node_modules root — so `require('pm3/agent')` fails and the
+// `npm i -g pm3` puts the CLI on PATH but does not make the package require-able - Node
+// never searches the global node_modules root - so `require('pm3/agent')` fails and the
 // app silently degrades to a no-op. An absolute path in the environment works for global
 // installs, local installs and npm link alike, with no per-project setup.
 const AGENT_PATH = require.resolve('../agent');
@@ -73,7 +73,7 @@ function parseCommand(script) {
 }
 
 // Env overrides are validated, not merely coerced: spawn() throws on a name containing '='
-// or a NUL byte, and it would throw at restart time — long after the bad record was saved and
+// or a NUL byte, and it would throw at restart time - long after the bad record was saved and
 // the dashboard said "Saved". Rejecting here keeps a process that starts today startable.
 function _sanitizeEnv(raw) {
   if (raw == null) return { env: {} };
@@ -147,7 +147,7 @@ function _spawnProcess(procRecord) {
   try {
     child = spawn(cmd, args, {
       cwd,
-      // The record holds overrides only, so the daemon's environment is merged in here — a
+      // The record holds overrides only, so the daemon's environment is merged in here - a
       // child spawned with just the overrides would run without PATH, HOME or TZ. Overrides
       // win over inherited values, which is the whole point of setting one.
       // PM3_AGENT is added at spawn time rather than stored on the record, so a machine's
@@ -155,7 +155,7 @@ function _spawnProcess(procRecord) {
       // an app can name itself in its own logs; it is never how PM3 identifies the sender.
       env: { ...process.env, ...env, PM3_AGENT: AGENT_PATH, PM3_NAME: name },
       // Each child leads its own process group, so stopping it can signal the whole group
-      // and take down whatever the script spawned in turn — `npm start`'s node, a shell
+      // and take down whatever the script spawned in turn - `npm start`'s node, a shell
       // wrapper's worker. Without this only the direct child is signalled and the
       // grandchildren survive as orphans still holding the port.
       detached: true,
@@ -181,7 +181,7 @@ function _spawnProcess(procRecord) {
   runtime[name] = { proc: child, config: procRecord, watcher: null };
   emit('process:update', getProcessInfo(name));
 
-  // Handle spawn errors (e.g. command not found) — without this handler
+  // Handle spawn errors (e.g. command not found) - without this handler
   // Node.js throws an uncaught exception and crashes the daemon.
   child.on('error', err => {
     const procs2 = storage.loadProcesses();
@@ -199,7 +199,7 @@ function _spawnProcess(procRecord) {
     _handleCrash(procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
   });
 
-  // Log stdout — split chunks so every output line gets its own timestamp
+  // Log stdout - split chunks so every output line gets its own timestamp
   child.stdout.on('data', data => {
     const ts = new Date().toISOString();
     data.toString().trimEnd().split('\n').forEach(rawLine => {
@@ -212,7 +212,7 @@ function _spawnProcess(procRecord) {
 
   // Agent IPC (ignored by children that don't use it). Control requests are handled
   // here rather than in memDetail because this closure is the only place that knows
-  // which child sent the message — that is what lets an app stop itself without
+  // which child sent the message - that is what lets an app stop itself without
   // naming itself, and what stops it from claiming to be a process it is not.
   child.on('message', msg => {
     if (msg && typeof msg === 'object' && msg[AGENT_KEY] === 'control') {
@@ -226,13 +226,13 @@ function _spawnProcess(procRecord) {
   child.stderr.on('data', data => {
     const ts = new Date().toISOString();
     const text = data.toString();
-    // SIGUSR1 makes Node print its real inspector URL here — that is how the CDP
+    // SIGUSR1 makes Node print its real inspector URL here - that is how the CDP
     // fallback learns the port belonging to this specific pid.
     memDetail.noteStderr(name, text);
     text.trimEnd().split('\n').forEach(rawLine => {
       if (!rawLine) return;
       // Node's own "Debugger listening/attached/ending" chatter is provoked by PM3's
-      // memory probe, not written by the app — keep it out of the app's error log.
+      // memory probe, not written by the app - keep it out of the app's error log.
       if (memDetail.isInspectorNoise(rawLine)) return;
       const line = `[${ts}] [ERR] ${rawLine}`;
       storage.appendLog(name, 'err', line);
@@ -347,7 +347,7 @@ function _handleControl(senderName, child, msg) {
     try { child.send({ [AGENT_KEY]: 'control-ack', id: msg.id, ...res }); } catch {}
   };
 
-  // No target means the sender itself — the one name the child never has to be trusted for.
+  // No target means the sender itself - the one name the child never has to be trusted for.
   const target = msg.target ? resolveProcess(msg.target) : senderName;
   if (!target) return reply({ ok: false, error: `Process "${msg.target}" not found` });
 
@@ -360,7 +360,7 @@ function _handleControl(senderName, child, msg) {
   if (msg.action === 'stop') {
     // A plain stop already stays stopped: stopProcess marks the record STOPPED, which
     // both the exit handler and resurrect() honour. Persisting autorestart:false is a
-    // separate, opt-in decision because it outlives the emergency — it would still be
+    // separate, opt-in decision because it outlives the emergency - it would still be
     // off the next time somebody starts the process by hand.
     if (msg.disableAutorestart) updateProcess(target, { autorestart: false });
     storage.appendLog(target, 'out', `[${ts}] [PM3] Stop requested by ${via}`);
@@ -451,7 +451,7 @@ function stopProcess(name) {
 
 // --- Stop every managed process, and wait for them to actually be gone ---
 //
-// Children are spawned with detached:false, which only means "same process group" — it
+// Children are spawned with detached:false, which only means "same process group" - it
 // does NOT make the OS kill them when the daemon exits. Without this they survive as
 // orphans re-parented to init, still holding their ports, which is why a web server kept
 // serving after `pm3 kill`. Their records also still said `running`, so the next daemon
@@ -465,7 +465,7 @@ function stopAll(timeoutMs = 5000) {
 
   // Mark what was running so the next daemon start brings back exactly this set. Written
   // before the signals go out, because after them these processes are indistinguishable
-  // from ones somebody stopped by hand — and those must stay stopped.
+  // from ones somebody stopped by hand - and those must stay stopped.
   const procs = storage.loadProcesses();
   for (const [name] of entries) if (procs[name]) procs[name].resurrect = true;
   storage.saveProcesses(procs);
@@ -530,7 +530,7 @@ function restartProcess(name) {
     oldChild.once('exit',  onExitOrError);
     oldChild.once('error', onExitOrError);
   } else {
-    // Process was already stopped/crashed — spawn immediately
+    // Process was already stopped/crashed - spawn immediately
     _doSpawn();
   }
 
@@ -590,7 +590,7 @@ async function updateStats() {
     if (process.platform === 'linux') {
       // Build set of TCP/UDP socket inodes once for the whole update cycle.
       // Unix-domain sockets (used internally by Node.js) are excluded because
-      // they don't appear in these tables — so internal libuv sockets don't inflate the count.
+      // they don't appear in these tables - so internal libuv sockets don't inflate the count.
       const tcpInodes = new Set();
       for (const f of ['/proc/net/tcp', '/proc/net/tcp6', '/proc/net/udp', '/proc/net/udp6']) {
         try {
@@ -655,8 +655,8 @@ async function updateStats() {
 
 // --- Resurrect saved processes ---
 // Two ways a process earns a restart on daemon start:
-//   RUNNING/STARTING — the daemon died without cleaning up (crash, SIGKILL, power loss).
-//   resurrect flag   — `pm3 kill` took it down on purpose and owes it a comeback.
+//   RUNNING/STARTING - the daemon died without cleaning up (crash, SIGKILL, power loss).
+//   resurrect flag   - `pm3 kill` took it down on purpose and owes it a comeback.
 // A process stopped by hand has neither, and stays down.
 function resurrect() {
   const procs = storage.loadProcesses();
@@ -694,7 +694,7 @@ function updateProcess(name, updates) {
 
   // Env is replaced wholesale rather than merged: the editor shows the complete set of
   // overrides, so a key the user deleted must actually disappear. A running process keeps the
-  // environment it was spawned with — Linux gives no way to change it — so this lands on the
+  // environment it was spawned with - Linux gives no way to change it - so this lands on the
   // next restart, which is what the dashboard tells the user.
   if (updates.env !== undefined) {
     const { env, error } = _sanitizeEnv(updates.env);

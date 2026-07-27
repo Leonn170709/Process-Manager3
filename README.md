@@ -1,4 +1,4 @@
-# ⚡ PM3 — Process Manager
+# ⚡ PM3 - Process Manager
 
 > A lightweight, modern Node.js process manager with a real-time Liquid Glass web dashboard and persistent issue tracking.
 
@@ -8,15 +8,15 @@
 
 ## Features
 
-- **Auto-restart** — configurable restart limits, crash detection, and memory-limit enforcement
-- **Liquid Glass dashboard** — real-time web UI at `localhost:4926/dashboard`
-- **Persistent issue tracking** — every crash is logged with full stack traces, survives restarts
-- **Live log streaming** — WebSocket-based log tail in the dashboard and via `pm3 logs --follow`
-- **Terminal monitor** — `pm3 monit` for a live process overview in the terminal
-- **Process persistence** — `pm3 save` / `pm3 resurrect` to survive reboots
-- **System boot integration** — systemd, launchd, and Windows Task Scheduler via `pm3 startup`
-- **Zero-config daemon** — starts automatically on first use, runs detached in the background
-- **CPU & memory detail modals** — click the CPU or Memory card in the System tab for live charts, per-core/thread breakdown, and a sortable process list that can switch between PM3-managed and all system-wide processes
+- **Auto-restart** - configurable restart limits, crash detection, and memory-limit enforcement
+- **Liquid Glass dashboard** - real-time web UI at `localhost:4926/dashboard`
+- **Persistent issue tracking** - every crash is logged with full stack traces, survives restarts
+- **Live log streaming** - WebSocket-based log tail in the dashboard and via `pm3 logs --follow`
+- **Terminal monitor** - `pm3 monit` for a live process overview in the terminal
+- **Process persistence** - `pm3 save` / `pm3 resurrect` to survive reboots
+- **System boot integration** - systemd, launchd, and Windows Task Scheduler via `pm3 startup`
+- **Zero-config daemon** - starts automatically on first use, runs detached in the background
+- **CPU & memory detail modals** - click the CPU or Memory card in the System tab for live charts, per-core/thread breakdown, and a sortable process list that can switch between PM3-managed and all system-wide processes
 
 ---
 
@@ -78,7 +78,7 @@ The PM3 daemon starts automatically on first use and runs in the background.
 
 `pm3 kill` takes everything down with it and brings it all back next time. Nothing PM3
 spawned is killed by the OS when the daemon exits, so the daemon signals each child's whole
-process group — the script *and* anything it spawned in turn — and waits for them to
+process group - the script *and* anything it spawned in turn - and waits for them to
 actually go. Whatever was running is flagged, and the next `pm3` command starts the daemon
 and restarts exactly that set. A process you stopped by hand is not flagged and stays down.
 
@@ -142,45 +142,45 @@ Open at `http://localhost:4926/dashboard` or run `pm3 dashboard`.
 | **Processes** | Live status, CPU/RAM usage, restart count, uptime · per-process Start/Stop/Restart/Logs/Delete |
 | **Logs** | Real-time log streaming via WebSocket with process selector |
 | **Issues** | Crash history with severity levels, full error messages, and stack traces |
-| **System** | CPU load, memory usage, network I/O with sparklines, disk usage, server uptime — click the CPU or Memory card for a detailed modal |
+| **System** | CPU load, memory usage, network I/O with sparklines, disk usage, server uptime - click the CPU or Memory card for a detailed modal |
 | **Config** | Edit all PM3 settings live via the dashboard |
 
 ### CPU detail modal
 
 Click the **CPU Load** card in the System tab to open a detailed view:
 
-- **3-minute sparkline** — rolling CPU history with tap-to-pin crosshair
-- **Stat boxes** — User %, System %, Idle %, Load average (1m / 5m / 15m), logical core count
-- **Per-core grid** — individual load bar for every logical thread. If the CPU has hyperthreading enabled (physical cores < logical threads), a **Thread / Core toggle** appears:
-  - *Threads* — shows each logical CPU separately (Thread 0, Thread 1 …)
-  - *Cores* — groups sibling threads by physical core, shows the averaged load, and displays a per-thread breakdown line (`T0: X% · T1: Y%`) inside each box
-- **Process list** — sortable by CPU usage (highest / lowest). Toggle between **⚡ PM3** (managed processes only) and **🖥 System** (all running system processes, top 60). Click any row to expand it:
-  - PM3 process: PID, status, uptime, restarts, net I/O, memory limit, script path — plus buttons to open the full Stats or Logs modal
+- **3-minute sparkline** - rolling CPU history with tap-to-pin crosshair
+- **Stat boxes** - User %, System %, Idle %, Load average (1m / 5m / 15m), logical core count
+- **Per-core grid** - individual load bar for every logical thread. If the CPU has hyperthreading enabled (physical cores < logical threads), a **Thread / Core toggle** appears:
+  - *Threads* - shows each logical CPU separately (Thread 0, Thread 1 …)
+  - *Cores* - groups sibling threads by physical core, shows the averaged load, and displays a per-thread breakdown line (`T0: X% · T1: Y%`) inside each box
+- **Process list** - sortable by CPU usage (highest / lowest). Toggle between **⚡ PM3** (managed processes only) and **🖥 System** (all running system processes, top 60). Click any row to expand it:
+  - PM3 process: PID, status, uptime, restarts, net I/O, memory limit, script path - plus buttons to open the full Stats or Logs modal
   - System process: PID, parent PID, user, state, nice, priority, full command line
 
 ### Memory detail modal
 
 Click the **Memory** card in the System tab to open a detailed view:
 
-- **3-minute sparkline** — rolling memory % history
-- **JS heap vs native chart** — stacked `heapUsed` / `external` / `native` across all managed processes, so a JS leak and a native leak are distinguishable at a glance
-- **Split summary** — rss · heapTotal · heapUsed · external · arrayBuffers · derived native
-- **Segmented usage bar** — shows Used (active), Cached, and Buffers as distinct colour bands with a legend
-- **Stat boxes** — Total RAM, Used (active), Available, Cached, Buffers, Swap used / total
-- **Process list** — sortable by RAM usage. Same **⚡ PM3 / 🖥 System** toggle and click-to-expand rows as the CPU modal. Rows show the process's own memory split (`heap 84 MB · native 310 MB`), and expanding one reveals the full split plus any structures the app registered with the agent
+- **3-minute sparkline** - rolling memory % history
+- **JS heap vs native chart** - stacked `heapUsed` / `external` / `native` across all managed processes, so a JS leak and a native leak are distinguishable at a glance
+- **Split summary** - rss · heapTotal · heapUsed · external · arrayBuffers · derived native
+- **Segmented usage bar** - shows Used (active), Cached, and Buffers as distinct colour bands with a legend
+- **Stat boxes** - Total RAM, Used (active), Available, Cached, Buffers, Swap used / total
+- **Process list** - sortable by RAM usage. Same **⚡ PM3 / 🖥 System** toggle and click-to-expand rows as the CPU modal. Rows show the process's own memory split (`heap 84 MB · native 310 MB`), and expanding one reveals the full split plus any structures the app registered with the agent
 
-The modal contains **no CPU data at all** — CPU lives in the CPU modal and memory in this one.
+The modal contains **no CPU data at all** - CPU lives in the CPU modal and memory in this one.
 
 ### Per-process memory modal
 
 Click the **RAM cell** of any row in the Processes table to open a standalone memory view
 for that one process:
 
-- **JS heap vs native chart** — stacked `heapUsed` / `external` / `native`, seeded with up
+- **JS heap vs native chart** - stacked `heapUsed` / `external` / `native`, seeded with up
   to an hour of history so you can see the trend immediately
-- **Full split** — rss · heapTotal · heapUsed · external · arrayBuffers · native, plus
+- **Full split** - rss · heapTotal · heapUsed · external · arrayBuffers · native, plus
   event-loop lag, GC count/pause time and active handles when the agent is attached
-- **Tracked structures** — entry counts for everything the app registered, with a
+- **Tracked structures** - entry counts for everything the app registered, with a
   per-structure **Measure size** button
 
 Every other stat cell (CPU, Net, Sockets) still opens the combined Stats modal.
@@ -189,7 +189,7 @@ Every other stat cell (CPU, Net, Sockets) still opens the combined Stats modal.
 
 For every managed **Node** process PM3 reads `process.memoryUsage()` from inside the
 process, either via the [opt-in agent](agent/README.md) (preferred) or by briefly opening
-the Node inspector over CDP. Anything else — a shell script, a Python worker — shows RSS
+the Node inspector over CDP. Anything else - a shell script, a Python worker - shows RSS
 with an explicit *"heap detail unavailable"* note rather than a guessed breakdown.
 
 Adding the agent to your app also gives you **named structures**: entry counts for the
@@ -204,12 +204,12 @@ const pm3 = process.env.PM3_AGENT
 pm3?.track('cache', () => cache);
 ```
 
-Load it via `PM3_AGENT`, not `require('pm3/agent')` — a global `npm i -g pm3` puts the CLI
+Load it via `PM3_AGENT`, not `require('pm3/agent')` - a global `npm i -g pm3` puts the CLI
 on `PATH` but leaves the package unresolvable, so the bare specifier throws.
 
 The agent can also **stop or restart the app from inside it**, which is how you build a
-kill switch your app can pull on itself — an `/emergencystop` chat command, a tripped
-safety check — without it knowing its own pid, port or name:
+kill switch your app can pull on itself - an `/emergencystop` chat command, a tripped
+safety check - without it knowing its own pid, port or name:
 
 ```js
 await pm3.stop();               // this process, and it stays stopped
@@ -232,7 +232,7 @@ PM3 automatically records issues when:
 - `Error:`, `Exception`, or `FATAL` appears in stderr
 - A process exceeds its max restart limit
 
-Issues are **persistent** — stored in `~/.pm3/issues.json` and survive daemon restarts. They are never auto-deleted.
+Issues are **persistent** - stored in `~/.pm3/issues.json` and survive daemon restarts. They are never auto-deleted.
 
 Each issue captures:
 - Timestamp, process name & ID
@@ -374,7 +374,7 @@ sudo pm3 startup
 PM3 is a simpler, dependency-light alternative. It has a built-in Liquid Glass dashboard, persistent per-process issue tracking, and a single-file daemon that's easy to understand and modify.
 
 **Does PM3 support clustering?**  
-Not in v1.0 — single-process mode only. Cluster support is planned for a future release.
+Not in v1.0 - single-process mode only. Cluster support is planned for a future release.
 
 **Can I run npm scripts?**  
 Yes: `pm3 start npm --name myapp -- run start`

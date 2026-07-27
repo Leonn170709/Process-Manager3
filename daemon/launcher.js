@@ -39,7 +39,7 @@ async function startDaemon() {
   return { error: 'Daemon did not start in time' };
 }
 
-// Signal 0 does no killing — it only asks whether the pid is still there.
+// Signal 0 does no killing - it only asks whether the pid is still there.
 function _alive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
@@ -69,7 +69,7 @@ async function stopDaemon(timeoutMs = 20000) {
   }
 
   // The daemon now stops every managed process before it exits, so this is no longer
-  // instant. Wait for the pid to actually go away — reporting "daemon stopped" off the
+  // instant. Wait for the pid to actually go away - reporting "daemon stopped" off the
   // signal alone would put the CLI's success message ahead of the shutdown it describes.
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -78,7 +78,7 @@ async function stopDaemon(timeoutMs = 20000) {
   }
 
   // Wedged past its own 10 s self-timeout. Force it rather than hanging the CLI, and say
-  // so — a SIGKILLed daemon cannot clean up, so this is the one path that can still leave
+  // so - a SIGKILLed daemon cannot clean up, so this is the one path that can still leave
   // orphans behind.
   try { process.kill(pid, 'SIGKILL'); } catch {}
   return { ok: true, forced: true };

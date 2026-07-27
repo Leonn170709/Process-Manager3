@@ -1,7 +1,7 @@
-# `pm3/agent` — in-process memory reporting and lifecycle control
+# `pm3/agent` - in-process memory reporting and lifecycle control
 
 A tiny, zero-dependency module you add to your own app so PM3 can show **what its memory
-is actually made of** — JS heap vs native, plus entry counts for structures you name — and
+is actually made of** - JS heap vs native, plus entry counts for structures you name - and
 so the app can **stop or restart itself** without knowing its own pid, port or name.
 
 Reporting is a **no-op when the app is not running under PM3**, so it is safe to leave in
@@ -9,7 +9,7 @@ production code and safe to run the app standalone. `stop()` and `restart()` are
 deliberate exception: outside PM3 they resolve to `{ ok: false }` rather than pretending,
 because an app that reports "stopped" while still running is worse than one that fails.
 
-## Quick start — use `PM3_AGENT`
+## Quick start - use `PM3_AGENT`
 
 PM3 sets `PM3_AGENT` in every child's environment to the absolute path of this module.
 Load it from there:
@@ -23,14 +23,14 @@ pm3?.track('cache', () => cache);
 ```
 
 That is the whole integration. No port is opened, no timer is started, nothing is sent
-unless PM3 asks. Run the same file with plain `node app.js` and `pm3` is simply `null` —
+unless PM3 asks. Run the same file with plain `node app.js` and `pm3` is simply `null`:
 the app behaves exactly as if the lines were not there.
 
 ### Why not `require('pm3/agent')`?
 
 Because it breaks on the most common install. `npm install -g pm3` puts the **CLI** on your
 `PATH`, but Node never searches the global `node_modules` root when resolving a
-`require()`, so `require('pm3/agent')` throws `MODULE_NOT_FOUND` — and if you wrapped it in
+`require()`, so `require('pm3/agent')` throws `MODULE_NOT_FOUND` - and if you wrapped it in
 a `try/catch`, your app would silently report nothing while looking perfectly healthy.
 
 `PM3_AGENT` carries the resolved absolute path, so it works identically for a global
@@ -38,7 +38,7 @@ install, a local `node_modules` install, and `npm link`, with no per-project set
 hardcoded paths.
 
 If `pm3` **is** a local dependency of your app and you want the module even when running
-standalone, this variant also works — `PM3_AGENT` still wins when present:
+standalone, this variant also works - `PM3_AGENT` still wins when present:
 
 ```js
 const pm3 = require(process.env.PM3_AGENT || 'pm3/agent').attach({ name: 'my-app' });
@@ -63,7 +63,7 @@ instance (the second call's options are ignored).
 **Returns** an object with `track`, `untrack`, `report`, `stop`, `restart`, `detach`,
 `enabled` and `name`.
 
-**Failure mode:** none — `attach()` does not throw. With no IPC channel (i.e. not started
+**Failure mode:** none - `attach()` does not throw. With no IPC channel (i.e. not started
 by PM3) it returns an agent with `enabled === false` whose `track()` calls are recorded
 but never reported anywhere.
 
@@ -81,7 +81,7 @@ Registers a structure to report an entry count for. Returns the agent, so calls 
 | `name` | `string` | Label shown in the dashboard. Coerced with `String()`. |
 | `getter` | `function` | Called on each report; must return the structure. |
 
-**Failure mode:** a `getter` that is not a function is **silently ignored** — nothing is
+**Failure mode:** a `getter` that is not a function is **silently ignored** - nothing is
 registered. A getter that throws is caught per structure and reported as count `—`; it
 never breaks the rest of the report.
 
@@ -113,13 +113,13 @@ that structure's `bytes` to `null` rather than failing the report. A getter that
 gives that structure `count: null` and leaves the rest of the report intact.
 
 In a standalone run (`enabled === false`) the `mem` and `tracked` numbers are still real,
-but `loopLagMs` is `null` and the `gc` counters stay at zero — that instrumentation is only
+but `loopLagMs` is `null` and the `gc` counters stay at zero - that instrumentation is only
 started when PM3 is actually listening, so a standalone app pays nothing for it.
 
 ### `agent.stop(name?, options?) → Promise<result>`
 
 Asks PM3 to stop a process and leave it stopped. **With no name it stops the calling
-process** — PM3 identifies the sender from the IPC channel the message arrived on, so an
+process** - PM3 identifies the sender from the IPC channel the message arrived on, so an
 app never has to know or pass its own name, and cannot act on a process it is not.
 
 | Parameter | Type | Meaning |
@@ -127,18 +127,18 @@ app never has to know or pass its own name, and cannot act on a process it is no
 | `name` | `string` (optional) | Process name or id. Omit for "this process". |
 | `options.disableAutorestart` | `boolean` (default `false`) | Also clear the saved `autorestart` flag. See below. |
 
-Both `stop()` and `stop({ disableAutorestart: true })` are valid — stopping yourself is the
+Both `stop()` and `stop({ disableAutorestart: true })` are valid - stopping yourself is the
 common case, so the **name** is what gets omitted, not the options.
 
 ```js
 // A Discord /emergencystop command: answer first, then go down.
-await interaction.reply('🛑 Emergency stop — shutting down.');
+await interaction.reply('🛑 Emergency stop - shutting down.');
 const res = await pm3.stop();
 if (!res.ok) await interaction.followUp(`Failed: ${res.error}`);
 ```
 
 **It stays stopped.** PM3 does not restart a process it was told to stop, whatever
-`autorestart` and `maxRestarts` say, and `resurrect()` on daemon start skips it too — the
+`autorestart` and `maxRestarts` say, and `resurrect()` on daemon start skips it too - the
 stop is recorded on the process record, not just applied to the running pid. You do not
 need `disableAutorestart` for that.
 
@@ -146,7 +146,7 @@ Use `disableAutorestart` only when you want the flag itself turned off permanent
 change **outlives the emergency**: the next person to run `pm3 start <name>` gets a process
 that no longer restarts on crash, which is rarely what they expect.
 
-Coming back up is a shell operation — `pm3 restart <name>` (**not** `pm3 start`, which takes
+Coming back up is a shell operation - `pm3 restart <name>` (**not** `pm3 start`, which takes
 a script path, not a name). An app that has stopped itself cannot un-stop itself, so do not
 build your only recovery path into the app you just killed.
 
@@ -155,12 +155,12 @@ on the next daemon start, whereas `stop()` means down until a person says otherw
 
 **Failure mode:** never throws, never rejects. Resolves to `{ ok: true, action, name }` or
 `{ ok: false, error }`. A successful self-stop normally **never resolves at all**, because
-SIGTERM arrives before the reply does — treat the call as a point of no return, not as
+SIGTERM arrives before the reply does - treat the call as a point of no return, not as
 something with a result you can log afterwards. `{ ok: false }` cases:
 
 | `error` | Cause |
 |---|---|
-| `not running under PM3` | No IPC channel — started with plain `node`. |
+| `not running under PM3` | No IPC channel - started with plain `node`. |
 | `Process "x" not found` | Unknown name/id. Nothing was stopped. |
 | `no response from the PM3 daemon` | 5 s with no reply. If your code is running to see this, you were **not** stopped. |
 
@@ -172,11 +172,11 @@ it restarts the caller.
 ### `agent.name`
 
 The name PM3 knows this process by (from `PM3_NAME`), or `null` outside PM3. For your own
-log lines and confirmation messages — PM3 never needs you to pass it back.
+log lines and confirmation messages - PM3 never needs you to pass it back.
 
 ### `agent.detach()`
 
-Clears the registry and removes the IPC listener. Rarely needed — the agent holds nothing
+Clears the registry and removes the IPC listener. Rarely needed - the agent holds nothing
 open. Any in-flight `stop`/`restart` promise resolves to `{ ok: false }`.
 
 ### `agent.enabled`
@@ -203,8 +203,8 @@ did it.
 ### 1. Register a getter, not the value
 
 ```js
-pm3.track('cache', () => cache);   // ✅ correct — reads the current value each time
-pm3.track('cache', cache);         // ❌ WRONG — ignored, and pins the object forever
+pm3.track('cache', () => cache);   // ✅ correct - reads the current value each time
+pm3.track('cache', cache);         // ❌ WRONG - ignored, and pins the object forever
 ```
 
 The second form is ignored (it is not a function), which is the safe outcome: a stored
@@ -223,8 +223,8 @@ Entry **counts** are effectively free and are sampled on every report.
 ### 3. Contents are never reported, by design
 
 The agent reports `{ name, count, bytes? }` and nothing else. No key samples, no "first 10
-entries" preview, no type dumps. Tracked structures are exactly where secrets live —
-session tokens, API keys, user identifiers — and a dashboard that rendered their contents
+entries" preview, no type dumps. Tracked structures are exactly where secrets live:
+session tokens, API keys, user identifiers, and a dashboard that rendered their contents
 would be a credential leak, not a diagnostic. This is not configurable.
 
 ---
@@ -235,10 +235,10 @@ would be a credential leak, not a diagnostic. This is not configurable.
 
 | Field | Meaning |
 |---|---|
-| `rss` | Resident set size — total physical memory the OS has given the process. |
+| `rss` | Resident set size - total physical memory the OS has given the process. |
 | `heapTotal` | V8 heap **reserved**. Address space, not necessarily resident. |
 | `heapUsed` | V8 heap live after the last GC. Rising steadily = a JS retention problem. |
-| `external` | Native memory bound to JS objects — Buffers, typed arrays, some addons. |
+| `external` | Native memory bound to JS objects - Buffers, typed arrays, some addons. |
 | `arrayBuffers` | The `ArrayBuffer`/`Buffer` portion of `external`. |
 
 Plus:
@@ -256,7 +256,7 @@ Plus:
 | Shown as | Meaning |
 |---|---|
 | `42 MB` | Exact: `rss - heapTotal - external`, valid because the reserved heap fits inside RSS. |
-| `≤ 42 MB` | Upper bound: `heapTotal` exceeded RSS (V8 reserved more heap than is resident), so PM3 subtracts `heapUsed` instead. The true figure is lower. A `≤` is never decoration — do not read it as a measurement. |
+| `≤ 42 MB` | Upper bound: `heapTotal` exceeded RSS (V8 reserved more heap than is resident), so PM3 subtracts `heapUsed` instead. The true figure is lower. A `≤` is never decoration - do not read it as a measurement. |
 | `n/a` | `external` alone exceeds RSS. No subtraction is meaningful, but the conclusion is: the memory is in **buffers/ArrayBuffers, not native addons**. |
 
 A large `native` points at native addons or allocator fragmentation.
@@ -266,7 +266,7 @@ A large `native` points at native addons or allocator fragmentation.
 ## What this cannot tell you
 
 **It cannot see inside native memory.** If `sharp`/libvips, `canvas`/Cairo, `sqlite3` or any
-other native addon is holding 300 MB, the agent can tell you that ~300 MB is native — and
+other native addon is holding 300 MB, the agent can tell you that ~300 MB is native - and
 nothing more. It cannot attribute those bytes to a library, a call site, or an object. No
 JS-level tool can; a V8 heap snapshot cannot either.
 

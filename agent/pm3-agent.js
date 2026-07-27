@@ -1,6 +1,6 @@
 'use strict';
 
-// PM3 agent — opt-in, zero dependencies.
+// PM3 agent - opt-in, zero dependencies.
 //
 // One line in the host app:
 //   const pm3 = require('pm3/agent').attach({ name: 'my-app' });
@@ -8,11 +8,11 @@
 //   await pm3.stop();            // ask PM3 to stop this process, for good
 //
 // Reports { name, count, bytes? } per tracked structure and process.memoryUsage().
-// It NEVER reports contents — tracked structures routinely hold tokens and user data.
+// It NEVER reports contents - tracked structures routinely hold tokens and user data.
 //
 // Outside PM3 (no IPC channel) attach() returns a fully working object whose methods
 // are harmless: nothing is sent, no handle is created, the process exits normally.
-// The one exception is stop()/restart(), which cannot silently pretend to have worked —
+// The one exception is stop()/restart(), which cannot silently pretend to have worked:
 // they resolve to { ok: false } so the caller can tell the difference and react.
 
 const v8 = require('v8');
@@ -21,7 +21,7 @@ const KEY = '__pm3';
 
 let attached = null;
 
-// Entry count only — never the values themselves.
+// Entry count only - never the values themselves.
 function _count(v) {
   if (v == null) return null;
   if (typeof v.size === 'number') return v.size;           // Map, Set
@@ -61,7 +61,7 @@ function attach(opts) {
       if (deepName === name) {
         // Allocates a buffer as large as the structure. On demand only, one at a time.
         // Structured clone refuses functions, so anything holding one as an own property
-        // cannot be sized at all — a Map of pending Timeouts (each keeps its callback) or
+        // cannot be sized at all - a Map of pending Timeouts (each keeps its callback) or
         // a class instance referencing a logger. That is not a failure to report as a bare
         // null: keep the reason so the dashboard can say which structure and why.
         try { row.bytes = v8.serialize(getter()).length; }
@@ -99,7 +99,7 @@ function attach(opts) {
     return new Promise(resolve => {
       const id = ++msgId;
       // If this fires we are demonstrably still alive well after asking to be stopped,
-      // so the request did not take effect — that is a failure, not a slow success.
+      // so the request did not take effect - that is a failure, not a slow success.
       const timer = setTimeout(() => {
         pending.delete(id);
         resolve({ ok: false, error: 'no response from the PM3 daemon' });
@@ -115,7 +115,7 @@ function attach(opts) {
     });
   }
 
-  // stop(opts) and stop(name, opts) are both valid — stopping yourself is the common
+  // stop(opts) and stop(name, opts) are both valid - stopping yourself is the common
   // case, so the name is what gets omitted.
   function _args(target, options) {
     if (target && typeof target === 'object') return { target: null, options: target };

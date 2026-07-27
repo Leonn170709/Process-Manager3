@@ -527,7 +527,7 @@ program
       const socket = io(DAEMON_BASE_URL);
       nl();
       console.log('  ' + chalk.dim('─'.repeat(W - 2)));
-      console.log('  ' + chalk.dim('Following  —  Ctrl+C to stop'));
+      console.log('  ' + chalk.dim('Following  -  Ctrl+C to stop'));
       console.log('  ' + chalk.dim('─'.repeat(W - 2)));
       nl();
       socket.on('log', data => {
@@ -704,7 +704,7 @@ program
 
     ok(`PM3 daemon stopped${names.length ? `  ${chalk.dim('·')}  ${names.join(', ')}` : ''}`);
     if (r.forced) {
-      warn('Daemon did not exit in time and was force-killed — some processes may still be running.');
+      warn('Daemon did not exit in time and was force-killed - some processes may still be running.');
       hint('Check with: ps aux | grep -v grep | grep node');
     } else if (names.length) {
       hint('They start again automatically with the next pm3 command.');
@@ -836,7 +836,7 @@ program
   });
 
 // ══════════════════════════════════════════════════════════════
-//  pm3 doctor — check required / optional system tools
+//  pm3 doctor - check required / optional system tools
 // ══════════════════════════════════════════════════════════════
 
 program
