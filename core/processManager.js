@@ -154,7 +154,11 @@ function _spawnProcess(procRecord) {
       // install path never gets baked into ~/.pm3/processes.json. PM3_NAME rides along so
       // an app can name itself in its own logs; it is never how PM3 identifies the sender.
       env: { ...process.env, ...env, PM3_AGENT: AGENT_PATH, PM3_NAME: name },
-      detached: false,
+      // Each child leads its own process group, so stopping it can signal the whole group
+      // and take down whatever the script spawned in turn — `npm start`'s node, a shell
+      // wrapper's worker. Without this only the direct child is signalled and the
+      // grandchildren survive as orphans still holding the port.
+      detached: true,
       // 4th fd = IPC channel for the opt-in memory agent. A child that never listens on
       // it is unaffected (verified: a plain script still exits immediately), and the
       // agent unrefs the channel so it cannot hold a child open either.
@@ -411,6 +415,15 @@ function _captureIssue(name, errorText, severity) {
   emit('issue:new', issueTracker.getIssues()[0]);
 }
 
+// Signal a child and everything it spawned. Children are started detached, so each is a
+// process group leader and a negative pid reaches the whole group. Falls back to the bare
+// child if the group is already gone (it is reaped as soon as the leader exits).
+function _killTree(child, signal) {
+  if (!child || !child.pid) return;
+  try { process.kill(-child.pid, signal); return; } catch {}
+  try { child.kill(signal); } catch {}
+}
+
 // --- Stop process ---
 function stopProcess(name) {
   const procs = storage.loadProcesses();
@@ -428,12 +441,51 @@ function stopProcess(name) {
   if (runtime[name]) {
     if (runtime[name].watcher) runtime[name].watcher.close();
     if (runtime[name].memCheck) clearInterval(runtime[name].memCheck);
-    try { runtime[name].proc.kill('SIGTERM'); } catch {}
+    _killTree(runtime[name].proc, 'SIGTERM');
     delete runtime[name];
   }
 
   emit('process:update', procs[name]);
   return procs[name];
+}
+
+// --- Stop every managed process, and wait for them to actually be gone ---
+//
+// Children are spawned with detached:false, which only means "same process group" — it
+// does NOT make the OS kill them when the daemon exits. Without this they survive as
+// orphans re-parented to init, still holding their ports, which is why a web server kept
+// serving after `pm3 kill`. Their records also still said `running`, so the next daemon
+// start resurrected them and produced a second copy fighting the first for the port.
+//
+// Resolves once every child has exited (or been SIGKILLed), so the caller can exit knowing
+// nothing outlived it.
+function stopAll(timeoutMs = 5000) {
+  const entries = Object.entries(runtime).map(([name, r]) => [name, r && r.proc]);
+  if (!entries.length) return Promise.resolve(0);
+
+  // Mark what was running so the next daemon start brings back exactly this set. Written
+  // before the signals go out, because after them these processes are indistinguishable
+  // from ones somebody stopped by hand — and those must stay stopped.
+  const procs = storage.loadProcesses();
+  for (const [name] of entries) if (procs[name]) procs[name].resurrect = true;
+  storage.saveProcesses(procs);
+
+  // Listeners must be attached before the signals go out, or a child that dies
+  // immediately would exit before anything is watching for it.
+  const waits = entries.map(([, child]) => new Promise(resolve => {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return resolve();
+    const timer = setTimeout(() => {
+      _killTree(child, 'SIGKILL');
+      resolve();                       // SIGKILL cannot be refused; don't wait on it
+    }, timeoutMs);
+    const done = () => { clearTimeout(timer); resolve(); };
+    child.once('exit', done);
+    child.once('error', done);
+  }));
+
+  for (const [name] of entries) stopProcess(name);
+
+  return Promise.all(waits).then(() => entries.length);
 }
 
 // --- Restart process ---
@@ -465,7 +517,7 @@ function restartProcess(name) {
     let spawned = false;
     const watchdog = setTimeout(() => {
       if (spawned) return;
-      try { oldChild.kill('SIGKILL'); } catch {}
+      _killTree(oldChild, 'SIGKILL');
     }, 5000);
 
     const onExitOrError = () => {
@@ -602,16 +654,24 @@ async function updateStats() {
 }
 
 // --- Resurrect saved processes ---
+// Two ways a process earns a restart on daemon start:
+//   RUNNING/STARTING — the daemon died without cleaning up (crash, SIGKILL, power loss).
+//   resurrect flag   — `pm3 kill` took it down on purpose and owes it a comeback.
+// A process stopped by hand has neither, and stays down.
 function resurrect() {
   const procs = storage.loadProcesses();
-  let count = 0;
-  for (const [name, proc] of Object.entries(procs)) {
-    if (proc.status === STATUS.RUNNING || proc.status === STATUS.STARTING) {
-      _spawnProcess(proc);
-      count++;
+  const toStart = [];
+  for (const proc of Object.values(procs)) {
+    if (proc.status === STATUS.RUNNING || proc.status === STATUS.STARTING || proc.resurrect) {
+      delete proc.resurrect;        // one-shot: a later hand-stop must not be undone
+      toStart.push(proc);
     }
   }
-  return count;
+  // Persist the cleared flags BEFORE spawning: _spawnProcess writes each record itself,
+  // and saving this older snapshot afterwards would wipe the pids it just recorded.
+  if (toStart.length) storage.saveProcesses(procs);
+  for (const proc of toStart) _spawnProcess(proc);
+  return toStart.length;
 }
 
 // --- Resolve by name or id ---
@@ -697,6 +757,7 @@ module.exports = {
   setEmitter,
   startProcess,
   stopProcess,
+  stopAll,
   restartProcess,
   deleteProcess,
   getProcessInfo,

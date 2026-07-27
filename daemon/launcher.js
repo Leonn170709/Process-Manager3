@@ -39,7 +39,12 @@ async function startDaemon() {
   return { error: 'Daemon did not start in time' };
 }
 
-async function stopDaemon() {
+// Signal 0 does no killing — it only asks whether the pid is still there.
+function _alive(pid) {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+async function stopDaemon(timeoutMs = 20000) {
   let pid = null;
 
   if (fs.existsSync(PATHS.pid)) {
@@ -59,10 +64,24 @@ async function stopDaemon() {
 
   try {
     process.kill(pid, 'SIGTERM');
-    return { ok: true };
   } catch {
     return { error: `Could not kill PID ${pid}. Retry with sudo` };
   }
+
+  // The daemon now stops every managed process before it exits, so this is no longer
+  // instant. Wait for the pid to actually go away — reporting "daemon stopped" off the
+  // signal alone would put the CLI's success message ahead of the shutdown it describes.
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 200));
+    if (!_alive(pid)) return { ok: true };
+  }
+
+  // Wedged past its own 10 s self-timeout. Force it rather than hanging the CLI, and say
+  // so — a SIGKILLed daemon cannot clean up, so this is the one path that can still leave
+  // orphans behind.
+  try { process.kill(pid, 'SIGKILL'); } catch {}
+  return { ok: true, forced: true };
 }
 
 module.exports = { isDaemonRunning, startDaemon, stopDaemon };

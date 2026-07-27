@@ -806,12 +806,26 @@ function mergeAndSort(out, err) {
 // Write PID file
 fs.writeFileSync(PATHS.pid, String(process.pid), 'utf8');
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  try { fs.unlinkSync(PATHS.pid); } catch {}
-  process.exit(0);
-});
-process.on('SIGINT', () => {
-  try { fs.unlinkSync(PATHS.pid); } catch {}
-  process.exit(0);
-});
+// Graceful shutdown. The daemon takes its processes down with it: nothing it spawned is
+// killed by the OS when it exits, so exiting first would leave every managed app running
+// as an orphan — still bound to its port, invisible to PM3, and duplicated the next time
+// the daemon starts.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;            // a second Ctrl-C must not race the first
+  shuttingDown = true;
+  console.log(`[PM3] ${signal} received — stopping managed processes...`);
+  const done = () => {
+    try { fs.unlinkSync(PATHS.pid); } catch {}
+    process.exit(0);
+  };
+  pm.stopAll()
+    .then(n => console.log(`[PM3] Stopped ${n} process(es), exiting`))
+    .catch(err => console.error('[PM3] Error during shutdown:', err))
+    .finally(done);
+  // Never let a wedged child keep the daemon alive: stopAll SIGKILLs stragglers after
+  // 5 s, so anything still pending at 10 s is the daemon's own fault, not a child's.
+  setTimeout(done, 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

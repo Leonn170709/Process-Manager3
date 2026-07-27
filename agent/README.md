@@ -146,8 +146,12 @@ Use `disableAutorestart` only when you want the flag itself turned off permanent
 change **outlives the emergency**: the next person to run `pm3 start <name>` gets a process
 that no longer restarts on crash, which is rarely what they expect.
 
-Coming back up is a shell operation — `pm3 start <name>`. An app that has stopped itself
-cannot un-stop itself, so do not build your only recovery path into the app you just killed.
+Coming back up is a shell operation — `pm3 restart <name>` (**not** `pm3 start`, which takes
+a script path, not a name). An app that has stopped itself cannot un-stop itself, so do not
+build your only recovery path into the app you just killed.
+
+This is a different kind of stop from `pm3 kill`: a kill flags its processes to come back
+on the next daemon start, whereas `stop()` means down until a person says otherwise.
 
 **Failure mode:** never throws, never rejects. Resolves to `{ ok: true, action, name }` or
 `{ ok: false, error }`. A successful self-stop normally **never resolves at all**, because

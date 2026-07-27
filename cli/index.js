@@ -683,12 +683,32 @@ program
 
 program
   .command('kill')
-  .description('Stop the PM3 daemon')
+  .description('Stop the PM3 daemon and every process it manages')
   .action(async () => {
     const { stopDaemon } = require('../daemon/launcher');
+    // Count before killing: afterwards there is no daemon left to ask. Guarded by a
+    // liveness check because api() exits the process when the daemon is unreachable,
+    // and `pm3 kill` on an already-dead daemon should still report that plainly.
+    let names = [];
+    if (await isDaemonRunning()) {
+      const procs = await api('get', '/api/processes');
+      names = Object.values(procs)
+        .filter(p => ['running', 'restarting', 'starting'].includes(p.status))
+        .map(p => p.name);
+    }
+
+    if (names.length) process.stdout.write(`  ${chalk.dim(`Stopping ${names.length} process(es)...`)} `);
     const r = await stopDaemon();
+    if (names.length) process.stdout.write(chalk.green('done') + '\n');
     if (r.error) return fail(r.error);
-    ok('PM3 daemon stopped');
+
+    ok(`PM3 daemon stopped${names.length ? `  ${chalk.dim('·')}  ${names.join(', ')}` : ''}`);
+    if (r.forced) {
+      warn('Daemon did not exit in time and was force-killed — some processes may still be running.');
+      hint('Check with: ps aux | grep -v grep | grep node');
+    } else if (names.length) {
+      hint('They start again automatically with the next pm3 command.');
+    }
   });
 
 program

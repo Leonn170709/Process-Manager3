@@ -74,7 +74,13 @@ The PM3 daemon starts automatically on first use and runs in the background.
 | `pm3 dashboard` | Open web dashboard |
 | `pm3 startup` | Configure system boot |
 | `pm3 unstartup` | Remove boot config |
-| `pm3 kill` | Stop the PM3 daemon |
+| `pm3 kill` | Stop the daemon **and every process it manages** |
+
+`pm3 kill` takes everything down with it and brings it all back next time. Nothing PM3
+spawned is killed by the OS when the daemon exits, so the daemon signals each child's whole
+process group — the script *and* anything it spawned in turn — and waits for them to
+actually go. Whatever was running is flagged, and the next `pm3` command starts the daemon
+and restarts exactly that set. A process you stopped by hand is not flagged and stays down.
 
 ### `pm3 start` options
 
@@ -211,7 +217,7 @@ await pm3.stop('other-worker'); // or a named one
 ```
 
 PM3 does not restart a process it was told to stop, whatever `autorestart` says, and does
-not resurrect it on daemon start. Bringing it back is a deliberate `pm3 start <name>`.
+not resurrect it on daemon start. Bringing it back is a deliberate `pm3 restart <name>`.
 
 See **[agent/README.md](agent/README.md)** for the full API. Reporting is a no-op outside
 PM3, so the agent is safe to leave in production code.
