@@ -201,8 +201,20 @@ pm3?.track('cache', () => cache);
 Load it via `PM3_AGENT`, not `require('pm3/agent')` — a global `npm i -g pm3` puts the CLI
 on `PATH` but leaves the package unresolvable, so the bare specifier throws.
 
-See **[agent/README.md](agent/README.md)** for the full API. The agent is a no-op outside
-PM3, so it is safe to leave in production code.
+The agent can also **stop or restart the app from inside it**, which is how you build a
+kill switch your app can pull on itself — an `/emergencystop` chat command, a tripped
+safety check — without it knowing its own pid, port or name:
+
+```js
+await pm3.stop();               // this process, and it stays stopped
+await pm3.stop('other-worker'); // or a named one
+```
+
+PM3 does not restart a process it was told to stop, whatever `autorestart` says, and does
+not resurrect it on daemon start. Bringing it back is a deliberate `pm3 start <name>`.
+
+See **[agent/README.md](agent/README.md)** for the full API. Reporting is a no-op outside
+PM3, so the agent is safe to leave in production code.
 
 ---
 

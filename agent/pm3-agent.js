@@ -1,16 +1,19 @@
 'use strict';
 
-// PM3 memory agent — opt-in, zero dependencies.
+// PM3 agent — opt-in, zero dependencies.
 //
 // One line in the host app:
 //   const pm3 = require('pm3/agent').attach({ name: 'my-app' });
 //   pm3.track('cache', () => cache);
+//   await pm3.stop();            // ask PM3 to stop this process, for good
 //
 // Reports { name, count, bytes? } per tracked structure and process.memoryUsage().
 // It NEVER reports contents — tracked structures routinely hold tokens and user data.
 //
 // Outside PM3 (no IPC channel) attach() returns a fully working object whose methods
 // are harmless: nothing is sent, no handle is created, the process exits normally.
+// The one exception is stop()/restart(), which cannot silently pretend to have worked —
+// they resolve to { ok: false } so the caller can tell the difference and react.
 
 const v8 = require('v8');
 
@@ -82,8 +85,48 @@ function attach(opts) {
     };
   }
 
+  // Control requests (stop/restart) waiting on the daemon's ack, by request id.
+  const pending = new Map();
+  let msgId = 0;
+
+  // Ask PM3 to act on a process. A null target means "the process making the call":
+  // the daemon already knows which child sent the message, so the app never has to
+  // name itself and cannot mistakenly act on a process it is not.
+  function control(action, target, extra) {
+    if (!live) {
+      return Promise.resolve({ ok: false, error: 'not running under PM3' });
+    }
+    return new Promise(resolve => {
+      const id = ++msgId;
+      // If this fires we are demonstrably still alive well after asking to be stopped,
+      // so the request did not take effect — that is a failure, not a slow success.
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        resolve({ ok: false, error: 'no response from the PM3 daemon' });
+      }, 5000);
+      pending.set(id, res => { clearTimeout(timer); resolve(res); });
+      try {
+        process.send({ [KEY]: 'control', id, action, target: target || null, ...extra });
+      } catch (err) {
+        clearTimeout(timer);
+        pending.delete(id);
+        resolve({ ok: false, error: String(err && err.message || err).split('\n')[0] });
+      }
+    });
+  }
+
+  // stop(opts) and stop(name, opts) are both valid — stopping yourself is the common
+  // case, so the name is what gets omitted.
+  function _args(target, options) {
+    if (target && typeof target === 'object') return { target: null, options: target };
+    return { target: target || null, options: options || {} };
+  }
+
   const api = {
     enabled: live,
+    // The name PM3 knows this process by, or null outside PM3. Handy for log lines
+    // and confirmation messages; PM3 does not need you to pass it back.
+    name: process.env.PM3_NAME || null,
     // Register a GETTER, not a value: track('c', c) pins the object forever.
     track(name, getter) {
       if (typeof getter === 'function') registry.set(String(name), getter);
@@ -91,8 +134,21 @@ function attach(opts) {
     },
     untrack(name) { registry.delete(String(name)); return api; },
     report,                    // usable standalone too, for a health endpoint
+    // Stop a process and leave it stopped. PM3 does not restart a process it was told
+    // to stop, and does not resurrect one on daemon start, so this survives on its own;
+    // { disableAutorestart: true } additionally clears the saved autorestart flag for
+    // the paranoid case, and that change outlives the stop.
+    stop(target, options) {
+      const a = _args(target, options);
+      return control('stop', a.target, { disableAutorestart: !!a.options.disableAutorestart });
+    },
+    restart(target) {
+      return control('restart', _args(target).target, {});
+    },
     detach() {
       registry.clear();
+      for (const resolve of pending.values()) resolve({ ok: false, error: 'agent detached' });
+      pending.clear();
       if (onMessage) process.removeListener('message', onMessage);
       attached = null;
     },
@@ -101,8 +157,17 @@ function attach(opts) {
   let onMessage = null;
   if (live) {
     onMessage = m => {
-      if (!m || m[KEY] !== 'mem-request') return;   // ignore the host app's own IPC
-      try { process.send({ [KEY]: 'mem', id: m.id, data: report(m.deep) }); } catch {}
+      if (!m || typeof m !== 'object') return;      // ignore the host app's own IPC
+      if (m[KEY] === 'mem-request') {
+        try { process.send({ [KEY]: 'mem', id: m.id, data: report(m.deep) }); } catch {}
+        return;
+      }
+      if (m[KEY] === 'control-ack') {
+        const resolve = pending.get(m.id);
+        // A stop ack usually loses the race with its own SIGTERM. That is fine: the
+        // process is gone, so nothing is left to resolve. Only a survivor gets here.
+        if (resolve) { pending.delete(m.id); resolve({ ok: !!m.ok, error: m.error, action: m.action, name: m.name }); }
+      }
     };
     process.on('message', onMessage);
     // A message listener refs the IPC channel and would stop the host app from ever

@@ -1,10 +1,13 @@
-# `pm3/agent` — in-process memory reporting
+# `pm3/agent` — in-process memory reporting and lifecycle control
 
 A tiny, zero-dependency module you add to your own app so PM3 can show **what its memory
-is actually made of**: JS heap vs native, plus entry counts for structures you name.
+is actually made of** — JS heap vs native, plus entry counts for structures you name — and
+so the app can **stop or restart itself** without knowing its own pid, port or name.
 
-It is a **no-op when the app is not running under PM3**, so it is safe to leave in
-production code and safe to run the app standalone.
+Reporting is a **no-op when the app is not running under PM3**, so it is safe to leave in
+production code and safe to run the app standalone. `stop()` and `restart()` are the
+deliberate exception: outside PM3 they resolve to `{ ok: false }` rather than pretending,
+because an app that reports "stopped" while still running is worse than one that fails.
 
 ## Quick start — use `PM3_AGENT`
 
@@ -57,7 +60,8 @@ instance (the second call's options are ignored).
 |---|---|---|
 | `options.name` | `string` (optional) | A label echoed back in the report. Purely cosmetic; PM3 identifies processes by its own process name. |
 
-**Returns** an object with `track`, `untrack`, `report`, `detach` and `enabled`.
+**Returns** an object with `track`, `untrack`, `report`, `stop`, `restart`, `detach`,
+`enabled` and `name`.
 
 **Failure mode:** none — `attach()` does not throw. With no IPC channel (i.e. not started
 by PM3) it returns an agent with `enabled === false` whose `track()` calls are recorded
@@ -112,14 +116,81 @@ In a standalone run (`enabled === false`) the `mem` and `tracked` numbers are st
 but `loopLagMs` is `null` and the `gc` counters stay at zero — that instrumentation is only
 started when PM3 is actually listening, so a standalone app pays nothing for it.
 
+### `agent.stop(name?, options?) → Promise<result>`
+
+Asks PM3 to stop a process and leave it stopped. **With no name it stops the calling
+process** — PM3 identifies the sender from the IPC channel the message arrived on, so an
+app never has to know or pass its own name, and cannot act on a process it is not.
+
+| Parameter | Type | Meaning |
+|---|---|---|
+| `name` | `string` (optional) | Process name or id. Omit for "this process". |
+| `options.disableAutorestart` | `boolean` (default `false`) | Also clear the saved `autorestart` flag. See below. |
+
+Both `stop()` and `stop({ disableAutorestart: true })` are valid — stopping yourself is the
+common case, so the **name** is what gets omitted, not the options.
+
+```js
+// A Discord /emergencystop command: answer first, then go down.
+await interaction.reply('🛑 Emergency stop — shutting down.');
+const res = await pm3.stop();
+if (!res.ok) await interaction.followUp(`Failed: ${res.error}`);
+```
+
+**It stays stopped.** PM3 does not restart a process it was told to stop, whatever
+`autorestart` and `maxRestarts` say, and `resurrect()` on daemon start skips it too — the
+stop is recorded on the process record, not just applied to the running pid. You do not
+need `disableAutorestart` for that.
+
+Use `disableAutorestart` only when you want the flag itself turned off permanently. That
+change **outlives the emergency**: the next person to run `pm3 start <name>` gets a process
+that no longer restarts on crash, which is rarely what they expect.
+
+Coming back up is a shell operation — `pm3 start <name>`. An app that has stopped itself
+cannot un-stop itself, so do not build your only recovery path into the app you just killed.
+
+**Failure mode:** never throws, never rejects. Resolves to `{ ok: true, action, name }` or
+`{ ok: false, error }`. A successful self-stop normally **never resolves at all**, because
+SIGTERM arrives before the reply does — treat the call as a point of no return, not as
+something with a result you can log afterwards. `{ ok: false }` cases:
+
+| `error` | Cause |
+|---|---|
+| `not running under PM3` | No IPC channel — started with plain `node`. |
+| `Process "x" not found` | Unknown name/id. Nothing was stopped. |
+| `no response from the PM3 daemon` | 5 s with no reply. If your code is running to see this, you were **not** stopped. |
+
+### `agent.restart(name?) → Promise<result>`
+
+Same contract, but the process comes back and its restart counter increments. With no name
+it restarts the caller.
+
+### `agent.name`
+
+The name PM3 knows this process by (from `PM3_NAME`), or `null` outside PM3. For your own
+log lines and confirmation messages — PM3 never needs you to pass it back.
+
 ### `agent.detach()`
 
 Clears the registry and removes the IPC listener. Rarely needed — the agent holds nothing
-open.
+open. Any in-flight `stop`/`restart` promise resolves to `{ ok: false }`.
 
 ### `agent.enabled`
 
 `true` when the agent is talking to PM3, `false` when the app was started outside it.
+
+---
+
+## Who is allowed to stop what
+
+Any PM3-managed process can stop any other. That is not a privilege escalation: every
+child already runs as the same user as the daemon, can read `~/.pm3/processes.json`, can
+call the daemon's HTTP API on localhost, and can `kill(pid)` its siblings directly. What
+the agent adds is a way to do it without hardcoding a port, a pid or an install path.
+
+Every control request is written to the **target's** log with the name of whoever asked
+(`[PM3] Stop requested by "killer"`), so a process going down unexpectedly always says who
+did it.
 
 ---
 

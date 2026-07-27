@@ -19,6 +19,9 @@ const memDetail = require('./memDetail');
 // installs, local installs and npm link alike, with no per-project setup.
 const AGENT_PATH = require.resolve('../agent');
 
+// Message discriminator shared with agent/pm3-agent.js.
+const AGENT_KEY = '__pm3';
+
 // In-memory process map: id -> { proc, config, stats, watcher }
 const runtime = {};
 
@@ -148,8 +151,9 @@ function _spawnProcess(procRecord) {
       // child spawned with just the overrides would run without PATH, HOME or TZ. Overrides
       // win over inherited values, which is the whole point of setting one.
       // PM3_AGENT is added at spawn time rather than stored on the record, so a machine's
-      // install path never gets baked into ~/.pm3/processes.json.
-      env: { ...process.env, ...env, PM3_AGENT: AGENT_PATH },
+      // install path never gets baked into ~/.pm3/processes.json. PM3_NAME rides along so
+      // an app can name itself in its own logs; it is never how PM3 identifies the sender.
+      env: { ...process.env, ...env, PM3_AGENT: AGENT_PATH, PM3_NAME: name },
       detached: false,
       // 4th fd = IPC channel for the opt-in memory agent. A child that never listens on
       // it is unaffected (verified: a plain script still exits immediately), and the
@@ -202,8 +206,17 @@ function _spawnProcess(procRecord) {
     });
   });
 
-  // Memory agent IPC (ignored by children that don't use it)
-  child.on('message', msg => { memDetail.onAgentMessage(name, msg); });
+  // Agent IPC (ignored by children that don't use it). Control requests are handled
+  // here rather than in memDetail because this closure is the only place that knows
+  // which child sent the message — that is what lets an app stop itself without
+  // naming itself, and what stops it from claiming to be a process it is not.
+  child.on('message', msg => {
+    if (msg && typeof msg === 'object' && msg[AGENT_KEY] === 'control') {
+      _handleControl(name, child, msg);
+      return;
+    }
+    memDetail.onAgentMessage(name, msg);
+  });
 
   // Log stderr
   child.stderr.on('data', data => {
@@ -318,6 +331,51 @@ function _spawnProcess(procRecord) {
       });
     }, 5000);
   }
+}
+
+// --- Control requests from a managed child (agent.stop / agent.restart) ---
+//
+// This grants no privilege a managed process did not already have: every child runs as
+// the same user as the daemon and can already reach the daemon's HTTP API on localhost.
+// What it adds is a way to do it without hardcoding a port, a name, or a pid.
+function _handleControl(senderName, child, msg) {
+  const reply = res => {
+    try { child.send({ [AGENT_KEY]: 'control-ack', id: msg.id, ...res }); } catch {}
+  };
+
+  // No target means the sender itself — the one name the child never has to be trusted for.
+  const target = msg.target ? resolveProcess(msg.target) : senderName;
+  if (!target) return reply({ ok: false, error: `Process "${msg.target}" not found` });
+
+  const procs = storage.loadProcesses();
+  if (!procs[target]) return reply({ ok: false, error: `Process "${target}" not found` });
+
+  const ts = new Date().toISOString();
+  const via = target === senderName ? 'itself' : `"${senderName}"`;
+
+  if (msg.action === 'stop') {
+    // A plain stop already stays stopped: stopProcess marks the record STOPPED, which
+    // both the exit handler and resurrect() honour. Persisting autorestart:false is a
+    // separate, opt-in decision because it outlives the emergency — it would still be
+    // off the next time somebody starts the process by hand.
+    if (msg.disableAutorestart) updateProcess(target, { autorestart: false });
+    storage.appendLog(target, 'out', `[${ts}] [PM3] Stop requested by ${via}`);
+    // Ack before the SIGTERM so a self-stop has a chance to observe the result. It
+    // usually loses that race, which is why the agent treats a timeout as failure
+    // rather than assuming success.
+    reply({ ok: true, action: 'stop', name: target });
+    stopProcess(target);
+    return;
+  }
+
+  if (msg.action === 'restart') {
+    storage.appendLog(target, 'out', `[${ts}] [PM3] Restart requested by ${via}`);
+    reply({ ok: true, action: 'restart', name: target });
+    restartProcess(target);
+    return;
+  }
+
+  reply({ ok: false, error: `Unknown control action "${msg.action}"` });
 }
 
 function _handleCrash(procRecord, exitCode, message, severity) {
