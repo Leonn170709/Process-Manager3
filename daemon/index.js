@@ -727,19 +727,44 @@ _getMemLayout().catch(() => {});
 let _netDetailCache = null;
 let _netDetailTs = 0;
 
+// --- Watcher-aware polling ---------------------------------------------------
+// All three loops below exist to feed the dashboard. A dashboard left open in a
+// background tab disconnects its socket (see the visibilitychange handler in
+// index.html), so "no sockets" means nobody can see the result of this work.
+//
+// Nothing here enforces anything: memory limits run on their own per-process
+// `memCheck` interval in processManager, untouched by any of this. What is left
+// is display data, so when nobody is watching it drops to a slow heartbeat rather
+// than stopping — `pm3 list` still wants figures that are seconds old, not hours.
+const _watched = () => io.engine.clientsCount > 0;
+const IDLE_EVERY = 5;   // when unwatched, do the work on every 5th tick
+
 // --- Stats polling ---
+let _statsTick = 0;
 setInterval(() => {
+  if (!_watched() && ++_statsTick % IDLE_EVERY) return;   // 2 s watched, 10 s idle
   pm.updateStats();
 }, 2000);
 
 // --- In-process memory detail: its own slow schedule (agent IPC / CDP round-trip is
 // far heavier than pidusage, and the dashboard reads it off the stats broadcast) ---
+// Slowed rather than stopped when unwatched: an overnight leak is exactly the thing
+// you want in the history when you come back to look at it, even at coarser
+// resolution. This is the most expensive poll in the daemon, so idling it matters most.
+let _memTick = 0;
 setInterval(() => {
+  if (!_watched() && ++_memTick % IDLE_EVERY) return;
   pm.pollMemDetail().catch(() => {});
 }, pm.memPollInterval);
 
 // --- System metrics broadcast ---
+// Skipped outright when unwatched: unlike the two above, this loop has no consumer
+// other than the socket it emits on. `GET /api/system` computes the same figures on
+// demand for the CLI and the HTTP fallback, and the delta pollers already ignore any
+// gap longer than 15 s, so a resumed dashboard gets a correct rate rather than a
+// spike covering the whole idle period.
 setInterval(async () => {
+  if (!_watched()) return;
   try {
     const [cpu, mem, cpuStatic, temp, freq] = await Promise.all([
       si.currentLoad(), si.mem(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),

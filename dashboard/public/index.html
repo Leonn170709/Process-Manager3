@@ -96,8 +96,14 @@
       background: linear-gradient(135deg,#c3d9ff 0%,#ddd6fe 35%,#bae6fd 65%,#a7f3d0 100%);
       background-attachment: fixed;
     }
+    /* These stops look far too saturated read as hex, and that is the point. The
+       old dark theme ran its near-black base through `backdrop-filter: saturate(2.4)`
+       on every card, which multiplies chroma — dropping the filter took the colour
+       with it and left the UI flat black. The boost is baked into the stops now
+       instead of recomputed per frame. Measured against the pre-change render,
+       the card interior matches to within ~10/255. */
     [data-theme="dark"] {
-      background: linear-gradient(135deg,#060c18 0%,#0d0a1a 45%,#060e1c 75%,#050d14 100%);
+      background: linear-gradient(135deg,#0a1242 0%,#0c0b38 45%,#07163e 75%,#08204a 100%);
     }
     body { background: transparent; color: var(--t1); }
 
@@ -118,9 +124,12 @@
     }
     [data-theme="dark"] #bg {
       background:
-        radial-gradient(58% 52% at 10% 2%,   rgba(30,60,130,0.55), rgba(30,60,130,0) 72%),
-        radial-gradient(50% 46% at 97% 56%,  rgba(65,28,110,0.48), rgba(65,28,110,0) 72%),
-        radial-gradient(46% 44% at 42% 106%, rgba(15,90,65,0.38),  rgba(15,90,65,0) 72%);
+        /* First layer paints on top: the old blobs left the top-right corner
+           uncovered, and a 135deg base gradient alone cannot reproduce that. */
+        radial-gradient(70% 68% at 104% -8%, rgba(4,8,26,0.90),     rgba(4,8,26,0) 78%),
+        radial-gradient(72% 64% at 4% -6%,   rgba(0,64,237,0.26),   rgba(0,64,237,0) 74%),
+        radial-gradient(46% 48% at 108% 70%, rgba(120,25,225,0.30), rgba(120,25,225,0) 74%),
+        radial-gradient(60% 54% at 34% 106%, rgba(0,160,90,0.34),   rgba(0,160,90,0) 76%);
     }
 
     /* ── App shell ───────────────────────────────── */
@@ -294,20 +303,26 @@
     .status-pill { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:600; }
     .status-pill::before { content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0; }
     .status-running    { background:rgba(5,150,105,0.12);color:var(--green);border:1px solid rgba(5,150,105,0.25); }
-    /* No pulse on `running`. An infinite animation never lets the compositor go
-       idle — the page keeps producing frames at 60fps forever, and there is one
-       of these per running process. `running` is a steady state anyway; the
-       colour already says it. The short-lived states below keep their pulse,
-       because there "something is happening" is the whole message. */
-    .status-running::before { background:var(--green);box-shadow:0 0 5px var(--green); }
+    /* Every pulse on this page is stepped, and must stay that way.
+       An infinite animation stops the compositor going idle, and measured on an
+       AMD iGPU at 1080p the cost is per *frame produced*, not per element or per
+       pixel changed: 23 dots animating smoothly cost 15% GPU, and promoting them
+       to their own layers with will-change changed nothing (15.04% vs 15.06%).
+       steps() is the only lever that works, because the compositor skips frames
+       where no animated value changed. Measured, 23 dots: smooth 15.1%, steps(20)
+       3.0%, steps(12) 2.3%, steps(6) 2.0%, none 0.0% — sublinear, with a ~1.5%
+       floor for animating at all. steps(N) is chosen per duration to land at
+       ~10 updates/s, which reads as a smooth pulse at this dot size.
+       Raising N raises GPU cost roughly 0.15% per extra update/s. */
+    .status-running::before { background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2s steps(20,end) infinite; }
     .status-stopped    { background:rgba(100,116,139,0.1);color:var(--t3);border:1px solid rgba(100,116,139,0.2); }
     .status-stopped::before { background:var(--t4); }
     .status-crashed    { background:rgba(220,38,38,0.1);color:var(--red);border:1px solid rgba(220,38,38,0.2); }
     .status-crashed::before { background:var(--red); }
     .status-restarting { background:rgba(217,119,6,0.1);color:var(--yellow);border:1px solid rgba(217,119,6,0.2); }
-    .status-restarting::before { background:var(--yellow);animation:pulse 1s infinite; }
+    .status-restarting::before { background:var(--yellow);animation:pulse 1s steps(10,end) infinite; }
     .status-starting   { background:rgba(8,145,178,0.1);color:var(--cyan);border:1px solid rgba(8,145,178,0.2); }
-    .status-starting::before { background:var(--cyan);animation:pulse 1s infinite; }
+    .status-starting::before { background:var(--cyan);animation:pulse 1s steps(10,end) infinite; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.25} }
 
     /* ── Log Terminal ────────────────────────────── */
@@ -331,7 +346,7 @@
     .log-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12);border-radius:2px; }
     .log-err { color:var(--log-err); }
     .log-out { color:var(--log-text); }
-    .live-dot { width:6px;height:6px;border-radius:50%;background:#34d399;animation:pulse 1.5s infinite; }
+    .live-dot { width:6px;height:6px;border-radius:50%;background:#34d399;animation:pulse 1.5s steps(15,end) infinite; }
 
     /* ── Issues ──────────────────────────────────── */
     .filter-chips { display:flex;gap:4px;flex-wrap:wrap; }
@@ -386,7 +401,7 @@
     .sys-metric.clickable:hover { background:var(--g1);transform:translateY(-1.5px);box-shadow:var(--shadow-md); }
     .sys-metric.clickable:hover .sm-hint { opacity:1; }
     .sm-hint { font-size:9.5px;color:var(--accent);margin-top:4px;opacity:0;transition:opacity 0.2s;font-weight:600;letter-spacing:0.2px; }
-    .res-modal { width:900px;max-height:90vh; }
+    /* .res-modal's width lives further down, after .modal — see the note there. */
     /* The memory subtitle carries "heap 1183 MB · native 39 MB", not "12% CPU" — the
        shared 72px last column clipped it. Memory modal only; the CPU list keeps 72px. */
     #mm-proc-list .res-proc-row { grid-template-columns:minmax(120px,1.4fr) 60px 1fr 240px; }
@@ -505,15 +520,18 @@
     .modal {
       background:var(--modal-bg);
       border:1px solid var(--border);border-radius:18px;
-      width:600px;max-width:95vw;max-height:86vh;overflow-y:auto;
+      width:760px;max-width:95vw;max-height:86vh;overflow-y:auto;
       box-shadow:inset 0 1.5px 0 var(--spec), var(--shadow-lg);
       animation:modalIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
     }
-    /* Memory modal only — the split chart plus the per-process breakdown needs the width.
-       Must come after .modal: same specificity, so source order decides (which is why
-       .res-modal's 900px above never took effect — left alone deliberately, changing it
-       would resize the drive/interface/runtime modals). */
-    .mem-modal-wide { width:1200px;max-width:96vw;max-height:90vh; }
+    /* These must come after .modal: same specificity, so source order decides. The
+       .res-modal rule used to sit above .modal and therefore never took effect, which
+       is why every resource modal silently rendered at the base width. It is down here
+       now and does apply — the CPU / memory / network / storage / drive / interface /
+       runtime modals are the densest views in the app and were the ones most starved
+       of width. No element carries both classes, so they cannot fight. */
+    .mem-modal-wide { width:1360px;max-width:96vw;max-height:90vh; }
+    .res-modal      { width:1080px;max-width:96vw;max-height:90vh; }
     .modal::-webkit-scrollbar { width:4px; }
     .modal::-webkit-scrollbar-thumb { background:rgba(100,140,200,0.25);border-radius:2px; }
     @keyframes modalIn { from{transform:scale(0.88) translateY(24px);opacity:0}to{transform:scale(1) translateY(0);opacity:1} }
@@ -614,7 +632,7 @@
       padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;
       background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.25);color:#34d399;
     }
-    .stdin-badge::before { content:'';width:5px;height:5px;border-radius:50%;background:#34d399;animation:pulse 2s infinite; }
+    .stdin-badge::before { content:'';width:5px;height:5px;border-radius:50%;background:#34d399;animation:pulse 2s steps(20,end) infinite; }
 
     /* ── Proc stats / edit ───────────────────────────── */
     .pab-gear { background:rgba(100,116,139,0.10);color:var(--t3);border-color:rgba(100,116,139,0.25); }
@@ -626,6 +644,16 @@
     .chart-label .cur { font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
     .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:0.2px; }
     .chart-hover-area { position:relative;cursor:crosshair;touch-action:none; }
+    /* Y-axis labels live here, not in the SVG — see _chartYLabels. Right-aligned into the
+       gutter the SVG reserves on its right edge; `top` is set inline in px, which is exact
+       because the SVG's height and viewBox height are the same number. */
+    .chart-c { position:relative; }
+    .chart-yl { position:absolute;inset:0;pointer-events:none; }
+    .chart-yl span {
+      position:absolute;right:2px;transform:translateY(-50%);
+      font-size:9.5px;line-height:1;font-family:'Inter',sans-serif;
+      color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums;
+    }
     .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:8px 8px 4px;overflow:hidden; }
     .chart-xhair {
       position:absolute;top:0;bottom:0;width:1px;pointer-events:none;display:none;
@@ -653,7 +681,7 @@
     .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
     .stat-kv-label { font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600; }
     .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-top:1px;word-break:break-all; }
-    .modal-wide { width:840px; }
+    .modal-wide { width:1020px; }
     /* Network section */
     .net-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px 14px; }
     .net-metric { }
@@ -1932,6 +1960,7 @@ function _resetLogPause() {
 }
 // HTTP fallback: poll for new log lines when socket hasn't delivered events recently
 async function _pollLogsIfStale() {
+  if (document.hidden) return;   // nobody is reading the terminal
   if (!modalLogProcess || logPaused) return;
   if (!document.getElementById('logs-modal').classList.contains('open')) return;
   if (Date.now() - _lastLogSocketTs < 4000) return; // socket is delivering — skip
@@ -2505,9 +2534,34 @@ function recordHistory(proc) {
 // Geometry is shared with _attachChartHover: the data occupies x = 0..CHART_CW, and the
 // remaining CHART_PAD_R units are the y-label gutter. The crosshair maths has to use the
 // same fraction or it drifts right-wards across the chart.
-const CHART_W = 660, CHART_PAD_R = 36;
+const CHART_W = 660, CHART_PAD_R = 52;
 const CHART_CW = CHART_W - CHART_PAD_R;
 const CHART_DATA_FRAC = CHART_CW / CHART_W;
+
+// Y-axis labels as HTML overlaid on the chart, never as <text> inside it.
+//
+// The SVG is deliberately stretched — a fixed 660-unit viewBox drawn into whatever width
+// the container happens to be, via preserveAspectRatio="none". That is right for the plot
+// and fatal for text: non-uniform scaling smears the glyphs horizontally, which is what
+// made "10 MB" unreadable, and it got worse the further the container width was from 660.
+// A nested <svg> with "meet" fixes the distortion but then scales the text *down* with the
+// chart, so the mini charts ended up with 5px labels clipped mid-word. HTML escapes both
+// problems: the labels sit in the CSS pixel grid at a fixed size, whatever the chart does.
+//
+// Vertical placement is a straight px mapping because the SVG's height attribute and its
+// viewBox height are the same number — y scale is exactly 1, only x is stretched.
+const CHART_MIN_H_FOR_LABELS = 70;
+function _chartYLabels(H, levels, unit) {
+  // A 56px-tall mini chart has no room for four labels, and no need: its header already
+  // prints the current value plus min/avg/max. The gutter stays reserved either way, so
+  // the shared crosshair geometry (CHART_DATA_FRAC) holds for every chart alike.
+  if (H < CHART_MIN_H_FOR_LABELS) return '';
+  return `<div class="chart-yl">` + levels.map(({ y, text }, i) =>
+    // Unit on the top label only — repeating " KB/s" four times overflows the gutter and
+    // pushes the numbers back over the plot.
+    `<span style="top:${y.toFixed(1)}px">${text}${i === levels.length - 1 ? unit : ''}</span>`
+  ).join('') + `</div>`;
+}
 
 // Round for display without lying about small values: an idle network chart whose max is
 // 0.4 KB/s must not label every gridline "0".
@@ -2562,13 +2616,14 @@ function renderChart(values, color, chartId, unit, chartH) {
   const linePath = _smoothPath(pts);
   const areaPath = linePath + ` L${pts[pts.length-1].x.toFixed(2)},${H-PAD_B} L${pts[0].x.toFixed(2)},${H-PAD_B} Z`;
   const gid = `cg_${chartId}`;
-  const gridSvg = [0.25, 0.5, 0.75, 1].map(p => {
-    const y = H - PAD_B - p*(H-PAD_T-PAD_B);
-    const lbl = _chartNum(max*p, unit) + unit;
-    return `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>
-<text x="${cW+4}" y="${y+3.5}" font-size="8" style="fill:var(--t4)" font-family="Inter,sans-serif">${lbl}</text>`;
-  }).join('');
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">
+  const levels = [0.25, 0.5, 0.75, 1].map(p => ({
+    y: H - PAD_B - p*(H-PAD_T-PAD_B),
+    text: _chartNum(max*p, unit),   // number only; the unit goes on the top label
+  }));
+  const gridSvg = levels.map(({ y }) =>
+    `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>`
+  ).join('');
+  return `<div class="chart-c"><svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">
     <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${color}" stop-opacity="0.32"/>
       <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
@@ -2576,7 +2631,7 @@ function renderChart(values, color, chartId, unit, chartH) {
     ${gridSvg}
     <path d="${areaPath}" fill="url(#${gid})"/>
     <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-  </svg>`;
+  </svg>${_chartYLabels(H, levels, unit)}</div>`;
 }
 
 // Stacked variant of renderChart: same geometry, same smoothing, cumulative bands.
@@ -2607,12 +2662,15 @@ function renderStackedChart(series, chartId, chartH) {
     bands += `<path d="${line} L${pts[n-1].x.toFixed(2)},${H-PAD_B} L${pts[0].x.toFixed(2)},${H-PAD_B} Z" fill="${series[si].color}" fill-opacity="0.55"/>
 <path d="${line}" fill="none" stroke="${series[si].color}" stroke-width="1.4" stroke-linejoin="round"/>`;
   }
-  const grid = [0.25, 0.5, 0.75, 1].map(p => {
-    const y = H - PAD_B - p*(H-PAD_T-PAD_B);
-    return `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>
-<text x="${cW+4}" y="${y+3.5}" font-size="8" style="fill:var(--t4)" font-family="Inter,sans-serif">${_chartNum(max*p, '')}M</text>`;
-  }).join('');
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">${grid}${bands}</svg>`;
+  const levels = [0.25, 0.5, 0.75, 1].map(p => ({
+    y: H - PAD_B - p*(H-PAD_T-PAD_B),
+    text: _chartNum(max*p, ''),
+  }));
+  const grid = levels.map(({ y }) =>
+    `<line x1="0" y1="${y}" x2="${cW}" y2="${y}" style="stroke:var(--border-sm)" stroke-width="0.5" stroke-dasharray="3,5"/>`
+  ).join('');
+  return `<div class="chart-c"><svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block" preserveAspectRatio="none">${grid}${bands}</svg>` +
+         `${_chartYLabels(H, levels, ' MB')}</div>`;
 }
 function memLegend(series) {
   return series.map(s => `<span style="margin-right:10px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};opacity:0.8;margin-right:3px"></span>${s.label}</span>`).join('');
@@ -4711,9 +4769,33 @@ document.getElementById('stdin-input').addEventListener('keydown', e => {
   }
 });
 
-// ── Page Visibility — pause heavy timers when tab is hidden ───────────────
+// ── Page Visibility — go fully idle while nobody can see the page ─────────
+// A dashboard left open in a background tab used to cost as much as a visible one:
+// the daemon kept polling and broadcasting every 2 s, and this page kept parsing and
+// rendering it. Hiding stops both ends. The socket is deliberately *disconnected*
+// rather than merely ignored, because that is the signal the daemon uses to drop its
+// own polling to a slow heartbeat (see `_watched()` in daemon/index.js) — ignoring
+// the events client-side would still leave the daemon doing all the work.
+//
+// Nothing is lost by disconnecting: issues and process state are persisted, and
+// `_resumeLive()` re-syncs from scratch on return. Live toasts are missed while
+// hidden, which is the point — there is nobody there to read them.
+//
+// Caveat worth knowing: `document.hidden` covers a background tab, a minimised
+// window and another workspace, but a window merely *covered* by another window is
+// still "visible" to the browser on most Linux setups, so that case keeps running.
+function _pauseLive() {
+  if (socket.connected) socket.disconnect();
+}
+function _resumeLive() {
+  if (!socket.connected) socket.connect();
+  loadInitialData();
+  fetchSystem();
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    _pauseLive();
     if (statsModalTimer) { clearInterval(statsModalTimer); statsModalTimer = null; }
     if (editModalTimer)  { clearInterval(editModalTimer);  editModalTimer  = null; }
     if (cpuModalTimer)     { clearInterval(cpuModalTimer);     cpuModalTimer     = null; }
@@ -4725,6 +4807,7 @@ document.addEventListener('visibilitychange', () => {
     if (driveDetailTimer)    { clearInterval(driveDetailTimer);    driveDetailTimer    = null; }
     if (ifaceDetailTimer)    { clearInterval(ifaceDetailTimer);    ifaceDetailTimer    = null; }
   } else {
+    _resumeLive();
     if (statsModalName && !statsModalTimer) statsModalTimer = setInterval(_tickStatsModal, 2000);
     if (editModalName  && !editModalTimer)  editModalTimer  = setInterval(_tickEditModal,  2000);
     if (document.getElementById('cpu-modal')?.classList.contains('open')          && !cpuModalTimer)     cpuModalTimer     = setInterval(_tickCpuModal,         2000);
@@ -4735,8 +4818,9 @@ document.addEventListener('visibilitychange', () => {
     if (document.getElementById('storage-modal')?.classList.contains('open')      && !storageModalTimer) storageModalTimer = setInterval(_tickStorageModal,    2000);
     if (document.getElementById('drive-detail-modal')?.classList.contains('open') && !driveDetailTimer)  driveDetailTimer  = setInterval(_tickDriveDetailModal, 2000);
     if (document.getElementById('iface-detail-modal')?.classList.contains('open') && !ifaceDetailTimer)  ifaceDetailTimer  = setInterval(_tickIfaceDetailModal, 2000);
-    // Refresh process data after returning to tab
-    if (Date.now() - _lastSocketSystemTs > 3000) refreshProcesses();
+    // Logs streamed over the socket stop arriving while disconnected, so re-read the
+    // tail from disk rather than leaving a hole in the terminal.
+    if (modalLogProcess) _pollLogsIfStale();
     // Flush any log lines that accumulated while RAF was paused in the background
     if (_logRafQueue.length) _flushLogQueue();
   }

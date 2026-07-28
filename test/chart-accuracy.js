@@ -9,8 +9,8 @@ const end   = html.indexOf('// ── Stats modal');
 assert(start > 0 && end > start, 'could not locate chart section');
 const src = html.slice(start, end);
 const sandbox = {};
-new Function('exports', src + '\nObject.assign(exports,{renderChart,_smoothPath,_chartSampleX,_chartNum,CHART_W,CHART_CW,CHART_DATA_FRAC});')(sandbox);
-const { renderChart, _smoothPath, _chartSampleX, _chartNum, CHART_W, CHART_CW, CHART_DATA_FRAC } = sandbox;
+new Function('exports', src + '\nObject.assign(exports,{renderChart,_smoothPath,_chartSampleX,_chartNum,CHART_W,CHART_CW,CHART_DATA_FRAC,CHART_PAD_R});')(sandbox);
+const { renderChart, _smoothPath, _chartSampleX, _chartNum, CHART_W, CHART_CW, CHART_DATA_FRAC, CHART_PAD_R } = sandbox;
 
 // --- 1. bezier must not overshoot the plot band (was drawing >100% CPU) ---
 function pathYRange(d) {
@@ -77,10 +77,29 @@ const overflow = renderChart([50, 250, 50], 'red', 't', '%');   // % axis is fix
 const ys = [...overflow.matchAll(/[MC]([\d.]+),([\d.]+)/g)].map(m => +m[2]);
 assert(Math.min(...ys) >= PAD_T - 1e-6, `>100% value escaped the plot band: ${Math.min(...ys)}`);
 
-// --- 5. gridline labels are inside the gutter, not over the data ---
+// --- 5. y-axis labels are HTML, never <text> in the stretched SVG ---
+// The SVG is preserveAspectRatio="none", so x is scaled non-uniformly: any <text> inside
+// it gets smeared horizontally, and the distortion grows the further the container width
+// is from CHART_W. Labels must therefore live outside the SVG, in the CSS pixel grid.
 const svg = renderChart([1, 2, 3], 'red', 't2', '%');
-const labelXs = [...svg.matchAll(/<text x="([\d.]+)"/g)].map(m => +m[1]);
-assert(labelXs.length === 4, `expected 4 gridline labels, got ${labelXs.length}`);
-assert(labelXs.every(x => x >= CHART_CW), 'a gridline label overlaps the data area');
+assert(!/<text/.test(svg), 'y-axis labels are drawn inside the stretched SVG and will smear');
+assert(/<div class="chart-c">/.test(svg), 'chart is missing its positioning container');
+
+const labels = [...svg.matchAll(/<span style="top:([\d.]+)px">([^<]*)<\/span>/g)];
+assert.strictEqual(labels.length, 4, `expected 4 gridline labels, got ${labels.length}`);
+// Every label must sit on a gridline, i.e. inside the plot band.
+assert(labels.every(m => +m[1] >= PAD_T - 1e-6 && +m[1] <= H - PAD_B + 1e-6),
+  'a y-axis label is positioned outside the plot band');
+// The unit belongs on the top label only — four copies of " KB/s" overflow the gutter.
+const kb = [...renderChart([1, 2, 3], 'red', 't3', ' KB/s')
+  .matchAll(/<span style="top:[\d.]+px">([^<]*)<\/span>/g)].map(m => m[1]);
+assert.strictEqual(kb.filter(t => t.includes('KB/s')).length, 1,
+  `unit should appear on exactly one label, got: ${kb.join(' | ')}`);
+
+// Short charts drop the labels entirely rather than clip them — the gutter stays reserved
+// either way, so the shared crosshair geometry is unaffected.
+const mini = renderChart([1, 2, 3], 'red', 't4', ' KB/s', 56);
+assert(!/chart-yl/.test(mini), 'mini charts must not render y-axis labels');
+assert(/viewBox="0 0 660 56"/.test(mini), 'mini chart lost the shared 660-unit geometry');
 
 console.log('ok - all chart accuracy checks pass');

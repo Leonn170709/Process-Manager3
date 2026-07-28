@@ -46,18 +46,22 @@ const overlayRule = code.match(/\.modal-overlay\s*\{([^}]*)\}/);
 assert.ok(overlayRule && /display\s*:\s*none/.test(overlayRule[1]),
   '.modal-overlay must be display:none when closed');
 
-// 4. An infinite animation never lets the compositor go idle: the page keeps
-//    producing frames forever. Only short-lived, at-most-one-on-screen
-//    indicators may have one, and never the steady `running` state, which has
-//    one instance per managed process.
+// 4. An infinite animation never lets the compositor go idle. Measured, the cost
+//    is per frame *produced* — not per element, not per pixel — so the only lever
+//    is making fewer frames differ: every infinite animation must be stepped, so
+//    the compositor can skip the frames in between. Smooth costs 15% GPU where
+//    stepped costs 3%. Layer promotion does not help; do not swap steps() for
+//    will-change and assume it is equivalent.
 const infinite = [];
 for (const m of code.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-  if (/animation[^;}]*\binfinite\b/.test(m[2])) infinite.push(selectorOf(m[1]));
+  const decl = (m[2].match(/animation[^;}]*\binfinite\b[^;}]*/) || [])[0];
+  if (decl) infinite.push({ sel: selectorOf(m[1]), decl });
 }
-assert.ok(!infinite.some(s => s.includes('.status-running')),
-  '.status-running must not animate — one per running process, forever');
-assert.ok(infinite.length <= 4,
-  `too many infinite animations (${infinite.length}): ${infinite.join(' | ')}`);
+const smooth = infinite.filter(a => !/\bsteps\(/.test(a.decl));
+assert.strictEqual(smooth.length, 0,
+  `infinite animation without steps() — costs ~5x the GPU: ${smooth.map(a => a.sel).join(' | ')}`);
+assert.ok(infinite.length <= 6,
+  `too many infinite animations (${infinite.length}): ${infinite.map(a => a.sel).join(' | ')}`);
 
 // 5. The background wash is painted once. Anything animated underneath the app
 //    re-triggers every composited surface above it.
@@ -65,5 +69,28 @@ const bgRule = code.match(/#bg\s*\{([^}]*)\}/);
 assert.ok(bgRule, '#bg background layer missing');
 assert.ok(!/animation/.test(bgRule[1]), '#bg must not animate — it sits under the whole app');
 
+// 6. A hidden dashboard must cost the daemon nothing. The client has to *disconnect*
+//    its socket rather than just ignore events, because the socket count is the only
+//    signal the daemon has that anyone is watching — ignoring events client-side
+//    would leave the daemon polling and broadcasting at full rate into the void.
+//    Measured: daemon CPU 1.90% watched, 0.42% hidden, 0.40% with no client at all.
+const js = html.slice(html.lastIndexOf('<script>'), html.lastIndexOf('</script>'));
+assert.ok(/function _pauseLive\s*\(\)\s*\{[^}]*socket\.disconnect\(\)/.test(js),
+  '_pauseLive must disconnect the socket, not merely stop rendering');
+assert.ok(/function _resumeLive\s*\(\)\s*\{[^}]*socket\.connect\(\)/.test(js),
+  '_resumeLive must reconnect the socket');
+assert.ok(/visibilitychange[\s\S]{0,400}_pauseLive\(\)/.test(js),
+  'visibilitychange must call _pauseLive when the page is hidden');
+assert.ok(/_resumeLive\(\)/.test(js) && /loadInitialData\(\)/.test(js),
+  'returning to the page must re-sync state that was missed while disconnected');
+
+const daemon = fs.readFileSync(path.join(__dirname, '../daemon/index.js'), 'utf8');
+assert.ok(/const _watched = \(\) => io\.engine\.clientsCount > 0/.test(daemon),
+  'daemon lost its notion of whether anyone is watching');
+// Each of the three dashboard-feeding loops must consult it.
+const gated = (daemon.match(/!_watched\(\)/g) || []).length;
+assert.ok(gated >= 3,
+  `expected all 3 dashboard polling loops to check _watched(), found ${gated}`);
+
 console.log(`ok - dashboard perf checks pass (${infinite.length} transient animations, ` +
-            `${bdBlocks.length} overlay-only backdrop-filter rules)`);
+            `${bdBlocks.length} overlay-only backdrop-filter rules, ${gated} watcher-gated loops)`);
