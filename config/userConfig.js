@@ -48,6 +48,17 @@ const SCHEMA = {
     unit: 'issues',
     desc: 'Maximum number of stored issues (-1 = unlimited)',
   },
+  discordToken: {
+    default: '',
+    unit: '',
+    secret: true,
+    desc: 'Discord bot token for the control panel (empty = disabled, needs daemon restart)',
+  },
+  discordChannel: {
+    default: '',
+    unit: '',
+    desc: 'Discord channel ID the bot posts and accepts commands in (empty = disabled)',
+  },
 };
 
 const DEFAULTS = Object.fromEntries(
@@ -86,6 +97,16 @@ function get(key) {
   return load()[key];
 }
 
+// Same as getAll(), with `secret` values replaced by a fixed placeholder. Used
+// everywhere the config leaves the daemon (REST, dashboard, CLI listing) so a bot
+// token is never echoed back over the network.
+const MASK = '••••••••';
+function getAllMasked() {
+  const cfg = load();
+  for (const [k, def] of Object.entries(SCHEMA)) if (def.secret && cfg[k]) cfg[k] = MASK;
+  return cfg;
+}
+
 function set(key, rawValue) {
   if (!(key in SCHEMA)) {
     const valid = Object.keys(SCHEMA).join(', ');
@@ -94,6 +115,10 @@ function set(key, rawValue) {
 
   const def = SCHEMA[key].default;
   let value;
+
+  // A masked value coming back from the dashboard means "unchanged", not "set the
+  // literal bullets as my token".
+  if (SCHEMA[key].secret && rawValue === MASK) return { key, value: load()[key], prev: load()[key] };
 
   if (def === null || typeof def === 'number') {
     // Accepts a number or the literal string "null"
@@ -125,4 +150,4 @@ function reset() {
   return { ...DEFAULTS };
 }
 
-module.exports = { SCHEMA, DEFAULTS, PATHS, load, getAll, get, set, reset };
+module.exports = { SCHEMA, DEFAULTS, PATHS, MASK, load, getAll, getAllMasked, get, set, reset };

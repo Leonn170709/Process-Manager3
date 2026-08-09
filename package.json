@@ -28,5 +28,8 @@
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "optionalDependencies": {
+    "discord.js": "^14.27.0"
   }
 }

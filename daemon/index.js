@@ -249,7 +249,7 @@ app.post('/api/issues/:id/resolve', (req, res) => {
 
 // Config
 app.get('/api/config', (req, res) => {
-  res.json({ config: userConfig.getAll(), schema: userConfig.SCHEMA });
+  res.json({ config: userConfig.getAllMasked(), schema: userConfig.SCHEMA });
 });
 
 app.post('/api/config', (req, res) => {
@@ -263,8 +263,8 @@ app.post('/api/config', (req, res) => {
 });
 
 app.post('/api/config/reset', (req, res) => {
-  const defaults = userConfig.reset();
-  res.json({ ok: true, config: defaults });
+  userConfig.reset();
+  res.json({ ok: true, config: userConfig.getAllMasked() });
 });
 
 // System metrics
@@ -819,6 +819,9 @@ server.listen(DAEMON_PORT, '0.0.0.0', () => {
   console.log(`PM3 Daemon running on port ${DAEMON_PORT}`);
   console.log(`PM3 Dashboard: http://localhost:${DAEMON_PORT}/dashboard`);
 });
+
+// Optional Discord control panel - no-op unless discordToken + discordChannel are set.
+require('../discord').start();
 
 // --- Helpers ---
 function mergeAndSort(out, err) {

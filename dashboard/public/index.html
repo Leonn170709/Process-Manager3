@@ -486,8 +486,9 @@
     .cfg-desc { font-size:11.5px;color:var(--t3); }
     .cfg-unit { font-size:10.5px;color:var(--t4);margin-left:5px; }
     .cfg-input-wrap { flex-shrink:0; }
-    .cfg-input-wrap input[type="number"],
-    .cfg-input-wrap input[type="text"] {
+    /* Every type, not an enumeration: the wrap holds exactly one input, and the
+       secret keys render as type=password, which an enumeration silently misses. */
+    .cfg-input-wrap input {
       width:150px;padding:7px 11px;background:var(--g2);border:1px solid var(--border-sm);
       border-radius:var(--r-xs);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:12px;
       outline:none;transition:all 0.15s;
@@ -825,7 +826,7 @@
 
       .cfg-row { flex-direction:column;align-items:stretch;gap:9px;padding:12px 14px; }
       .cfg-input-wrap { width:100%; }
-      .cfg-input-wrap input[type="number"], .cfg-input-wrap input[type="text"] { width:100%; }
+      .cfg-input-wrap input { width:100%; }
 
       .detail-row { flex-direction:column;gap:2px; }
       .detail-key { width:auto; }
@@ -2334,8 +2335,10 @@ function renderConfig() {
         <input type="number" id="cfg-${key}" value="${val ?? ''}" placeholder="${val===null?'null (unlimited)':schema.default}" min="-1">
       </div>`;
     } else {
+      // Secrets arrive from /api/config already masked; submitting the mask back means
+      // "unchanged" (see userConfig.set), so the real value never round-trips.
       inputHtml = `<div class="cfg-input-wrap">
-        <input type="text" id="cfg-${key}" value="${val ?? ''}">
+        <input type="${schema.secret ? 'password' : 'text'}" id="cfg-${key}" value="${escapeHtml(String(val ?? ''))}">
       </div>`;
     }
     return `<div class="cfg-row">
@@ -2364,7 +2367,10 @@ async function saveConfig() {
       value = track && track.classList.contains('on') ? 'true' : 'false';
     } else {
       const el = document.getElementById(`cfg-${key}`);
-      value = el ? (el.value.trim() === '' ? 'null' : el.value.trim()) : null;
+      if (!el) return;
+      // Blank means "unlimited" for a numeric key, but a literal empty string for a
+      // text one - sending 'null' there would store the four characters n-u-l-l.
+      value = el.value.trim() === '' && typeof schema.default !== 'string' ? 'null' : el.value.trim();
     }
     if (value === null) return;
     const numCheck = parseFloat(value);

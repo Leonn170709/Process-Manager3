@@ -141,14 +141,14 @@ program
 
     // ── helpers ──────────────────────────────────────────────
     function fmtVal(v) {
-      if (v === null || v === undefined) return chalk.dim('—');
+      if (v === null || v === undefined || v === '') return chalk.dim('—');
       if (v === true)  return chalk.green('true');
       if (v === false) return chalk.red('false');
       return chalk.white(String(v));
     }
 
     function showAll() {
-      const current  = cfg.getAll();
+      const current  = cfg.getAllMasked();   // `pm3 config get <key>` still prints the real value
       const { SCHEMA } = cfg;
       const W = Math.min(termW(), 72);
 
