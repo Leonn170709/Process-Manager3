@@ -3,7 +3,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const pidusage = require('pidusage');
 const chokidar = require('chokidar');
 
@@ -199,15 +198,14 @@ function _spawnProcess(procRecord) {
     _handleCrash(procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
   });
 
-  // Log stdout - split chunks so every output line gets its own timestamp
+  // Log stdout - split chunks so every output line gets its own timestamp, but write the
+  // chunk as one append: a chatty app would otherwise cost a syscall per line.
   child.stdout.on('data', data => {
     const ts = new Date().toISOString();
-    data.toString().trimEnd().split('\n').forEach(rawLine => {
-      if (!rawLine) return;
-      const line = `[${ts}] ${rawLine}`;
-      storage.appendLog(name, 'out', line);
-      emit('log', { name, line, type: 'out' });
-    });
+    const lines = data.toString().trimEnd().split('\n').filter(Boolean).map(l => `[${ts}] ${l}`);
+    if (!lines.length) return;
+    storage.appendLog(name, 'out', lines.join('\n'));
+    for (const line of lines) emit('log', { name, line, type: 'out' });
   });
 
   // Agent IPC (ignored by children that don't use it). Control requests are handled
@@ -229,15 +227,15 @@ function _spawnProcess(procRecord) {
     // SIGUSR1 makes Node print its real inspector URL here - that is how the CDP
     // fallback learns the port belonging to this specific pid.
     memDetail.noteStderr(name, text);
-    text.trimEnd().split('\n').forEach(rawLine => {
-      if (!rawLine) return;
+    const lines = text.trimEnd().split('\n')
       // Node's own "Debugger listening/attached/ending" chatter is provoked by PM3's
       // memory probe, not written by the app - keep it out of the app's error log.
-      if (memDetail.isInspectorNoise(rawLine)) return;
-      const line = `[${ts}] [ERR] ${rawLine}`;
-      storage.appendLog(name, 'err', line);
-      emit('log', { name, line, type: 'err' });
-    });
+      .filter(l => l && !memDetail.isInspectorNoise(l))
+      .map(l => `[${ts}] [ERR] ${l}`);
+    if (lines.length) {
+      storage.appendLog(name, 'err', lines.join('\n'));
+      for (const line of lines) emit('log', { name, line, type: 'err' });
+    }
     // Detect error patterns
     if (text.includes('Error:') || text.includes('Exception') || text.includes('FATAL')) {
       _captureIssue(name, text, SEVERITY.ERROR);
@@ -393,7 +391,6 @@ function _handleCrash(procRecord, exitCode, message, severity) {
     exitCode,
     reason: message,
     severity,
-    logs,
   });
   emit('issue:new', issueTracker.getIssues()[0]);
 }
@@ -410,7 +407,6 @@ function _captureIssue(name, errorText, severity) {
     exitCode: null,
     reason: 'Runtime error detected in stderr',
     severity,
-    logs: errorText,
   });
   emit('issue:new', issueTracker.getIssues()[0]);
 }
@@ -540,6 +536,7 @@ function restartProcess(name) {
 // --- Delete process ---
 function deleteProcess(name) {
   stopProcess(name);
+  memDetail.drop(name);
   const procs = storage.loadProcesses();
   const record = procs[name];
   delete procs[name];
@@ -646,10 +643,12 @@ async function updateStats() {
       }
     }
 
-    if (changed) {
-      storage.saveProcesses(procs);
-      emit('stats:update', procs);
-    }
+    // Every restart gets a new pid, so snapshots of exited ones would otherwise pile up forever.
+    for (const pid of Object.keys(prevProcIO)) if (!pids.includes(+pid)) delete prevProcIO[pid];
+
+    // Stats stay in RAM: the records are the live in-memory copy, and none of these fields
+    // are persisted anyway, so a save here would only rewrite an identical file.
+    if (changed) emit('stats:update', procs);
   } catch {}
 }
 
@@ -687,6 +686,17 @@ function updateProcess(name, updates) {
   const procs = storage.loadProcesses();
   if (!procs[name]) return { error: `Process "${name}" not found` };
 
+  // Validate before touching anything: the record is the live in-memory copy, so a
+  // half-applied update that then errors out would still reach disk with the next save.
+  let env;
+  if (updates.env !== undefined) {
+    const r = _sanitizeEnv(updates.env);
+    if (r.error) return { error: r.error };
+    env = r.env;
+  }
+  const newName = (updates.name || '').trim();
+  if (newName && newName !== name && procs[newName]) return { error: `Name "${newName}" is already taken` };
+
   // Simple field updates (take effect on next restart)
   for (const key of ['maxRestarts', 'memoryLimit', 'autorestart']) {
     if (updates[key] !== undefined) procs[name][key] = updates[key];
@@ -696,16 +706,10 @@ function updateProcess(name, updates) {
   // overrides, so a key the user deleted must actually disappear. A running process keeps the
   // environment it was spawned with - Linux gives no way to change it - so this lands on the
   // next restart, which is what the dashboard tells the user.
-  if (updates.env !== undefined) {
-    const { env, error } = _sanitizeEnv(updates.env);
-    if (error) return { error };
-    procs[name].env = env;
-  }
+  if (env) procs[name].env = env;
 
   // Rename
-  const newName = (updates.name || '').trim();
   if (newName && newName !== name) {
-    if (procs[newName]) return { error: `Name "${newName}" is already taken` };
     procs[newName] = { ...procs[name], name: newName };
     delete procs[name];
     if (runtime[name]) { runtime[newName] = runtime[name]; delete runtime[name]; }
@@ -769,6 +773,7 @@ module.exports = {
     runtime[name] ? memDetail.deepSize(name, runtime[name], structure)
                   : Promise.resolve({ error: `Process "${name}" is not running` }),
   memPollInterval: memDetail.POLL_MS,
+  flushMemHistory: memDetail.flush,
   resurrect,
   resolveProcess,
   updateProcess,

@@ -14,6 +14,7 @@ const express = require('express');
 const { Server: SocketIOServer } = require('socket.io');
 const { EventEmitter } = require('events');
 const si = require('systeminformation');
+const sys = require('../core/sysMetrics');   // spawn-free Linux versions of the hot-path si calls
 const fs = require('fs');
 
 const { DAEMON_PORT, DASHBOARD_PORT, PATHS, STATUS } = require('../config/constants');
@@ -34,7 +35,7 @@ let _prevFsRx = 0, _prevFsWx = 0, _prevFsTs = 0;
 let _diskSpeed = { readSec: 0, writeSec: 0 };
 async function _pollDiskSpeed() {
   try {
-    const s = await si.fsStats();
+    const s = await sys.fsStats();
     const now = Date.now();
     if (_prevFsTs) {
       const dt = (now - _prevFsTs) / 1000;
@@ -49,14 +50,17 @@ async function _pollDiskSpeed() {
   } catch {}
 }
 
-// Network speed tracking (total + per-interface)
+// Network speed tracking: the total is the default-route interface (bridges and veths carry the
+// same bytes again), per-interface speeds cover every interface. Both maps are rebuilt each poll
+// so interfaces that went away (container veths) do not pile up.
 let _prevNetBytes = {};
 let _netSpeed = { rxSec: 0, txSec: 0 };
 let _ifaceSpeed = {};
 async function _pollNetSpeed() {
   try {
-    const ifaces = await si.networkStats();
+    const { ifaces, primary } = await sys.networkStats();
     const now = Date.now();
+    const prev = {}, speeds = {};
     let rx = 0, tx = 0;
     for (const i of ifaces) {
       if (i.iface === 'lo') continue;
@@ -66,12 +70,14 @@ async function _pollNetSpeed() {
         if (dt > 0 && dt < 15) {
           const irx = Math.max(0, (i.rx_bytes - p.rx) / dt);
           const itx = Math.max(0, (i.tx_bytes - p.tx) / dt);
-          rx += irx; tx += itx;
-          _ifaceSpeed[i.iface] = { rxSec: Math.round(irx), txSec: Math.round(itx) };
+          if (!primary || i.iface === primary) { rx += irx; tx += itx; }
+          speeds[i.iface] = { rxSec: Math.round(irx), txSec: Math.round(itx) };
         }
       }
-      _prevNetBytes[i.iface] = { rx: i.rx_bytes, tx: i.tx_bytes, ts: now };
+      prev[i.iface] = { rx: i.rx_bytes, tx: i.tx_bytes, ts: now };
     }
+    _prevNetBytes = prev;
+    _ifaceSpeed = speeds;
     _netSpeed = { rxSec: Math.round(rx), txSec: Math.round(tx) };
   } catch {}
 }
@@ -216,17 +222,6 @@ app.delete('/api/logs/:name', (req, res) => {
   res.json({ ok: true });
 });
 
-// Get log file stream (tail)
-app.get('/api/logs/:name/stream', (req, res) => {
-  const name = pm.resolveProcess(req.params.name);
-  if (!name) return res.status(404).json({ error: 'Process not found' });
-  const logPath = storage.getLogPath(name, 'out');
-  if (!fs.existsSync(logPath)) return res.json({ lines: [] });
-  const content = fs.readFileSync(logPath, 'utf8');
-  const lines = content.split('\n').filter(Boolean).slice(-200);
-  res.json({ lines });
-});
-
 // Issues
 app.get('/api/issues', (req, res) => {
   res.json(issueTracker.getIssues());
@@ -271,7 +266,7 @@ app.post('/api/config/reset', (req, res) => {
 app.get('/api/system', async (req, res) => {
   try {
     const [cpu, mem, disk, cpuStatic, temp, freq] = await Promise.all([
-      si.currentLoad(), si.mem(), si.fsSize(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
+      sys.currentLoad(), si.mem(), si.fsSize(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
     ]);
     await _pollNetSpeed();
     const tempData = temp && temp.main != null ? {
@@ -698,7 +693,7 @@ let _cpuTempCache = null;
 let _cpuTempTs = 0;
 async function _getCpuTemp() {
   if (Date.now() - _cpuTempTs < 2500) return _cpuTempCache;
-  try { _cpuTempCache = await si.cpuTemperature(); } catch { _cpuTempCache = null; }
+  try { _cpuTempCache = await sys.cpuTemperature(); } catch { _cpuTempCache = null; }
   _cpuTempTs = Date.now();
   return _cpuTempCache;
 }
@@ -767,7 +762,7 @@ setInterval(async () => {
   if (!_watched()) return;
   try {
     const [cpu, mem, cpuStatic, temp, freq] = await Promise.all([
-      si.currentLoad(), si.mem(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
+      sys.currentLoad(), si.mem(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
     ]);
     await Promise.all([_pollNetSpeed(), _pollDiskSpeed()]);
     const tempData = temp && temp.main != null ? {
@@ -844,6 +839,9 @@ function shutdown(signal) {
   shuttingDown = true;
   console.log(`[PM3] ${signal} received - stopping managed processes...`);
   const done = () => {
+    // Writes that are coalesced in RAM and may still be pending
+    try { storage.flushIssues(); } catch (err) { console.error('[PM3] Could not save issues:', err.message); }
+    pm.flushMemHistory();
     try { fs.unlinkSync(PATHS.pid); } catch {}
     process.exit(0);
   };

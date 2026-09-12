@@ -29,6 +29,13 @@ npm install
 npm install -g .
 ```
 
+### Updating
+
+```bash
+./update.sh               # pull, reinstall changed dependencies, restart the daemon
+./update.sh --no-restart  # same, but leave the running daemon alone
+```
+
 ---
 
 ## Quick Start

@@ -72,11 +72,20 @@ function ensureDir() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+// The daemon reads config on hot paths (every new issue) while the CLI writes this file from
+// another process, so the parsed copy is cached by mtime: one stat instead of read + parse.
+let _cache = null;
+let _cacheMtime = -1;
+
 function load() {
   try {
-    if (!fs.existsSync(PATHS.config)) return { ...DEFAULTS };
-    const data = JSON.parse(fs.readFileSync(PATHS.config, 'utf8'));
-    return { ...DEFAULTS, ...data };
+    const st = fs.statSync(PATHS.config, { throwIfNoEntry: false });
+    if (!st) return { ...DEFAULTS };
+    if (st.mtimeMs !== _cacheMtime) {
+      _cache = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(PATHS.config, 'utf8')) };
+      _cacheMtime = st.mtimeMs;
+    }
+    return { ..._cache };
   } catch {
     return { ...DEFAULTS };
   }

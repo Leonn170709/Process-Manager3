@@ -1,14 +1,14 @@
 'use strict';
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const storage = require('../storage');
 const { SEVERITY } = require('../config/constants');
 const userConfig = require('../config/userConfig');
 
-function createIssue({ processName, processId, message, stack, exitCode, reason, severity, logs }) {
+function createIssue({ processName, processId, message, stack, exitCode, reason, severity }) {
   const issues = storage.loadIssues();
   const issue = {
-    id: uuidv4(),
+    id: randomUUID(),
     timestamp: new Date().toISOString(),
     processName: processName || 'unknown',
     processId: processId || null,
@@ -17,7 +17,6 @@ function createIssue({ processName, processId, message, stack, exitCode, reason,
     exitCode: exitCode !== undefined ? exitCode : null,
     reason: reason || '',
     severity: severity || SEVERITY.ERROR,
-    logs: logs || '',
     resolved: false,
   };
   issues.unshift(issue); // newest first

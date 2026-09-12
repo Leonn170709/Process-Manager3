@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PATHS } = require('../config/constants');
+const storage = require('../storage');
 
 const POLL_MS = 12000;
 const HISTORY_MAX = 300;               // ~1 h at 12 s
@@ -293,17 +294,25 @@ async function deepSize(name, runtimeEntry, structure) {
   return row || { error: 'structure not tracked' };
 }
 
+// Deleted for good, unlike crashed: no process is left to look at this history under.
+function drop(name) {
+  forget(name);
+  if (history[name]) { delete history[name]; historyDirty = true; }
+}
+
 // Keep it in memory, flush occasionally — a sample every 12 s is not worth a write each time.
-setInterval(() => {
+// The daemon also calls this on shutdown so a restart does not lose the last few minutes.
+function flush() {
   if (!historyDirty) return;
   historyDirty = false;
-  try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(history), 'utf8'); } catch {}
-}, FLUSH_MS).unref();
+  try { storage.writeFileAtomic(HISTORY_FILE, JSON.stringify(history)); } catch {}
+}
+setInterval(flush, FLUSH_MS).unref();
 
 module.exports = {
   POLL_MS,
-  pollAll, pollOne, deepSize,
-  onAgentMessage, noteStderr, isInspectorNoise, forget, rename,
+  pollAll, pollOne, deepSize, flush,
+  onAgentMessage, noteStderr, isInspectorNoise, forget, rename, drop,
   get: name => detail[name] || null,
   getHistory: name => history[name] || [],
   all: () => detail,

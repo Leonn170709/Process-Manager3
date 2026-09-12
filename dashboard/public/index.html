@@ -1536,9 +1536,10 @@ function _updateIssueLimitLabel() {
 }
 loadInitialData();
 
-// Poll for new issues every 5 s as fallback when Socket.IO isn't delivering events
+// Poll for new issues every 5 s as fallback when Socket.IO isn't delivering events. While it
+// is connected, issue:new covers this and every (re)connect sends the full list in `init`.
 setInterval(async () => {
-  if (document.hidden) return;
+  if (document.hidden || socket.connected) return;
   try {
     const r = await fetch('/api/issues');
     const fresh = await r.json();
