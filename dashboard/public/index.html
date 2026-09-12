@@ -15,13 +15,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet" />
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <!-- Served by the daemon itself: same version as the server, works without internet -->
+    <script src="/socket.io/socket.io.min.js"></script>
     <style>
     /* ── Reset ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; }
+    html, body { height: 100%; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; overflow: hidden; }
 
     /* ── Light theme ─────────────────────────────── */
     :root {
@@ -158,7 +159,7 @@
     .nav-tab {
       padding:5px 13px;border-radius:20px;cursor:pointer;font-size:12.5px;
       font-weight:500;color:var(--t3);background:transparent;border:none;
-      font-family:'Inter',sans-serif;transition:background-color 0.18s,color 0.18s;
+      font-family:'IBM Plex Sans',sans-serif;transition:background-color 0.18s,color 0.18s;
       display:inline-flex;align-items:center;gap:5px;
     }
     .nav-tab:hover { color:var(--t2);background:var(--g3); }
@@ -183,14 +184,14 @@
       font-size:11.5px;
     }
     .nav-chip .lbl { color:var(--t3);font-size:10.5px; }
-    .nav-chip .val { color:var(--t1);font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11px; }
+    .nav-chip .val { color:var(--t1);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11px; }
     .nav-actions { display:flex;gap:6px;padding-left:10px;flex-shrink:0; }
 
     /* ── Buttons ─────────────────────────────────── */
     .btn {
       padding:6px 14px;border-radius:var(--r-xs);border:1px solid var(--border);
       background:var(--g1);
-      color:var(--t1);cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;
+      color:var(--t1);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;
       font-weight:500;transition:background-color 0.15s,box-shadow 0.15s,transform 0.15s,border-color 0.15s;
       display:inline-flex;align-items:center;gap:5px;
       box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
@@ -238,20 +239,16 @@
     .card-title { font-size:12.5px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:6px; }
 
     /* ── Stat Pills ──────────────────────────────── */
-    .stats-strip { display:flex;gap:7px;flex-shrink:0; }
+    /* One line per figure, "7 running": the strip reads as a status sentence, not four billboards */
+    .stats-strip { display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap; }
     .stat-pill {
-      flex:1;padding:10px 14px;
+      flex:0 1 auto;display:flex;align-items:baseline;gap:7px;padding:7px 14px;
       background:var(--pane);
       border:1px solid var(--border);border-radius:var(--r-sm);
-      box-shadow:inset 0 1.5px 0 var(--spec), var(--shadow);
-      position:relative;overflow:hidden;
+      box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
     }
-    .stat-pill::before {
-      content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
-      background:linear-gradient(90deg,transparent,var(--spec),transparent);
-    }
-    .sp-val   { font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.1; }
-    .sp-label { font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-top:3px; }
+    .sp-val   { font-size:17px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1.1;font-variant-numeric:tabular-nums; }
+    .sp-label { font-size:12.5px;color:var(--t2);font-weight:500; }
 
     /* ── Process Table ───────────────────────────── */
     .table-wrap { flex:1;overflow:auto;min-height:0; }
@@ -260,7 +257,7 @@
     .proc-table { width:100%;border-collapse:collapse; }
     .proc-table th {
       text-align:left;padding:7px 12px;font-size:10.5px;color:var(--t3);
-      text-transform:uppercase;letter-spacing:0.5px;font-weight:600;
+      letter-spacing:0.5px;font-weight:600;
       border-bottom:1px solid var(--border-sm);position:sticky;top:0;z-index:1;
       /* Opaque enough that rows scrolling under it stay hidden — this used to
          lean on a blur that never made it opaque in the first place. */
@@ -270,15 +267,15 @@
     .proc-row:hover { background:var(--g3); }
     .proc-row td { padding:7px 12px;vertical-align:middle; }
     .proc-name   { font-weight:600;color:var(--t1);font-size:12.5px; }
-    .proc-script { font-size:10.5px;color:var(--t4);font-family:'JetBrains Mono',monospace;margin-top:1px; }
-    .mono { font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t2); }
+    .proc-script { font-size:10.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace;margin-top:1px; }
+    .mono { font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--t2); }
     .proc-actions { display:flex;gap:4px;flex-wrap:nowrap;align-items:center; }
     .proc-actions .sep { width:1px;height:18px;background:var(--border-sm);flex-shrink:0;margin:0 2px; }
 
     /* ── Process action buttons ──────────────────── */
     .pab {
       padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;
-      border:1px solid;cursor:pointer;font-family:'Inter',sans-serif;
+      border:1px solid;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
       display:inline-flex;align-items:center;gap:5px;
       transition:background-color 0.15s,color 0.15s,transform 0.15s;
       white-space:nowrap;letter-spacing:0.1px;
@@ -338,7 +335,7 @@
     }
     .log-title { font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;color:rgba(255,255,255,0.85); }
     .log-body {
-      font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.8;
+      font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.8;
       padding:12px 16px;overflow-y:auto;flex:1;
       white-space:pre-wrap;word-break:break-all;color:var(--log-text);
     }
@@ -375,20 +372,21 @@
     .issue-left { display:flex;align-items:center;gap:7px; }
     .issue-right { display:flex;align-items:center;gap:6px;flex-shrink:0; }
     .issue-name { font-weight:600;font-size:12.5px;color:var(--t1); }
-    .issue-time { font-size:10.5px;color:var(--t4);font-family:'JetBrains Mono',monospace; }
-    .issue-msg  { font-size:11.5px;color:var(--t2);font-family:'JetBrains Mono',monospace;line-height:1.5;
+    .issue-time { font-size:10.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace; }
+    .issue-msg  { font-size:11.5px;color:var(--t2);font-family:'IBM Plex Mono',monospace;line-height:1.5;
                   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
     .issue-meta { font-size:10.5px;color:var(--t4);margin-top:4px;display:flex;gap:10px; }
-    .severity-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase; }
+    .severity-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px; }
     .severity-critical { background:rgba(220,38,38,0.10);color:var(--red);border:1px solid rgba(220,38,38,0.2); }
     .severity-error    { background:rgba(217,119,6,0.10);color:var(--yellow);border:1px solid rgba(217,119,6,0.2); }
     .severity-warning  { background:rgba(8,145,178,0.10);color:var(--cyan);border:1px solid rgba(8,145,178,0.2); }
 
     /* ── System tab ──────────────────────────────── */
-    .sys-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px;flex-shrink:0; }
+    /* auto-fit, not auto-fill: the six cards stretch across the row instead of leaving half of it empty */
+    .sys-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:7px;flex-shrink:0; }
     .sys-metric { padding:12px 14px; }
-    .sm-label { font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:6px; }
-    .sm-val   { font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1; }
+    .sm-label { font-size:10.5px;color:var(--t3);letter-spacing:0.5px;font-weight:600;margin-bottom:6px; }
+    .sm-val   { font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1; }
     .sm-sub   { font-size:10.5px;color:var(--t4);margin-top:5px; }
     .progress { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;margin-top:9px;overflow:hidden; }
     .progress-fill { height:100%;border-radius:2px;transition:width 0.6s ease; }
@@ -407,13 +405,13 @@
     #mm-proc-list .res-proc-row { grid-template-columns:minmax(120px,1.4fr) 60px 1fr 240px; }
     .mem-split-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0; }
     .mem-split-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:7px 9px; }
-    .mem-split-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px; }
-    .mem-split-val { font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-top:2px; }
+    .mem-split-lbl { font-size:9.5px;color:var(--t3);letter-spacing:0.4px; }
+    .mem-split-val { font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;margin-top:2px; }
     .mem-note { font-size:10px;color:var(--t4);font-style:italic;margin:2px 0 6px; }
     .mem-track-hdr { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px; }
     .mem-track-row { display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--border-sm);font-size:11px; }
-    .mem-track-name { font-family:'JetBrains Mono',monospace;color:var(--t2);flex:1; }
-    .mem-track-count { font-family:'JetBrains Mono',monospace;color:var(--accent2); }
+    .mem-track-name { font-family:'IBM Plex Mono',monospace;color:var(--t2);flex:1; }
+    .mem-track-count { font-family:'IBM Plex Mono',monospace;color:var(--accent2); }
     .res-stats-grid { display:grid;gap:6px;margin:10px 0 8px; }
     .res-stat-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:9px 12px; }
     .res-stat-box.clickable { cursor:pointer;transition:background 0.15s,border-color 0.15s,transform 0.12s; }
@@ -426,17 +424,17 @@
       100% { box-shadow:inset 0 0 0 2px transparent,0 0 0 0 transparent; }
     }
     .nav-flash { animation:navFlash 1.6s ease-out !important; border-radius:var(--r-xs); }
-    .res-stat-lbl { font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
-    .res-stat-val { font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1);line-height:1.1; }
+    .res-stat-lbl { font-size:9.5px;color:var(--t3);letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
+    .res-stat-val { font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1);line-height:1.1; }
     .res-stat-sub { font-size:9.5px;color:var(--t4);margin-top:2px; }
     .res-core-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px;margin:8px 0 2px; }
     .res-core-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:6px 8px; }
     .res-core-lbl { font-size:9px;color:var(--t3);font-weight:600;margin-bottom:3px; }
-    .res-core-val { font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:3px; }
+    .res-core-val { font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-bottom:3px; }
     .res-core-bar { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;overflow:hidden; }
     .res-core-fill { height:100%;border-radius:2px;transition:width 0.5s; }
     .res-sec-hdr { display:flex;align-items:center;justify-content:space-between;padding:8px 0 5px;border-top:1px solid var(--border-sm);margin-top:6px; }
-    .res-sec-title { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px; }
+    .res-sec-title { font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px; }
     .res-sort-btn { font-size:10px;font-weight:600;padding:3px 10px;background:var(--g2);border:1px solid var(--border-sm);border-radius:20px;color:var(--t2);cursor:pointer;transition:all 0.15s; }
     .res-sort-btn:hover { background:var(--g1);color:var(--t1);border-color:var(--border); }
     .res-proc-scroll { max-height:320px;overflow-y:auto;border-radius:var(--r-xs);border:1px solid var(--border-sm); }
@@ -448,16 +446,16 @@
     .res-proc-row.expanded { background:var(--g2); }
     .res-proc-name { font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .res-proc-script { font-size:10px;color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px; }
-    .rp-val { font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;text-align:right;white-space:nowrap; }
+    .rp-val { font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap; }
     .rp-bar { height:6px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden;width:100%; }
     .rp-bar-fill { height:100%;border-radius:3px;transition:width 0.45s ease; }
-    .rp-sub { font-size:10.5px;color:var(--t3);font-family:'JetBrains Mono',monospace;text-align:right;white-space:nowrap; }
+    .rp-sub { font-size:10.5px;color:var(--t3);font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap; }
     .res-proc-detail { padding:10px 14px 13px 14px;border-bottom:1px solid var(--border-sm);background:var(--g3);animation:detailIn 0.14s ease; }
     @keyframes detailIn { from{opacity:0;margin-top:-6px}to{opacity:1;margin-top:0} }
     .rpd-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px;margin-bottom:8px; }
-    .rpd-lbl { font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;display:block;margin-bottom:1px; }
-    .rpd-val { font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-word; }
-    .rpd-cmd { font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);word-break:break-all;margin:6px 0 8px;line-height:1.5;padding:5px 8px;background:var(--g2);border-radius:5px;border:1px solid var(--border-sm); }
+    .rpd-lbl { font-size:9px;color:var(--t3);letter-spacing:0.4px;font-weight:600;display:block;margin-bottom:1px; }
+    .rpd-val { font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-word; }
+    .rpd-cmd { font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--t3);word-break:break-all;margin:6px 0 8px;line-height:1.5;padding:5px 8px;background:var(--g2);border-radius:5px;border:1px solid var(--border-sm); }
     .res-mode-toggle { display:flex;background:var(--g2);border:1px solid var(--border-sm);border-radius:20px;padding:2px;gap:2px; }
     .rmt-btn { font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:16px;cursor:pointer;color:var(--t3);background:transparent;transition:all 0.15s;font-family:inherit; }
     .rmt-btn.active { background:var(--g1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,0.12); }
@@ -467,8 +465,8 @@
     /* ── CPU/Net hw info boxes ───────────────────── */
     .hw-info-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:5px;margin:6px 0; }
     .hw-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:7px 10px; }
-    .hw-lbl { font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
-    .hw-val { font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-word;line-height:1.2; }
+    .hw-lbl { font-size:9px;color:var(--t3);letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
+    .hw-val { font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-word;line-height:1.2; }
     /* ── Net interface table ─────────────────────── */
     .net-iface-row { display:grid;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--border-sm);align-items:center; }
     .net-iface-row:last-child { border-bottom:none; }
@@ -482,7 +480,7 @@
       padding:13px 16px;border-bottom:1px solid var(--border-sm);gap:20px;
     }
     .cfg-row:last-child { border-bottom:none; }
-    .cfg-key { font-weight:600;font-size:12.5px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-bottom:3px; }
+    .cfg-key { font-weight:600;font-size:12.5px;color:var(--t1);font-family:'IBM Plex Mono',monospace;margin-bottom:3px; }
     .cfg-desc { font-size:11.5px;color:var(--t3); }
     .cfg-unit { font-size:10.5px;color:var(--t4);margin-left:5px; }
     .cfg-input-wrap { flex-shrink:0; }
@@ -490,7 +488,7 @@
        secret keys render as type=password, which an enumeration silently misses. */
     .cfg-input-wrap input {
       width:150px;padding:7px 11px;background:var(--g2);border:1px solid var(--border-sm);
-      border-radius:var(--r-xs);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:12px;
+      border-radius:var(--r-xs);color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:12px;
       outline:none;transition:all 0.15s;
     }
     .cfg-input-wrap input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
@@ -561,7 +559,7 @@
     .form-label { display:block;font-size:11.5px;font-weight:600;color:var(--t2);margin-bottom:5px; }
     .form-input {
       width:100%;padding:8px 12px;background:var(--g2);border:1px solid var(--border-sm);
-      border-radius:var(--r-xs);color:var(--t1);font-family:'Inter',sans-serif;font-size:12.5px;
+      border-radius:var(--r-xs);color:var(--t1);font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;
       outline:none;transition:all 0.15s;
     }
     .form-input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
@@ -600,17 +598,16 @@
     /* ── Issue detail ────────────────────────────── */
     .detail-row { display:flex;gap:12px;margin-bottom:8px; }
     .detail-key { font-size:11.5px;color:var(--t3);width:90px;flex-shrink:0;font-weight:500; }
-    .detail-val { font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--t1);word-break:break-all; }
+    .detail-val { font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-all; }
     .stack-trace {
       background:rgba(10,15,30,0.07);border:1px solid rgba(10,15,30,0.1);border-radius:var(--r-xs);
-      padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--t2);
+      padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--t2);
       white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:6px;
     }
     .stack-trace::-webkit-scrollbar { width:4px; }
     .stack-trace::-webkit-scrollbar-thumb { background:rgba(80,120,200,0.2); }
     .section-title {
-      font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
-      letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;
+      font-size:11px;font-weight:700;color:var(--t3);      letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;
     }
     .section-title::after { content:'';flex:1;height:1px;background:rgba(0,0,0,0.07); }
 
@@ -620,11 +617,11 @@
       border-top:1px solid var(--log-border);flex-shrink:0;
       background:rgba(0,0,0,0.18);
     }
-    .stdin-prompt { color:#34d399;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0;user-select:none; }
+    .stdin-prompt { color:#34d399;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0;user-select:none; }
     .stdin-input {
       flex:1;padding:6px 10px;background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.12);border-radius:6px;
-      color:rgba(200,220,255,0.88);font-family:'JetBrains Mono',monospace;font-size:12px;
+      color:rgba(200,220,255,0.88);font-family:'IBM Plex Mono',monospace;font-size:12px;
       outline:none;transition:all 0.15s;
     }
     .stdin-input:focus { border-color:rgba(255,255,255,0.24);background:rgba(255,255,255,0.09); }
@@ -642,9 +639,9 @@
     .stat-cell { cursor:pointer;transition:color 0.15s; }
     .stat-cell:hover { color:var(--accent) !important; }
     .chart-block { margin-bottom:16px; }
-    .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
-    .chart-label .cur { font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
-    .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:0.2px; }
+    .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
+    .chart-label .cur { font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1); }
+    .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace;font-weight:500;letter-spacing:0.2px; }
     .chart-hover-area { position:relative;cursor:crosshair;touch-action:none; }
     /* Y-axis labels live here, not in the SVG — see _chartYLabels. Right-aligned into the
        gutter the SVG reserves on its right edge; `top` is set inline in px, which is exact
@@ -653,7 +650,7 @@
     .chart-yl { position:absolute;inset:0;pointer-events:none; }
     .chart-yl span {
       position:absolute;right:2px;transform:translateY(-50%);
-      font-size:9.5px;line-height:1;font-family:'Inter',sans-serif;
+      font-size:9.5px;line-height:1;font-family:'IBM Plex Sans',sans-serif;
       color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums;
     }
     .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:8px 8px 4px;overflow:hidden; }
@@ -675,24 +672,24 @@
       background:var(--tip-bg);
       border:1px solid var(--border-sm);
       box-shadow:inset 0 1px 0 var(--spec-sm),var(--shadow);
-      font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;
+      font-size:11px;font-family:'IBM Plex Mono',monospace;font-weight:600;
       color:var(--t1);white-space:nowrap;letter-spacing:0.3px;z-index:11;
       transition:border-color 0.15s;
     }
     .chart-tip.locked { border-color:rgba(251,191,36,0.55);box-shadow:inset 0 1px 0 var(--spec-sm),0 0 8px rgba(251,191,36,0.18); }
     .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
-    .stat-kv-label { font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;font-weight:600; }
-    .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'JetBrains Mono',monospace;margin-top:1px;word-break:break-all; }
+    .stat-kv-label { font-size:10px;color:var(--t3);letter-spacing:0.4px;font-weight:600; }
+    .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'IBM Plex Mono',monospace;margin-top:1px;word-break:break-all; }
     .modal-wide { width:1020px; }
     /* Network section */
     .net-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px 14px; }
     .net-metric { }
-    .net-speed { font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;margin:3px 0; }
+    .net-speed { font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin:3px 0; }
     /* Log filter controls */
     .log-filter-btn {
       padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:600;
       border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
-      color:rgba(255,255,255,0.45);cursor:pointer;font-family:'Inter',sans-serif;
+      color:rgba(255,255,255,0.45);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
       transition:all 0.15s;
     }
     .log-filter-btn:hover { background:rgba(255,255,255,0.11);color:rgba(255,255,255,0.75); }
@@ -700,7 +697,7 @@
     .log-search-input {
       padding:3px 9px;border-radius:5px;font-size:10.5px;
       border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
-      color:rgba(255,255,255,0.7);font-family:'JetBrains Mono',monospace;outline:none;width:110px;
+      color:rgba(255,255,255,0.7);font-family:'IBM Plex Mono',monospace;outline:none;width:110px;
       transition:all 0.15s;
     }
     .log-search-input:focus { border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.09); }
@@ -718,6 +715,48 @@
     .col-check { width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0; }
     .col-lbl { font-size:12.5px;font-weight:500;color:var(--t2);flex:1;cursor:pointer; }
     .col-locked { font-size:10px;color:var(--t4);flex-shrink:0;font-style:italic; }
+
+    /* ── Refinements ───────────────────────────────
+       Labels are sentence case; the tracking and tiny sizes that suited all caps read as loose,
+       faint text without it, so they are reset here in one place rather than rule by rule. */
+    .sm-label, .chart-label, .section-title, .res-sec-title { letter-spacing:0;font-size:11.5px; }
+    .stat-kv-label, .hw-lbl, .res-stat-lbl, .rpd-lbl, .mem-split-lbl, .res-core-lbl { letter-spacing:0;font-size:10.5px; }
+    .severity-badge { letter-spacing:0;text-transform:capitalize; }
+    .status-pill { text-transform:capitalize; }
+    .btn:focus-visible, .nav-tab:focus-visible, .pab:focus-visible, .filter-chip:focus-visible {
+      outline:2px solid var(--accent);outline-offset:2px;
+    }
+
+    /* Process rows. The status rail lets the state read from the left edge before any text
+       does; everything else in the row stays quiet so the rail is the one loud thing. */
+    .proc-table th { font-size:11.5px;letter-spacing:0;font-weight:500;white-space:nowrap; }
+    .proc-row td:first-child { box-shadow:inset 3px 0 0 var(--rail, transparent); }
+    .proc-row[data-status="running"] { --rail:var(--green); }
+    .proc-row[data-status="crashed"] { --rail:var(--red); }
+    .proc-row[data-status="restarting"], .proc-row[data-status="starting"] { --rail:var(--yellow); }
+    .proc-row[data-status="stopped"] { --rail:var(--t4); }
+    .proc-row td.mono { white-space:nowrap;font-variant-numeric:tabular-nums; }
+    .proc-script { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px; }
+    .row-actions { display:flex;gap:2px;align-items:center; }
+    .row-actions .sep { width:1px;height:16px;background:var(--border-sm);margin:0 4px; }
+    /* Icons that take colour only when pointed at: six coloured buttons per row were the
+       loudest thing on the page, and a filled red Delete sat one misclick away. */
+    .ra {
+      width:30px;height:30px;display:inline-grid;place-items:center;border-radius:7px;
+      border:1px solid transparent;background:transparent;color:var(--t3);cursor:pointer;
+      transition:background-color 0.12s,color 0.12s,border-color 0.12s;
+    }
+    .ra svg { width:16px;height:16px; }
+    .ra:hover { background:var(--g1);border-color:var(--border-sm);color:var(--t1); }
+    .ra:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
+    .ra.go:hover   { color:var(--green); }
+    .ra.halt:hover { color:var(--red); }
+    .ra.del:hover  { color:#fff;background:var(--red);border-color:var(--red); }
+    .issue-count {
+      min-width:24px;height:22px;padding:0 7px;border-radius:11px;cursor:pointer;
+      font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+    }
+    .issue-count:hover { filter:brightness(1.1); }
 
     /* ══════════════════════════════════════════════════════════════════════
        Adaptive layer — phones, tablets, touch, reduced motion.
@@ -756,7 +795,7 @@
     /* Narrow enough that the process table would squash: let it scroll instead.
        Without the min-width the long script paths just wrap into a 6-line column. */
     @media (max-width: 1100px) {
-      .proc-table { min-width:1000px; }
+      .proc-table { min-width:880px; }
       .table-wrap { overflow:auto;-webkit-overflow-scrolling:touch; }
       .proc-table td:first-child { max-width:230px; }
       .proc-name, .proc-script { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
@@ -766,7 +805,7 @@
          are looking at a RAM figure with no idea whose it is. */
       .proc-table th:first-child, .proc-table td:first-child {
         position:sticky;left:0;z-index:2;background:var(--surface);
-        box-shadow:1px 0 0 var(--border-sm);
+        box-shadow:inset 3px 0 0 var(--rail, transparent), 1px 0 0 var(--border-sm);
       }
       .proc-table th:first-child { z-index:3; }
       .res-proc-scroll { overflow-x:auto; }
@@ -798,13 +837,13 @@
       .panel { padding:7px;gap:6px; }
       /* Every column still fits by scrolling, but shorten the trip: the script
          path is the one cell that is pure width and no information at a glance. */
-      .proc-table { min-width:800px; }
+      .proc-table { min-width:720px; }
       .proc-table td:first-child { max-width:150px; }
       .proc-script { display:none; }
       .stats-strip { flex-wrap:wrap;gap:6px; }
-      .stat-pill { flex:1 1 calc(50% - 3px);min-width:0;padding:9px 12px; }
-      .sp-val { font-size:19px; }
-      .sys-grid { grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); }
+      .stat-pill { flex:1 1 calc(50% - 3px);min-width:0;padding:7px 12px; }
+      .sp-val { font-size:16px; }
+      .sys-grid { grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); }
       .sm-val { font-size:20px; }
 
       /* Modals go full-screen — a centred 600px card on a 390px phone is a
@@ -866,16 +905,16 @@
 
         <div class="nav-tabs">
           <button class="nav-tab active" data-tab="processes"
-            onclick="switchTab('processes')">⚙ Processes</button>
+            onclick="switchTab('processes')">Processes</button>
           <button class="nav-tab" data-tab="issues"
             onclick="switchTab('issues')">
-            ⚠ Issues <span class="badge" id="issue-badge"
+            Issues <span class="badge" id="issue-badge"
               style="display:none">0</span>
           </button>
           <button class="nav-tab" data-tab="system"
-            onclick="switchTab('system')">📊 System</button>
+            onclick="switchTab('system')">System</button>
           <button class="nav-tab" data-tab="config"
-            onclick="switchTab('config')">🔧 Config</button>
+            onclick="switchTab('config')">Config</button>
         </div>
 
         <div class="nav-sys">
@@ -931,10 +970,10 @@
 
           <div class="card fill">
             <div class="card-hdr">
-              <div class="card-title">⚙ Processes</div>
+              <div class="card-title">Processes</div>
               <div style="display:flex;gap:6px">
-                <button class="btn sm" onclick="openColumnsModal()" title="Customize columns">⊞ Columns</button>
-                <button class="btn sm" onclick="refreshProcesses()">⟳ Refresh</button>
+                <button class="btn sm" onclick="openColumnsModal()" title="Choose and reorder columns">Columns</button>
+                <button class="btn sm" onclick="refreshProcesses()">Refresh</button>
               </div>
             </div>
             <div class="table-wrap">
@@ -1064,10 +1103,10 @@
           </div>
           <div class="card" style="flex-shrink:0">
             <div class="card-hdr">
-              <div class="card-title">🌐 Network</div>
+              <div class="card-title">Network</div>
               <div style="display:flex;gap:16px;font-size:11.5px;color:var(--t3)">
-                <span>↓ <span id="sys-net-rx" style="color:var(--green);font-weight:700;font-family:'JetBrains Mono',monospace">—</span></span>
-                <span>↑ <span id="sys-net-tx" style="color:var(--cyan);font-weight:700;font-family:'JetBrains Mono',monospace">—</span></span>
+                <span>↓ <span id="sys-net-rx" style="color:var(--green);font-weight:700;font-family:'IBM Plex Mono',monospace">—</span></span>
+                <span>↑ <span id="sys-net-tx" style="color:var(--cyan);font-weight:700;font-family:'IBM Plex Mono',monospace">—</span></span>
               </div>
             </div>
             <div class="net-grid">
@@ -1092,8 +1131,7 @@
             </div>
           </div>
           <div class="card fill">
-            <div class="card-hdr"><div class="card-title">💾 Disk
-                Usage</div></div>
+            <div class="card-hdr"><div class="card-title">Disk usage</div></div>
             <div class="disk-scroll" id="disk-list"></div>
           </div>
         </div>
@@ -1102,14 +1140,12 @@
         <div class="panel" id="tab-config">
           <div class="card fill">
             <div class="card-hdr">
-              <div class="card-title">🔧 Configuration</div>
+              <div class="card-title">Configuration</div>
               <div style="display:flex;gap:7px;align-items:center">
                 <span
                   style="font-size:11px;color:var(--t3)">~/.pm3/config.json</span>
-                <button class="btn sm danger" onclick="resetConfig()">↺
-                  Reset</button>
-                <button class="btn sm primary" onclick="saveConfig()">💾
-                  Save</button>
+                <button class="btn sm danger" onclick="resetConfig()">Reset to defaults</button>
+                <button class="btn sm primary" onclick="saveConfig()">Save changes</button>
               </div>
             </div>
             <div class="cfg-scroll" id="config-list">
@@ -1117,9 +1153,9 @@
                   class="empty-title">Loading config…</div><div
                   style="font-size:11.5px;color:var(--t4);margin-top:4px">If
                   this persists, run <code
-                    style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    style="font-family:'IBM Plex Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
                     kill</code> then <code
-                    style="font-family:'JetBrains Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    style="font-family:'IBM Plex Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
                     list</code> to restart the daemon.</div></div>
             </div>
           </div>
@@ -1132,7 +1168,7 @@
     <div class="modal-overlay" id="start-modal">
       <div class="modal">
         <div class="modal-hdr">
-          <div class="modal-title">＋ Start New Process</div>
+          <div class="modal-title">Start a process</div>
           <div class="modal-close" onclick="closeStartModal()">×</div>
         </div>
         <div class="modal-body">
@@ -1162,8 +1198,7 @@
           <div
             style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
             <button class="btn" onclick="closeStartModal()">Cancel</button>
-            <button class="btn primary" onclick="submitStart()">▶ Start
-              Process</button>
+            <button class="btn primary" onclick="submitStart()">Start process</button>
           </div>
         </div>
       </div>
@@ -1187,7 +1222,7 @@
           <div class="modal-title"
             style="display:flex;align-items:center;gap:8px">
             <div class="live-dot" id="logs-modal-dot"></div>
-            📋 <span id="logs-modal-title-name">Logs</span>
+            <span id="logs-modal-title-name">Logs</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <select class="form-input" id="logs-modal-select"
@@ -1257,17 +1292,17 @@
     <div class="modal-overlay" id="columns-modal">
       <div class="modal" style="width:380px">
         <div class="modal-hdr">
-          <div class="modal-title">⊞ Customize Columns</div>
+          <div class="modal-title">Columns</div>
           <div class="modal-close" onclick="closeColumnsModal()">×</div>
         </div>
         <div class="modal-body">
           <p style="font-size:11.5px;color:var(--t3);margin-bottom:12px">Drag to reorder · toggle checkbox to show/hide</p>
           <div id="columns-list"></div>
           <div style="display:flex;gap:8px;margin-top:14px;justify-content:space-between">
-            <button class="btn sm" onclick="resetColumnsToDefault()" style="color:var(--t3)">↺ Reset</button>
+            <button class="btn sm" onclick="resetColumnsToDefault()" style="color:var(--t3)">Reset</button>
             <div style="display:flex;gap:8px">
               <button class="btn" onclick="closeColumnsModal()">Cancel</button>
-              <button class="btn primary" onclick="saveColumnsModal()">💾 Save</button>
+              <button class="btn primary" onclick="saveColumnsModal()">Save</button>
             </div>
           </div>
         </div>
@@ -1278,7 +1313,7 @@
     <div class="modal-overlay" id="cpu-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">⚡ CPU Load Details</div>
+          <div class="modal-title">CPU</div>
           <div class="modal-close" onclick="closeCpuModal()">×</div>
         </div>
         <div class="modal-body" id="cpu-modal-body"></div>
@@ -1289,7 +1324,7 @@
     <div class="modal-overlay" id="mem-modal">
       <div class="modal mem-modal-wide">
         <div class="modal-hdr">
-          <div class="modal-title">💾 Memory Details</div>
+          <div class="modal-title">Memory</div>
           <div class="modal-close" onclick="closeMemModal()">×</div>
         </div>
         <div class="modal-body" id="mem-modal-body"></div>
@@ -1311,7 +1346,7 @@
     <div class="modal-overlay" id="drive-detail-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">💾 <span id="drive-detail-title">Drive</span></div>
+          <div class="modal-title"><span id="drive-detail-title">Drive</span></div>
           <div class="modal-close" onclick="closeDriveDetailModal()">×</div>
         </div>
         <div class="modal-body" id="drive-detail-body"></div>
@@ -1322,7 +1357,7 @@
     <div class="modal-overlay" id="iface-detail-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">🔌 <span id="iface-detail-title">Interface</span></div>
+          <div class="modal-title"><span id="iface-detail-title">Interface</span></div>
           <div class="modal-close" onclick="closeIfaceDetailModal()">×</div>
         </div>
         <div class="modal-body" id="iface-detail-body"></div>
@@ -1333,7 +1368,7 @@
     <div class="modal-overlay" id="runtime-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">⚙ Process Runtime</div>
+          <div class="modal-title">Process runtime</div>
           <div class="modal-close" onclick="closeRuntimeModal()">×</div>
         </div>
         <div class="modal-body" id="runtime-modal-body"></div>
@@ -1344,7 +1379,7 @@
     <div class="modal-overlay" id="storage-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">💾 Storage Details</div>
+          <div class="modal-title">Storage</div>
           <div class="modal-close" onclick="closeStorageModal()">×</div>
         </div>
         <div class="modal-body" id="storage-modal-body"></div>
@@ -1355,7 +1390,7 @@
     <div class="modal-overlay" id="net-modal">
       <div class="modal res-modal">
         <div class="modal-hdr">
-          <div class="modal-title">🌐 Network Details</div>
+          <div class="modal-title">Network</div>
           <div class="modal-close" onclick="closeNetModal()">×</div>
         </div>
         <div class="modal-body" id="net-modal-body"></div>
@@ -1484,10 +1519,11 @@ socket.on('issue:new', issue => {
   issues.unshift(issue);
   if (_maxIssuesCfg !== -1 && issues.length > _maxIssuesCfg) issues = issues.slice(0, _maxIssuesCfg);
   renderIssues();
+  if (processes[issue.processName]) renderProcessRow(processes[issue.processName]);   // its issue count
   const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
   if (activeTab !== 'issues') {
     const color = issue.severity === 'critical' ? 'error' : issue.severity === 'error' ? 'error' : 'info';
-    toast(`⚠ [${issue.severity}] ${issue.processName}: ${issue.message.slice(0, 60)}`, color);
+    toast(`${issue.processName}: ${issue.message.slice(0, 80)}`, color);
   }
 });
 socket.on('log:batch', batch => {
@@ -1557,7 +1593,7 @@ setInterval(async () => {
         const activeTab = document.querySelector('.nav-tab.active')?.dataset.tab;
         if (activeTab !== 'issues') {
           const color = iss.severity === 'warning' ? 'info' : 'error';
-          toast(`⚠ [${iss.severity}] ${iss.processName}: ${iss.message.slice(0, 60)}`, color);
+          toast(`${iss.processName}: ${iss.message.slice(0, 80)}`, color);
         }
       }
     }
@@ -1665,7 +1701,7 @@ function updateSysTab(data) {
   if (data.disk) document.getElementById('disk-list').innerHTML = data.disk.map(d => `
     <div style="padding:9px 14px;border-bottom:1px solid var(--border-sm)">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--t2)">${d.mount}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--t2)">${escapeHtml(d.mount)}${d.mounts && d.mounts.length > 1 ? `<span title="${escapeHtml(d.mounts.join(', '))}" style="color:var(--t4);font-family:'IBM Plex Sans',sans-serif"> and ${d.mounts.length - 1} more</span>` : ''}</span>
         <span style="font-size:11.5px;color:var(--t3)">${fmt(d.used)} / ${fmt(d.size)} · ${d.percent||0}%</span>
       </div>
       <div class="progress"><div class="progress-fill" style="width:${d.percent||0}%;background:${d.percent>85?'var(--red)':d.percent>65?'var(--yellow)':'var(--accent)'}"></div></div>
@@ -1677,14 +1713,14 @@ function renderProcesses() {
   const tbody = document.getElementById('proc-tbody');
   const empty = document.getElementById('proc-empty');
   const table = document.getElementById('proc-table');
-  if (!list.length) { tbody.innerHTML=''; table.style.display='none'; empty.style.display=''; return; }
-  table.style.display=''; empty.style.display='none'; tbody.innerHTML='';
-  list.forEach(p => {
-    const tr = document.createElement('tr');
-    tr.className = 'proc-row'; tr.id = `proc-row-${p.name}`;
-    tr.innerHTML = procRowHTML(p); tbody.appendChild(tr);
-  });
+  tbody.innerHTML = '';
+  if (!list.length) { table.style.display='none'; empty.style.display=''; return; }
+  table.style.display=''; empty.style.display='none';
+  list.forEach(renderProcessRow);
 }
+// Cells are diffed against what the row showed last, and only changed ones are replaced: a stats
+// tick costs a few cell swaps instead of rebuilding every row, uptime and issue counts stay live,
+// and a button under the pointer survives the tick instead of swallowing the click.
 function renderProcessRow(proc) {
   const table = document.getElementById('proc-table');
   const empty = document.getElementById('proc-empty');
@@ -1692,60 +1728,58 @@ function renderProcessRow(proc) {
   table.style.display=''; empty.style.display='none';
   let row = document.getElementById(`proc-row-${proc.name}`);
   if (!row) { row = document.createElement('tr'); row.className='proc-row'; row.id=`proc-row-${proc.name}`; document.getElementById('proc-tbody').appendChild(row); }
-  const hash = _procHash(proc);
-  if (row.dataset.hash === hash) return;
-  row.dataset.hash = hash;
-  row.innerHTML = procRowHTML(proc);
+  row.dataset.status = proc.status;
+  const cells = procCells(proc);
+  const prev = row._cells;
+  if (!prev || prev.length !== cells.length) { row.innerHTML = cells.join(''); row._cells = cells; return; }
+  const tpl = document.createElement('template');
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i] === prev[i]) continue;
+    tpl.innerHTML = cells[i];
+    row.replaceChild(tpl.content.firstElementChild, row.children[i]);
+  }
+  row._cells = cells;
 }
 function issueCountForProc(name) { return issues.filter(i => i.processName === name).length; }
 function issueIndicatorCell(name) {
   const procIssues = issues.filter(i => i.processName === name);
   if (!procIssues.length) return `<td class="mono" style="color:var(--t4)">—</td>`;
-  const hasCritical = procIssues.some(i => i.severity === 'critical');
-  const hasError    = procIssues.some(i => i.severity === 'error');
-  const color  = hasCritical ? 'var(--red)'    : hasError ? 'var(--yellow)'    : 'var(--cyan)';
-  const bg     = hasCritical ? 'rgba(220,38,38,0.13)' : hasError ? 'rgba(217,119,6,0.13)' : 'rgba(8,145,178,0.13)';
-  const border = hasCritical ? 'rgba(220,38,38,0.35)' : hasError ? 'rgba(217,119,6,0.35)' : 'rgba(8,145,178,0.35)';
-  return `<td onclick="event.stopPropagation();openIssuesFor('${name}')" style="cursor:pointer">
-    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;
-      border-radius:11px;background:${bg};border:1px solid ${border};color:${color};
-      font-weight:700;font-size:11px;padding:0 6px;font-family:'JetBrains Mono',monospace;
-      transition:opacity 0.15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">${procIssues.length}</span>
-  </td>`;
+  const sev = procIssues.some(i => i.severity === 'critical') ? 'critical'
+            : procIssues.some(i => i.severity === 'error') ? 'error' : 'warning';
+  return `<td><button class="issue-count severity-${sev}" title="Show issues for ${escapeHtml(name)}" onclick="event.stopPropagation();openIssuesFor(${jsArg(name)})">${procIssues.length}</button></td>`;
 }
 const COL_RENDERERS = {
-  name:         p => `<td><div class="proc-name">${p.name}</div><div class="proc-script">${p.script||''}</div></td>`,
+  name:         p => `<td><div class="proc-name">${escapeHtml(p.name)}</div><div class="proc-script" title="${escapeHtml(p.script||'')}">${escapeHtml(shortPath(p.script))}</div></td>`,
   status:       p => `<td><span class="status-pill status-${p.status}">${p.status}</span></td>`,
-  cpu:          p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.cpu!=null?p.cpu+'%':'—'}</td>`,
-  memory:       p => `<td class="mono stat-cell" title="View memory breakdown" onclick="event.stopPropagation();openProcMemModal('${encodeURIComponent(p.name)}')">${p.memory?p.memory+' MB':'—'}</td>`,
-  netRx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--green);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netRx!=null?fmtSpeed(p.netRx):'—'}</td>`,
-  netTx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--cyan);font-size:11px" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.netTx!=null?fmtSpeed(p.netTx):'—'}</td>`,
-  connections:  p => `<td class="mono stat-cell" title="View stats" style="color:var(--t3)" onclick="event.stopPropagation();openStatsModal('${p.name}')">${p.connections!=null?p.connections:'—'}</td>`,
+  cpu:          p => `<td class="mono stat-cell" title="View stats" onclick="event.stopPropagation();openStatsModal(${jsArg(p.name)})">${p.cpu!=null?p.cpu+'%':'—'}</td>`,
+  memory:       p => `<td class="mono stat-cell" title="View memory breakdown" onclick="event.stopPropagation();openProcMemModal(${jsArg(encodeURIComponent(p.name))})">${p.memory?p.memory+' MB':'—'}</td>`,
+  netRx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--green);font-size:11px" onclick="event.stopPropagation();openStatsModal(${jsArg(p.name)})">${p.netRx!=null?fmtSpeed(p.netRx):'—'}</td>`,
+  netTx:        p => `<td class="mono stat-cell" title="View stats" style="color:var(--cyan);font-size:11px" onclick="event.stopPropagation();openStatsModal(${jsArg(p.name)})">${p.netTx!=null?fmtSpeed(p.netTx):'—'}</td>`,
+  connections:  p => `<td class="mono stat-cell" title="View stats" style="color:var(--t3)" onclick="event.stopPropagation();openStatsModal(${jsArg(p.name)})">${p.connections!=null?p.connections:'—'}</td>`,
   uptime:       p => `<td class="mono">${formatUptime(p.uptime)}</td>`,
-  restartCount: p => `<td class="mono stat-cell" title="Click to reset to 0" onclick="event.stopPropagation();resetRestarts('${p.name}')">${p.restartCount}</td>`,
+  restartCount: p => `<td class="mono stat-cell" title="Click to reset to 0" onclick="event.stopPropagation();resetRestarts(${jsArg(p.name)})">${p.restartCount}</td>`,
   issues:       p => issueIndicatorCell(p.name),
   id:           p => `<td class="mono" style="color:var(--t4)">${p.id}</td>`,
   pid:          p => `<td class="mono" style="color:var(--t4)">${p.pid||'—'}</td>`,
-  actions:      p => `<td onclick="event.stopPropagation()">
-    <div class="proc-actions">
-      ${p.status==='running'||p.status==='starting'
-        ? `<button class="pab pab-stop"    onclick="procAction('stop','${p.name}')">■ Stop</button>`
-        : `<button class="pab pab-start"   onclick="procAction('start','${p.name}')">▶ Start</button>`}
-      <button class="pab pab-restart" onclick="procAction('restart','${p.name}')">↺ Restart</button>
-      <button class="pab pab-logs"    onclick="openLogsFor('${p.name}')">📋 Logs</button>
-      <button class="pab pab-issues"  onclick="openIssuesFor('${p.name}')">⚠ Issues</button>
-      <div class="sep"></div>
-      <button class="pab pab-gear"    onclick="openEditModal('${p.name}')" title="Edit settings">⚙</button>
-      <button class="pab pab-delete"  onclick="procAction('delete','${p.name}')">✕ Delete</button>
-    </div>
-  </td>`,
+  actions:      p => {
+    const n = jsArg(p.name), label = escapeHtml(p.name);
+    const active = p.status === 'running' || p.status === 'starting';
+    return `<td onclick="event.stopPropagation()"><div class="row-actions">
+      ${active
+        ? `<button class="ra halt" title="Stop" aria-label="Stop ${label}" onclick="procAction('stop',${n})">${ICONS.stop}</button>`
+        : `<button class="ra go" title="Start" aria-label="Start ${label}" onclick="procAction('start',${n})">${ICONS.play}</button>`}
+      <button class="ra" title="Restart" aria-label="Restart ${label}" onclick="procAction('restart',${n})">${ICONS.restart}</button>
+      <button class="ra" title="Logs" aria-label="Logs of ${label}" onclick="openLogsFor(${n})">${ICONS.logs}</button>
+      <button class="ra" title="Edit settings" aria-label="Edit ${label}" onclick="openEditModal(${n})">${ICONS.edit}</button>
+      <span class="sep"></span>
+      <button class="ra del" title="Delete" aria-label="Delete ${label}" onclick="procAction('delete',${n})">${ICONS.trash}</button>
+    </div></td>`;
+  },
 };
-function procRowHTML(p) {
-  return tableColumns.filter(c => c.visible).map(c => {
-    const r = COL_RENDERERS[c.key];
-    return r ? r(p) : '';
-  }).join('');
+function procCells(p) {
+  return tableColumns.filter(c => c.visible).map(c => (COL_RENDERERS[c.key] ? COL_RENDERERS[c.key](p) : ''));
 }
+function procRowHTML(p) { return procCells(p).join(''); }
 // ── Column customization ──────────────────────────
 function applyPrefs(prefs) {
   if (!prefs?.tableColumns) return;
@@ -1862,13 +1896,16 @@ async function resetRestarts(name) {
   } catch(e) { toast(e.message, 'error'); }
 }
 async function procAction(action, name) {
+  if (action === 'delete' && !confirm(`Delete "${name}"? It is stopped and removed from PM3. Its log files stay on disk.`)) return;
   const methods = {stop:'POST',restart:'POST',delete:'DELETE',start:'POST'};
-  const urls = {stop:`/api/processes/${name}/stop`,restart:`/api/processes/${name}/restart`,delete:`/api/processes/${name}`,start:`/api/processes/${name}/restart`};
+  const n = encodeURIComponent(name);
+  const urls = {stop:`/api/processes/${n}/stop`,restart:`/api/processes/${n}/restart`,delete:`/api/processes/${n}`,start:`/api/processes/${n}/restart`};
+  const done = {stop:'Stopped',restart:'Restarting',delete:'Deleted',start:'Starting'};
   try {
     const r = await fetch(urls[action],{method:methods[action]});
     const d = await r.json();
     if (d.error) { toast(d.error,'error'); return; }
-    toast(`"${name}" → ${action}`,'success');
+    toast(`${done[action]} "${name}"`,'success');
     if (action==='delete') { delete processes[name]; renderProcesses(); updateProcStats(); }
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1950,7 +1987,7 @@ function openLogsFor(name) {
   modal.classList.add('open');
   const sel = document.getElementById('logs-modal-select');
   sel.innerHTML = '<option value="">Select process…</option>' +
-    Object.keys(processes).map(n => `<option value="${n}"${n===name?' selected':''}>${n}</option>`).join('');
+    Object.keys(processes).map(n => `<option value="${escapeHtml(n)}"${n===name?' selected':''}>${escapeHtml(n)}</option>`).join('');
   if (name) {
     sel.value = name;
     loadModalLogs();
@@ -2023,7 +2060,7 @@ async function loadModalLogs() {
   modalLogLines.length = 0;
   _logRafQueue.length = 0;
   try {
-    const r = await fetch(`/api/logs/${name}?lines=200`);
+    const r = await fetch(`/api/logs/${encodeURIComponent(name)}?lines=200`);
     const d = await r.json();
     // Merge out + err, preserving type, sorted by timestamp prefix
     const outLines = d.out ? d.out.split('\n').filter(Boolean).map(l => ({ line: l, type: 'out' })) : [];
@@ -2293,8 +2330,11 @@ async function submitStart() {
   const script = document.getElementById('f-script').value.trim();
   if (!script) { toast('Script is required','error'); return; }
   const envRaw = document.getElementById('f-env').value.trim(); const env={};
-  if (envRaw) envRaw.split(',').forEach(pair=>{ const [k,v]=pair.split('='); if(k) env[k.trim()]=(v||'').trim(); });
-  const config = { script, name:document.getElementById('f-name').value.trim()||undefined, cwd:document.getElementById('f-cwd').value.trim()||undefined, maxRestarts:parseInt(document.getElementById('f-max-restarts').value)||15, memoryLimit:parseInt(document.getElementById('f-memory').value)||undefined, env };
+  // First '=' only: values such as base64 tokens contain more of them
+  if (envRaw) envRaw.split(',').forEach(pair=>{ const eq=pair.indexOf('='); const k=(eq<0?pair:pair.slice(0,eq)).trim(); if(k) env[k]=eq<0?'':pair.slice(eq+1).trim(); });
+  // Not `|| 15`: 0 is a real setting (never restart); an empty field leaves the default to the daemon
+  const mr = parseInt(document.getElementById('f-max-restarts').value, 10);
+  const config = { script, name:document.getElementById('f-name').value.trim()||undefined, cwd:document.getElementById('f-cwd').value.trim()||undefined, maxRestarts:Number.isNaN(mr)?undefined:mr, memoryLimit:parseInt(document.getElementById('f-memory').value)||undefined, env };
   try {
     const r = await fetch('/api/processes/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)});
     const d = await r.json();
@@ -2416,8 +2456,14 @@ function switchTab(name) {
 
 // ── Helpers ───────────────────────────────────────
 function toast(msg,type='info') {
-  const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg;
-  document.getElementById('toast-container').appendChild(el); setTimeout(()=>el.remove(),3200);
+  const box = document.getElementById('toast-container');
+  // An app printing errors in a loop raises an issue per chunk: repeats count up in place,
+  // and at most four toasts stack instead of a column running off the screen.
+  const same = [...box.children].find(t => t.dataset.msg === msg);
+  if (same) { same.dataset.n = (+same.dataset.n || 1) + 1; same.textContent = `${msg}  ×${same.dataset.n}`; return; }
+  while (box.children.length >= 4) box.firstChild.remove();
+  const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg; el.dataset.msg=msg;
+  box.appendChild(el); setTimeout(()=>el.remove(),3200);
 }
 
 function _showToolsNotifications() {
@@ -2458,9 +2504,9 @@ function _showToolsNotifications() {
         <div style="font-size:11px;color:var(--t3);margin-top:1px">${escapeHtml(n.msg)}</div>
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px">
           <span style="font-size:10px;color:var(--t4)">Run</span>
-          <code style="font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px">pm3 doctor</code>
+          <code style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--accent);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px">pm3 doctor</code>
           <span style="font-size:10px;color:var(--t4)">for full diagnostics</span>
-          ${n.fix ? `<span style="font-size:10px;color:var(--t4);margin-left:2px">·</span><code style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px;word-break:break-all">${escapeHtml(n.fix)}</code>` : ''}
+          ${n.fix ? `<span style="font-size:10px;color:var(--t4);margin-left:2px">·</span><code style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--t3);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px;word-break:break-all">${escapeHtml(n.fix)}</code>` : ''}
         </div>
       </div>
       <button onclick="this.closest('.tools-notice').remove()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`;
@@ -2495,7 +2541,7 @@ function renderUpdate(u) {
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:12px;color:var(--t1)">${escapeHtml(title)}</div>
         <div style="font-size:11px;color:var(--t3);margin-top:1px;word-break:break-word">${escapeHtml(msg)}</div>
-        ${commits ? `<div style="margin-top:5px;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--t3)">${commits}</div>` : ''}
+        ${commits ? `<div style="margin-top:5px;font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--t3)">${commits}</div>` : ''}
       </div>
       ${u.updating ? '' : `<button class="btn primary" onclick="runUpdate()">${u.error ? 'Retry' : 'Update now'}</button>
       <button onclick="dismissUpdate()" title="Hide until the next version" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`}
@@ -2523,6 +2569,24 @@ function formatDate(iso) { return new Date(iso).toLocaleString(); }
 function fmt(bytes) { if(!bytes) return '0 B'; const gb=bytes/1024/1024/1024; if(gb>=1) return gb.toFixed(1)+' GB'; return Math.round(bytes/1024/1024)+' MB'; }
 function fmtSpeed(bps) { if(!bps) return '0 B/s'; if(bps>=1048576) return (bps/1048576).toFixed(1)+' MB/s'; if(bps>=1024) return (bps/1024).toFixed(0)+' KB/s'; return bps+' B/s'; }
 function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// An argument for an inline onclick: JSON makes it a valid JS string, escaping keeps it inside the
+// attribute. The old '${name}' broke every button on a row whose process name held a quote.
+function jsArg(s) { return escapeHtml(JSON.stringify(String(s))); }
+// The last two path segments; the full path stays in the cell's tooltip
+function shortPath(p) {
+  if (!p) return '';
+  const parts = String(p).split('/');
+  return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : String(p);
+}
+const _sv = (body, fill) => `<svg viewBox="0 0 20 20" aria-hidden="true" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'}>${body}</svg>`;
+const ICONS = {
+  play:    _sv('<path d="M6.5 4.2v11.6a.6.6 0 0 0 .9.5l9.3-5.8a.6.6 0 0 0 0-1L7.4 3.7a.6.6 0 0 0-.9.5z"/>', true),
+  stop:    _sv('<rect x="5" y="5" width="10" height="10" rx="1.8"/>', true),
+  restart: _sv('<path d="M15.5 10.5a5.5 5.5 0 1 1-1.6-4.4"/><path d="M14.2 2.8v3.6h-3.6"/>'),
+  logs:    _sv('<path d="M4 5.5h12M4 10h12M4 14.5h7"/>'),
+  edit:    _sv('<path d="M12.8 4.2l3 3L7.5 15.5H4.5v-3z"/>'),
+  trash:   _sv('<path d="M4 6h12M8 6V4.5h4V6M6 6l.8 9.5h6.4L14 6"/>'),
+};
 function flashHighlight(el, delay=0) {
   if (!el) return;
   const run = () => {
@@ -2544,10 +2608,6 @@ let logPaused = false;
 const pausedLogQueue = [];    // holds { line, type } entries received while paused
 const LOG_TS_RE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]\s*/;
 
-// ── Row hash — skip re-render when nothing visible changed ────────────────
-function _procHash(p) {
-  return `${p.status}|${p.cpu}|${p.memory}|${p.netRx}|${p.netTx}|${p.connections}|${p.restartCount}`;
-}
 
 // ── Memory split history (Phase 0) ────────────────
 // Summed across managed processes, driven by the stats broadcast. The daemon refreshes
@@ -2662,7 +2722,7 @@ function renderChart(values, color, chartId, unit, chartH) {
   // Map it to 0 rather than dropping it, so the time axis stays aligned.
   values = values.map(v => Number.isFinite(+v) ? +v : 0);
   if (!values.length) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
-    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
+    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="IBM Plex Sans,sans-serif">No data yet…</text></svg>`;
   const dataMax = Math.max(...values, 1);
   const max = unit === '%' ? 100 : dataMax;
   // No rounding: with ~90 samples across 624 units the spacing is ~7 units, so rounding
@@ -2700,7 +2760,7 @@ function renderStackedChart(series, chartId, chartH) {
   const cW = CHART_CW;
   const n = Math.max(...series.map(s => s.values.length), 0);
   if (!n) return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
-    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="Inter,sans-serif">No data yet…</text></svg>`;
+    <text x="${cW/2}" y="${H/2+4}" text-anchor="middle" style="fill:var(--t4)" font-size="11" font-family="IBM Plex Sans,sans-serif">No data yet…</text></svg>`;
 
   // Cumulative totals, so each band sits on top of the ones below it.
   const num = v => Number.isFinite(+v) ? +v : 0;
@@ -2782,7 +2842,7 @@ function _buildStatsModal() {
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Connections
-          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1)" id="sm-conn-cur">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1)" id="sm-conn-cur">—</span>
           <span class="chart-stats" id="sm-conn-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-conn-area">
@@ -2793,7 +2853,7 @@ function _buildStatsModal() {
       </div>
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↓
-          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--green)" id="sm-net-rx">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--green)" id="sm-net-rx">—</span>
           <span class="chart-stats" id="sm-netrx-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-netrx-area">
@@ -2804,7 +2864,7 @@ function _buildStatsModal() {
       </div>
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↑
-          <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--cyan)" id="sm-net-tx">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--cyan)" id="sm-net-tx">—</span>
           <span class="chart-stats" id="sm-nettx-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-nettx-area">
@@ -2992,7 +3052,7 @@ function _tickStatsModal() {
     ? `<div style="grid-column:1/-1;margin-top:2px">
         <div class="stat-kv-label">Environment</div>
         <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
-          ${envEntries.map(([k,v])=>`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;background:var(--g2);border:1px solid var(--border-sm);border-radius:4px;padding:1px 6px;color:var(--t2)">${escapeHtml(k)}=<span style="color:var(--accent)">${escapeHtml(String(v))}</span></span>`).join('')}
+          ${envEntries.map(([k,v])=>`<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;background:var(--g2);border:1px solid var(--border-sm);border-radius:4px;padding:1px 6px;color:var(--t2)">${escapeHtml(k)}=<span style="color:var(--accent)">${escapeHtml(String(v))}</span></span>`).join('')}
         </div>
       </div>`
     : '';
@@ -3125,8 +3185,8 @@ function _pm3DetailHtml(modal, p) {
     <div class="rpd-lbl" style="margin-bottom:3px">Script</div>
     <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
     <div style="display:flex;gap:7px">
-      <button class="btn sm primary" onclick="event.stopPropagation();openStatsFromRes('${escapeHtml(p.name)}')">📊 Full stats</button>
-      <button class="btn sm" onclick="event.stopPropagation();openLogsFromRes('${escapeHtml(p.name)}')">📋 Logs</button>
+      <button class="btn sm primary" onclick="event.stopPropagation();openStatsFromRes(${jsArg(p.name)})">📊 Full stats</button>
+      <button class="btn sm" onclick="event.stopPropagation();openLogsFromRes(${jsArg(p.name)})">📋 Logs</button>
     </div>`);
 }
 
@@ -3184,7 +3244,7 @@ function _memSplitDetailHtml(p) {
       <div style="display:flex;align-items:center;gap:7px">
         ${_trackSortToggle()}
         <button class="btn sm" title="Measures every structure in turn, never in parallel — v8.serialize allocates a buffer as large as the structure it measures"
-          onclick="event.stopPropagation();measureAllStructures('${encodeURIComponent(p.name)}',this)">📐 Measure all</button>
+          onclick="event.stopPropagation();measureAllStructures(${jsArg(encodeURIComponent(p.name))},this)">📐 Measure all</button>
       </div>
     </div>
     ${_sortTracked(d.tracked).map(t => `<div class="mem-track-row">
@@ -3195,7 +3255,7 @@ function _memSplitDetailHtml(p) {
         : t.bytesError ? ` title="cannot be sized: ${escapeHtml(t.bytesError)}"` : ''}>${
         t.bytes != null ? _bytesTxt(t.bytes) + (t.bytesAt ? ' *' : '') : t.bytesError ? 'n/a' : ''}</span>
       <button class="btn sm" title="v8.serialize allocates a buffer as large as the structure — one at a time, on demand"
-        onclick="event.stopPropagation();measureStructure('${encodeURIComponent(p.name)}','${encodeURIComponent(t.name)}',this)">Measure size</button>
+        onclick="event.stopPropagation();measureStructure(${jsArg(encodeURIComponent(p.name))},'${encodeURIComponent(t.name)}',this)">Measure size</button>
     </div>`).join('')}` : (d.source === 'agent'
       ? `<div class="mem-note">No structures registered. Call <code>pm3.track('name', () => value)</code> in the app to name them.</div>` : '');
   return `
@@ -3315,8 +3375,8 @@ function _tickProcMemModal() {
     <div class="rpd-lbl" style="margin:8px 0 3px">Script</div>
     <div class="rpd-cmd">${escapeHtml(p.script || '—')}</div>
     <div style="display:flex;gap:7px">
-      <button class="btn sm primary" onclick="closeProcMemModal();openStatsModal('${escapeHtml(p.name)}')">📊 Full stats</button>
-      <button class="btn sm" onclick="closeProcMemModal();openLogsFor('${escapeHtml(p.name)}')">📋 Logs</button>
+      <button class="btn sm primary" onclick="closeProcMemModal();openStatsModal(${jsArg(p.name)})">📊 Full stats</button>
+      <button class="btn sm" onclick="closeProcMemModal();openLogsFor(${jsArg(p.name)})">📋 Logs</button>
     </div>`;
 }
 
@@ -3535,7 +3595,7 @@ function _tickCpuModal() {
     const cache = ci.cache || {};
     hwSection.innerHTML = `
       <div style="display:flex;align-items:center;padding:6px 0 4px;border-top:1px solid var(--border-sm);margin-top:6px">
-        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">CPU Hardware</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px">CPU Hardware</span>
       </div>
       <div class="hw-info-grid">
         ${ci.brand ? `<div class="hw-box" style="grid-column:span 2"><div class="hw-lbl">Model</div><div class="hw-val" style="font-size:11px">${escapeHtml(ci.manufacturer||'')} ${escapeHtml(ci.brand||'')}</div></div>` : ''}
@@ -3585,7 +3645,7 @@ function _tickCpuModal() {
     }
     coresSection.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 5px">
-        <span style="font-size:9.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">
+        <span style="font-size:9.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px">
           ${coreView === 'core' && canToggle ? `Physical cores (${physCores})` : `Logical threads (${threads.length})`}
         </span>
         ${canToggle ? `<div class="res-mode-toggle">
@@ -3880,7 +3940,7 @@ function _tickMemModal() {
     const totalSize = layout.filter(m => m.size > 0).reduce((s, m) => s + m.size, 0);
     layoutSection.innerHTML = `
       <div style="display:flex;align-items:center;padding:6px 0 4px;border-top:1px solid var(--border-sm);margin-top:6px">
-        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Memory Hardware</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px">Memory Hardware</span>
       </div>
       <div class="hw-info-grid">
         ${types ? `<div class="hw-box"><div class="hw-lbl">Type</div><div class="hw-val" style="color:var(--accent2)">${escapeHtml(types)}</div></div>` : ''}
@@ -4016,11 +4076,11 @@ function _tickNetModal() {
       </div>
       <div class="res-stat-box">
         <div class="res-stat-lbl">Default Gateway</div>
-        <div class="res-stat-val" style="font-size:12px;font-family:'JetBrains Mono',monospace">${escapeHtml(d.gateway||'—')}</div>
+        <div class="res-stat-val" style="font-size:12px;font-family:'IBM Plex Mono',monospace">${escapeHtml(d.gateway||'—')}</div>
       </div>
       <div class="res-stat-box">
         <div class="res-stat-lbl">DNS Servers</div>
-        <div class="res-stat-val" style="font-size:11px;font-family:'JetBrains Mono',monospace;line-height:1.4">${escapeHtml((d.dns||[]).slice(0,3).join('\n')||'—')}</div>
+        <div class="res-stat-val" style="font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.4">${escapeHtml((d.dns||[]).slice(0,3).join('\n')||'—')}</div>
       </div>
     </div>`);
 }
@@ -4047,8 +4107,8 @@ function _renderIfaceList() {
         <div style="font-size:10px;color:var(--t4);margin-top:1px">${escapeHtml(i.type||'—')}${speedLabel?' · '+speedLabel:''}</div>
       </div>
       <div style="min-width:0">
-        <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t1)">${escapeHtml(i.ip4||'—')}</div>
-        <div style="font-size:9.5px;color:var(--t4);font-family:'JetBrains Mono',monospace">${escapeHtml(i.mac||'—')}</div>
+        <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--t1)">${escapeHtml(i.ip4||'—')}</div>
+        <div style="font-size:9.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace">${escapeHtml(i.mac||'—')}</div>
       </div>
       <div style="font-size:10px;color:var(--accent);white-space:nowrap">Details →</div>
     </div>`;
@@ -4281,7 +4341,7 @@ function _renderRuntimeProcList() {
     const list = [..._sysProcs].sort((a,b)=>runtimeSortDesc?b.cpu-a.cpu:a.cpu-b.cpu).slice(0,50);
     container.innerHTML = list.map(p => {
       const key = 'sys_'+p.pid, isExp = runtimeExpanded===key;
-      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleRuntimeExpand('${key}')">
+      return `<div class="res-proc-row${isExp?' expanded':''}" onclick="toggleRuntimeExpand(${jsArg(key)})">
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script">${escapeHtml(p.user)} · PID ${p.pid}</div></div>
         <div class="rp-val" style="color:var(--accent)">${p.cpu}%</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${Math.min(100,Math.round(p.cpu*2))}%;background:var(--accent)"></div></div>
@@ -4297,7 +4357,7 @@ function _renderRuntimeProcList() {
     container.innerHTML = list.map(p => {
       const key = 'pm3_'+p.name, isExp = runtimeExpanded===key;
       const sCol = p.status==='running'?'var(--green)':p.status==='crashed'?'var(--red)':'var(--t3)';
-      return `<div class="res-proc-row${isExp?' expanded':''}" id="rm-row-${key}" onclick="toggleRuntimeExpand('${key}')">
+      return `<div class="res-proc-row${isExp?' expanded':''}" id="rm-row-${key}" onclick="toggleRuntimeExpand(${jsArg(key)})">
         <div class="rp-name"><div class="res-proc-name">${escapeHtml(p.name)}</div><div class="res-proc-script"><span style="color:${sCol}">${p.status}</span></div></div>
         <div class="rp-val" style="font-size:11px">${formatUptime(p.uptime)}</div>
         <div class="rp-bar"><div class="rp-bar-fill" style="width:${Math.min(100,Math.round((p.cpu||0)*1.5))}%;background:var(--accent)"></div></div>
@@ -4344,7 +4404,7 @@ function _tickRuntimeModal() {
     const u = rd.uptime;
     set('rm-uptime-section', `
       <div style="display:flex;align-items:center;padding:5px 0 4px;border-top:1px solid var(--border-sm);margin:4px 0">
-        <span style="font-size:10.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Uptime &amp; Timeline</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px">Uptime &amp; Timeline</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:8px">
         <div class="res-stat-box"><div class="res-stat-lbl">System Uptime</div><div class="res-stat-val" style="font-size:13px;color:var(--green)">${formatUptime(u.system)}</div><div class="res-stat-sub" style="font-size:8.5px">${new Date(u.bootTime*1000).toLocaleString()}</div></div>
@@ -4489,7 +4549,7 @@ function _renderDiskList() {
         ${dk.temperature!=null?`<div style="font-size:10px;color:${tCl};margin-top:1px">🌡 ${dk.temperature}°C</div>`:''}
       </div>
       <div style="text-align:right">
-        <div style="font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace">${fmt(dk.size)}</div>
+        <div style="font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace">${fmt(dk.size)}</div>
         <div style="font-size:10px;color:${sCl};font-weight:600;margin-top:2px">SMART: ${escapeHtml(smartLabel)}</div>
         <div style="font-size:10px;color:var(--accent);margin-top:2px">Details →</div>
       </div>
@@ -4635,28 +4695,28 @@ function openEditModal(name) {
   body.innerHTML = `
     <div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 16px 12px;margin:-16px -16px 16px;background:var(--g3);border-bottom:1px solid var(--border-sm);border-radius:var(--r) var(--r) 0 0">
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Status</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Status</span>
         <span id="els-status" class="status-pill status-${proc.status}" style="font-size:10px">${proc.status}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">CPU</span>
-        <span id="els-cpu" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)">${proc.cpu != null ? proc.cpu + '%' : '—'}</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">CPU</span>
+        <span id="els-cpu" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--accent)">${proc.cpu != null ? proc.cpu + '%' : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">RAM</span>
-        <span id="els-mem" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent2)">${proc.memory ? proc.memory + ' MB' : '—'}</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">RAM</span>
+        <span id="els-mem" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--accent2)">${proc.memory ? proc.memory + ' MB' : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Net ↓</span>
-        <span id="els-netrx" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green)">${proc.netRx != null ? fmtSpeed(proc.netRx) : '—'}</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Net ↓</span>
+        <span id="els-netrx" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--green)">${proc.netRx != null ? fmtSpeed(proc.netRx) : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Net ↑</span>
-        <span id="els-nettx" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--cyan)">${proc.netTx != null ? fmtSpeed(proc.netTx) : '—'}</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Net ↑</span>
+        <span id="els-nettx" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--cyan)">${proc.netTx != null ? fmtSpeed(proc.netTx) : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:9px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Sockets</span>
-        <span id="els-conn" style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--t2)">${proc.connections != null ? proc.connections : '—'}</span>
+        <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Sockets</span>
+        <span id="els-conn" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--t2)">${proc.connections != null ? proc.connections : '—'}</span>
       </div>
     </div>
     <div class="form-group">
@@ -4667,7 +4727,7 @@ function openEditModal(name) {
       <div class="form-group">
         <label class="form-label">Max Restarts</label>
         <input class="form-input" id="edit-max-restarts" type="number" min="-1" value="${proc.maxRestarts ?? 15}" oninput='if(+this.value<-1)this.value=-1' />
-        <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'JetBrains Mono',monospace">
+        <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'IBM Plex Mono',monospace">
           <span style="color:var(--accent)">-1</span> = infinite &nbsp;·&nbsp;
           <span style="color:var(--t3)">0</span> = no restarts &nbsp;·&nbsp;
           <span style="color:var(--t3)">N</span> = up to N times
@@ -4689,9 +4749,9 @@ function openEditModal(name) {
     <div class="form-group">
       <label class="form-label">Environment variables</label>
       <textarea class="form-input" id="edit-env" rows="6" spellcheck="false"
-        style="font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.55;resize:vertical;white-space:pre"
+        style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.55;resize:vertical;white-space:pre"
         placeholder="MALLOC_ARENA_MAX=2&#10;NODE_ENV=production">${escapeHtml(_envToText(proc.env))}</textarea>
-      <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'JetBrains Mono',monospace">
+      <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'IBM Plex Mono',monospace">
         One <span style="color:var(--accent)">KEY=value</span> per line · overrides only, the rest is
         inherited from the daemon · <span style="color:var(--yellow)">applied on the next restart</span>
       </div>

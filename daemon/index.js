@@ -112,6 +112,29 @@ app.use(express.json());
 if (userConfig.get('autoResurrect') !== false) {
   pm.resurrect();
 }
+pm.pruneMemHistory();
+
+// Disk usage spawns `df` and barely moves; `pm3 monit` alone asks for it every 2 s.
+let _fsCache = null;
+let _fsTs = 0;
+async function _fsSize() {
+  if (!_fsCache || Date.now() - _fsTs > 30000) { _fsCache = await si.fsSize(); _fsTs = Date.now(); }
+  return _fsCache;
+}
+
+// btrfs subvolumes and bind mounts report the same filesystem once per mount point (seven times
+// on a default btrfs install). Show each device once, with every place it is mounted.
+function _dedupeFs(list) {
+  const byDev = new Map();
+  for (const f of list) {
+    if (!f.size || _FS_SKIP_TYPES.has(f.type)) continue;
+    const seen = byDev.get(f.fs);
+    if (!seen) { byDev.set(f.fs, { ...f, mounts: [f.mount] }); continue; }
+    seen.mounts.push(f.mount);
+    if (f.mount.length < seen.mount.length) seen.mount = f.mount;
+  }
+  return [...byDev.values()];
+}
 
 // --- API Routes ---
 
@@ -267,7 +290,7 @@ app.post('/api/config/reset', (req, res) => {
 app.get('/api/system', async (req, res) => {
   try {
     const [cpu, mem, disk, cpuStatic, temp, freq] = await Promise.all([
-      sys.currentLoad(), si.mem(), si.fsSize(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
+      sys.currentLoad(), si.mem(), _fsSize(), _getCpuStatic(), _getCpuTemp(), _getCpuFreq(),
     ]);
     await _pollNetSpeed();
     const tempData = temp && temp.main != null ? {
@@ -311,11 +334,12 @@ app.get('/api/system', async (req, res) => {
         active: mem.active || 0,
         free: mem.free || 0,
       },
-      disk: disk.map(d => ({
+      disk: _dedupeFs(disk).map(d => ({
         fs: d.fs,
         size: d.size,
         used: d.used,
         mount: d.mount,
+        mounts: d.mounts,
         percent: d.use,
       })),
       loadAverage: cpu.avgLoad,
@@ -562,20 +586,19 @@ app.get('/api/system/storage', async (req, res) => {
       return res.json(_storageCache);
     }
     const [[sizes, layout], tools, nvmeTemps] = await Promise.all([
-      Promise.all([si.fsSize(), si.diskLayout()]),
+      Promise.all([_fsSize(), si.diskLayout()]),
       _checkTools(),
       Promise.resolve(_getNvmeSysfsTemps()),
     ]);
-    const fsList = sizes.filter(f =>
+    const fsList = _dedupeFs(sizes.filter(f =>
       f.size > 10 * 1024 * 1024 &&
-      !_FS_SKIP_TYPES.has(f.type) &&
       !f.mount.startsWith('/sys') &&
       !f.mount.startsWith('/proc') &&
       !f.mount.startsWith('/dev')
-    ).map(f => ({
+    )).map(f => ({
       fs: f.fs, type: f.type||null, size: f.size, used: f.used,
       available: f.available ?? Math.max(0, f.size - f.used),
-      use: f.use||0, mount: f.mount, rw: f.rw,
+      use: f.use||0, mount: f.mount, mounts: f.mounts, rw: f.rw,
     }));
     const canUseSudo = tools.smartmontools?.usesSudo === true;
     const disks = await Promise.all(layout.map(async d => {

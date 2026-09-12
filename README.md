@@ -100,7 +100,8 @@ and restarts exactly that set. A process you stopped by hand is not flagged and 
 --env <KEY=VAL,...>     Environment variables
 --watch                 Watch files, auto-restart on change
 --no-autorestart        Disable crash auto-restart
---max-restarts <n>      Max restart attempts  (default: 15)
+--max-restarts <n>      Max crashes in a row before giving up  (default: 15, -1 = never give up;
+                        a run that lasted over a minute resets the count)
 --memory-limit <mb>     Auto-restart if RAM exceeds this limit
 ```
 

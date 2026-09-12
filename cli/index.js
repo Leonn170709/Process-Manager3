@@ -423,7 +423,7 @@ program
 
       console.log(boxBlank(W));
       console.log(boxBot(W));
-      console.log(chalk.dim(`\n  Refreshing every 2s`));
+      console.log(chalk.dim(`\n  Refreshing every ${(cfg.get('monitorInterval') ?? 2000) / 1000}s`));
     };
 
     await render();
@@ -447,7 +447,7 @@ program
   .description('Show detailed process status')
   .action(async (id) => {
     await ensureDaemon();
-    const p = await api('get', `/api/processes/${id}`);
+    const p = await api('get', `/api/processes/${encodeURIComponent(id)}`);
     if (p.error) return fail(p.error);
 
     const W = Math.min(termW(), 66);
@@ -507,7 +507,7 @@ program
   .option('-f, --follow',    'Follow output live')
   .action(async (id, opts) => {
     await ensureDaemon();
-    const result = await api('get', `/api/logs/${id}?lines=${opts.lines}`);
+    const result = await api('get', `/api/logs/${encodeURIComponent(id)}?lines=${opts.lines}`);
     if (result.error) return fail(result.error);
 
     const W = termW();
@@ -530,10 +530,13 @@ program
       console.log('  ' + chalk.dim('Following  -  Ctrl+C to stop'));
       console.log('  ' + chalk.dim('─'.repeat(W - 2)));
       nl();
-      socket.on('log', data => {
-        if (data.name !== id && data.name !== result.name) return;
-        const line = '  ' + data.line;
-        console.log(data.type === 'err' ? chalk.red(line) : line);
+      // The daemon batches log lines into one event per 50 ms window
+      socket.on('log:batch', batch => {
+        for (const data of batch) {
+          if (data.name !== id && data.name !== result.name) continue;
+          const line = '  ' + data.line;
+          console.log(data.type === 'err' ? chalk.red(line) : line);
+        }
       });
     } else {
       nl();
@@ -559,8 +562,9 @@ program
     await ensureDaemon();
     const env = {};
     if (opts.env) opts.env.split(',').forEach(pair => {
-      const [k, v] = pair.split('=');
-      if (k) env[k.trim()] = (v || '').trim();
+      const eq = pair.indexOf('=');   // first '=' only: values like base64 tokens contain more
+      const k = eq === -1 ? pair : pair.slice(0, eq);
+      if (k.trim()) env[k.trim()] = eq === -1 ? '' : pair.slice(eq + 1).trim();
     });
     const path = require('path');
     const fs   = require('fs');
@@ -608,7 +612,7 @@ program
   .description('Stop a process')
   .action(async (id) => {
     await ensureDaemon();
-    const r = await api('post', `/api/processes/${id}/stop`);
+    const r = await api('post', `/api/processes/${encodeURIComponent(id)}/stop`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.gray('stopped'));
     if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
@@ -619,7 +623,7 @@ program
   .description('Restart a process')
   .action(async (id) => {
     await ensureDaemon();
-    const r = await api('post', `/api/processes/${id}/restart`);
+    const r = await api('post', `/api/processes/${encodeURIComponent(id)}/restart`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.cyan('restarting…'));
     if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
@@ -630,7 +634,7 @@ program
   .description('Delete a process')
   .action(async (id) => {
     await ensureDaemon();
-    const r = await api('delete', `/api/processes/${id}`);
+    const r = await api('delete', `/api/processes/${encodeURIComponent(id)}`);
     if (r.error) return fail(r.error);
     ok(chalk.bold(r.name) + '  ' + chalk.red('deleted'));
     if (cfg.get('autoSave')) { await api('post', '/api/save'); hint(`Auto-saved  ${chalk.dim(PATHS.processes)}`); }
@@ -645,7 +649,7 @@ program
   .description('Full process info as JSON')
   .action(async (id) => {
     await ensureDaemon();
-    const r = await api('get', `/api/processes/${id}`);
+    const r = await api('get', `/api/processes/${encodeURIComponent(id)}`);
     if (r.error) return fail(r.error);
     console.log(JSON.stringify(r, null, 2));
   });
@@ -760,7 +764,9 @@ program
             warn('PM3 is already configured to start on boot  ' + chalk.dim('(crontab)'));
             hint('Run  pm3 unstartup  to remove it.');
           } else {
-            execSync(`(crontab -l 2>/dev/null; echo "${entry}") | crontab -`);
+            // Through stdin, not a shell string: paths with spaces or quotes would break it
+            const base = crontab && !crontab.endsWith('\n') ? crontab + '\n' : crontab;
+            execSync('crontab -', { input: base + entry + '\n' });
             ok('Added PM3 to crontab (@reboot)');
             hint('Run  pm3 save  to persist your current processes.');
           }
@@ -823,7 +829,8 @@ program
           const entryOld = `@reboot ${nodeBin} ${pm3Bin} resurrect`;
           const ct = execSync('crontab -l 2>/dev/null', { encoding:'utf8' });
           const filtered = ct.split('\n').filter(l => { const t = l.trim(); return t !== entryNew && t !== entryOld; }).join('\n');
-          execSync(`printf '%s\n' ${JSON.stringify(filtered)} | crontab -`);
+          // Through stdin: in a shell string, $VARS and backticks in other entries got expanded
+          execSync('crontab -', { input: filtered.replace(/\n*$/, '\n') });
           ok('Removed PM3 from crontab');
         } catch (err) { fail('Failed to update crontab: ' + err.message); }
       }

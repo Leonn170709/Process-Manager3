@@ -300,6 +300,13 @@ function drop(name) {
   if (history[name]) { delete history[name]; historyDirty = true; }
 }
 
+function prune(keepNames) {
+  const keep = new Set(keepNames);
+  for (const name of Object.keys(history)) {
+    if (!keep.has(name)) { delete history[name]; historyDirty = true; }
+  }
+}
+
 // Keep it in memory, flush occasionally — a sample every 12 s is not worth a write each time.
 // The daemon also calls this on shutdown so a restart does not lose the last few minutes.
 function flush() {
@@ -312,7 +319,7 @@ setInterval(flush, FLUSH_MS).unref();
 module.exports = {
   POLL_MS,
   pollAll, pollOne, deepSize, flush,
-  onAgentMessage, noteStderr, isInspectorNoise, forget, rename, drop,
+  onAgentMessage, noteStderr, isInspectorNoise, forget, rename, drop, prune,
   get: name => detail[name] || null,
   getHistory: name => history[name] || [],
   all: () => detail,

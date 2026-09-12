@@ -4,7 +4,6 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const pidusage = require('pidusage');
-const chokidar = require('chokidar');
 
 const { STATUS, SEVERITY } = require('../config/constants');
 const storage = require('../storage');
@@ -26,6 +25,17 @@ const runtime = {};
 
 // Previous /proc/<pid>/io snapshots for computing per-process network delta
 const prevProcIO = {}; // { pid: { rchar, wchar, read_bytes, write_bytes, ts } }
+
+// Consecutive quick crashes per name. maxRestarts caps a crash LOOP, not a lifetime: a run that
+// lasted STABLE_MS starts a fresh streak, so a bot that crashes once a week is not abandoned
+// for good after its 15th crash.
+const _crashStreak = {};
+const STABLE_MS = 60 * 1000;
+
+// Names with a restart waiting on the old child's exit. A second restart meanwhile (double
+// click, watch burst, memory check) would spawn another child and orphan the first one,
+// untracked and still holding its port.
+const _restarting = new Set();
 
 // Event emitter for broadcasting to dashboard
 let _emitter = null;
@@ -92,9 +102,14 @@ function _sanitizeEnv(raw) {
 // --- Start process ---
 function startProcess(config, savedConfig = {}) {
   const procs = storage.loadProcesses();
+  // A second start under a running name would overwrite its record and orphan the first
+  // child, still holding its port. A stopped one is simply replaced, keeping its id.
+  if (config.name && runtime[config.name]) {
+    return { error: `"${config.name}" is already running - restart it instead` };
+  }
 
   // Build process record
-  const id = config.id !== undefined ? config.id : generateId();
+  const id = config.id !== undefined ? config.id : (procs[config.name]?.id ?? generateId());
   const name = config.name || `pm3-${id}`;
   const { cmd, args } = parseCommand(config.script);
   const extraArgs = config.args || savedConfig.args || [];
@@ -105,7 +120,9 @@ function startProcess(config, savedConfig = {}) {
   const { env, error: envError } = _sanitizeEnv(config.env || savedConfig.env || {});
   if (envError) return { error: envError };
   const autorestart = config.autorestart !== undefined ? config.autorestart : true;
-  const maxRestarts = config.maxRestarts || savedConfig.maxRestarts || 15;
+  // Not `||`: 0 is a real setting (never restart) and must not turn into the default
+  const num = v => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : undefined);
+  const maxRestarts = num(config.maxRestarts) ?? num(savedConfig.maxRestarts) ?? 15;
   const memoryLimit = config.memoryLimit || savedConfig.memoryLimit || null;
   const watch = config.watch || savedConfig.watch || false;
 
@@ -177,25 +194,28 @@ function _spawnProcess(procRecord) {
     storage.saveProcesses(procs);
   }
 
-  runtime[name] = { proc: child, config: procRecord, watcher: null };
+  // Every handler below reads the name off this entry instead of a captured variable, so
+  // renaming a running process (updateProcess) carries its logs, exit handling and restarts
+  // over to the new name.
+  const entry = runtime[name] = { proc: child, config: procRecord, watcher: null, name };
   emit('process:update', getProcessInfo(name));
 
   // Handle spawn errors (e.g. command not found) - without this handler
   // Node.js throws an uncaught exception and crashes the daemon.
   child.on('error', err => {
     const procs2 = storage.loadProcesses();
-    if (procs2[name]) {
-      procs2[name].pid = null;
-      procs2[name].status = STATUS.CRASHED;
+    const rec = procs2[entry.name];
+    if (rec) {
+      rec.pid = null;
+      rec.status = STATUS.CRASHED;
       storage.saveProcesses(procs2);
-      emit('process:update', procs2[name]);
+      emit('process:update', rec);
     }
-    if (runtime[name]) {
-      if (runtime[name].watcher)  runtime[name].watcher.close();
-      if (runtime[name].memCheck) clearInterval(runtime[name].memCheck);
-      delete runtime[name];
+    if (runtime[entry.name] === entry) {
+      _teardown(entry);
+      delete runtime[entry.name];
     }
-    _handleCrash(procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
+    _handleCrash(rec || procRecord, null, `Spawn error: ${err.message}`, SEVERITY.CRITICAL);
   });
 
   // Log stdout - split chunks so every output line gets its own timestamp, but write the
@@ -204,8 +224,8 @@ function _spawnProcess(procRecord) {
     const ts = new Date().toISOString();
     const lines = data.toString().trimEnd().split('\n').filter(Boolean).map(l => `[${ts}] ${l}`);
     if (!lines.length) return;
-    storage.appendLog(name, 'out', lines.join('\n'));
-    for (const line of lines) emit('log', { name, line, type: 'out' });
+    storage.appendLog(entry.name, 'out', lines.join('\n'));
+    for (const line of lines) emit('log', { name: entry.name, line, type: 'out' });
   });
 
   // Agent IPC (ignored by children that don't use it). Control requests are handled
@@ -214,10 +234,10 @@ function _spawnProcess(procRecord) {
   // naming itself, and what stops it from claiming to be a process it is not.
   child.on('message', msg => {
     if (msg && typeof msg === 'object' && msg[AGENT_KEY] === 'control') {
-      _handleControl(name, child, msg);
+      _handleControl(entry.name, child, msg);
       return;
     }
-    memDetail.onAgentMessage(name, msg);
+    memDetail.onAgentMessage(entry.name, msg);
   });
 
   // Log stderr
@@ -226,28 +246,27 @@ function _spawnProcess(procRecord) {
     const text = data.toString();
     // SIGUSR1 makes Node print its real inspector URL here - that is how the CDP
     // fallback learns the port belonging to this specific pid.
-    memDetail.noteStderr(name, text);
+    memDetail.noteStderr(entry.name, text);
     const lines = text.trimEnd().split('\n')
       // Node's own "Debugger listening/attached/ending" chatter is provoked by PM3's
       // memory probe, not written by the app - keep it out of the app's error log.
       .filter(l => l && !memDetail.isInspectorNoise(l))
       .map(l => `[${ts}] [ERR] ${l}`);
     if (lines.length) {
-      storage.appendLog(name, 'err', lines.join('\n'));
-      for (const line of lines) emit('log', { name, line, type: 'err' });
+      storage.appendLog(entry.name, 'err', lines.join('\n'));
+      for (const line of lines) emit('log', { name: entry.name, line, type: 'err' });
     }
     // Detect error patterns
     if (text.includes('Error:') || text.includes('Exception') || text.includes('FATAL')) {
-      _captureIssue(name, text, SEVERITY.ERROR);
+      _captureIssue(entry.name, text, SEVERITY.ERROR);
     }
   });
 
   // Handle exit
   child.on('exit', (code, signal) => {
-    // If a new child has been spawned under this name, ignore this exit event
-    if (runtime[name] && runtime[name].proc !== child) {
-      return;
-    }
+    const name = entry.name;
+    // A newer child owns this name now (restart, or a rename moved us): not ours to handle
+    if (runtime[name] && runtime[name] !== entry) return;
 
     const procs2 = storage.loadProcesses();
     if (!procs2[name]) return;
@@ -261,8 +280,11 @@ function _spawnProcess(procRecord) {
     procs2[name].netRx = 0;
     procs2[name].netTx = 0;
 
-    const isCrash = code !== 0 && code !== null;
-    const wasKilled = signal === 'SIGTERM' || signal === 'SIGKILL';
+    // SIGTERM from outside is someone asking it to stop. Any other signal is a crash - SIGKILL
+    // included, because that is how the kernel's OOM killer ends a process. PM3's own stops
+    // (which may SIGKILL a straggler) are recognised by the STOPPED status set beforehand.
+    const wasKilled = signal === 'SIGTERM';
+    const isCrash = (code !== 0 && code !== null) || (signal != null && !wasKilled);
 
     if (wasKilled || procs2[name].status === STATUS.STOPPED) {
       procs2[name].status = STATUS.STOPPED;
@@ -275,28 +297,30 @@ function _spawnProcess(procRecord) {
     if (isCrash) {
       procs2[name].status = STATUS.CRASHED;
       storage.saveProcesses(procs2);
-      _handleCrash(procs2[name], code, `Process exited with code ${code}`, SEVERITY.ERROR);
+      const why = code !== null ? `Process exited with code ${code}` : `Process killed by ${signal}`;
+      _handleCrash(procs2[name], code, why, SEVERITY.ERROR);
     }
 
+    if (Date.now() - Date.parse(procs2[name].startTime || 0) >= STABLE_MS) _crashStreak[name] = 0;
+    const streak = _crashStreak[name] || 0;
     const maxR = procs2[name].maxRestarts;
-    const underLimit = maxR === -1          // -1 = unlimited
-      ? true
-      : procs2[name].restartCount < maxR;   // 0 = never, N = up to N times
-    const shouldRestart = procs2[name].autorestart && underLimit && !wasKilled;
+    const underLimit = maxR === -1 || streak < maxR;   // -1 = unlimited, 0 = never, N = N in a row
 
-    if (shouldRestart) {
+    if (procs2[name].autorestart && underLimit) {
+      _crashStreak[name] = streak + 1;
       procs2[name].status = STATUS.RESTARTING;
       procs2[name].restartCount++;
       storage.saveProcesses(procs2);
       emit('process:update', procs2[name]);
       setTimeout(() => {
         const latest = storage.loadProcesses();
-        if (latest[name] && latest[name].status === STATUS.RESTARTING) {
-          _spawnProcess(latest[name]);
+        if (latest[entry.name] && latest[entry.name].status === STATUS.RESTARTING) {
+          _spawnProcess(latest[entry.name]);
         }
       }, 1000);
     } else {
-      procs2[name].status = STATUS.STOPPED;
+      // Gave up: say why it is down rather than dressing a crash loop up as a clean stop
+      procs2[name].status = isCrash ? STATUS.CRASHED : STATUS.STOPPED;
       storage.saveProcesses(procs2);
       delete runtime[name];
       emit('process:update', procs2[name]);
@@ -305,34 +329,45 @@ function _spawnProcess(procRecord) {
 
   // File watcher (if --watch)
   if (procRecord.watch) {
+    // Required here, not at the top: ~7 MB the daemon only pays for once something uses --watch
+    const chokidar = require('chokidar');
     const watcher = chokidar.watch(cwd, {
       ignored: /node_modules|\.git/,
       persistent: true,
       ignoreInitial: true,
     });
+    // Saving a project touches several files at once: one restart per burst, not per file
     watcher.on('change', () => {
-      storage.appendLog(name, 'out', `[${new Date().toISOString()}] [PM3] File change detected, restarting...`);
-      restartProcess(name);
+      clearTimeout(entry.watchTimer);
+      entry.watchTimer = setTimeout(() => {
+        storage.appendLog(entry.name, 'out', `[${new Date().toISOString()}] [PM3] File change detected, restarting...`);
+        restartProcess(entry.name);
+      }, 300);
     });
-    runtime[name].watcher = watcher;
+    entry.watcher = watcher;
   }
 
   // Memory monitor (-1 and null both mean no limit)
   if (procRecord.memoryLimit && procRecord.memoryLimit > 0) {
-    runtime[name].memCheck = setInterval(() => {
-      if (!runtime[name] || !runtime[name].proc) return;
-      const pid = runtime[name].proc.pid;
+    entry.memCheck = setInterval(() => {
+      const pid = entry.proc.pid;
       if (!pid) return;
       pidusage(pid, (err, stats) => {
         if (err || !stats) return;
         const mb = stats.memory / 1024 / 1024;
         if (mb > procRecord.memoryLimit) {
-          storage.appendLog(name, 'err', `[${new Date().toISOString()}] [PM3] Memory limit exceeded (${mb.toFixed(1)}MB > ${procRecord.memoryLimit}MB), restarting...`);
-          restartProcess(name);
+          storage.appendLog(entry.name, 'err', `[${new Date().toISOString()}] [PM3] Memory limit exceeded (${mb.toFixed(1)}MB > ${procRecord.memoryLimit}MB), restarting...`);
+          restartProcess(entry.name);
         }
       });
     }, 5000);
   }
+}
+
+function _teardown(entry) {
+  if (entry.watcher) entry.watcher.close();
+  clearInterval(entry.memCheck);
+  clearTimeout(entry.watchTimer);
 }
 
 // --- Control requests from a managed child (agent.stop / agent.restart) ---
@@ -425,6 +460,8 @@ function stopProcess(name) {
   const procs = storage.loadProcesses();
   if (!procs[name]) return { error: `Process "${name}" not found` };
 
+  _restarting.delete(name);   // a stop wins over a restart still waiting on the old child
+  delete _crashStreak[name];
   procs[name].status = STATUS.STOPPED;
   procs[name].cpu = 0;
   procs[name].memory = 0;
@@ -435,8 +472,7 @@ function stopProcess(name) {
   storage.saveProcesses(procs);
 
   if (runtime[name]) {
-    if (runtime[name].watcher) runtime[name].watcher.close();
-    if (runtime[name].memCheck) clearInterval(runtime[name].memCheck);
+    _teardown(runtime[name]);
     _killTree(runtime[name].proc, 'SIGTERM');
     delete runtime[name];
   }
@@ -488,16 +524,20 @@ function stopAll(timeoutMs = 5000) {
 function restartProcess(name) {
   const procs = storage.loadProcesses();
   if (!procs[name]) return { error: `Process "${name}" not found` };
+  if (_restarting.has(name)) return procs[name];   // already on its way back
 
   // Capture the old child before stopping, so we can wait for its exit
   const oldRuntime = runtime[name];
   const oldChild   = oldRuntime ? oldRuntime.proc : null;
   const wasActive  = oldChild && oldChild.exitCode === null && oldChild.signalCode === null;
 
-  // Tear down monitors / watchers and send SIGTERM
+  // Tear down monitors / watchers and send SIGTERM. stopProcess clears the pending flag,
+  // so it is set after it.
   stopProcess(name);
+  _restarting.add(name);
 
   function _doSpawn() {
+    if (!_restarting.delete(name)) return;   // stopped or deleted while we waited
     const latest = storage.loadProcesses();
     if (!latest[name]) return;
     latest[name].restartCount = (latest[name].restartCount || 0) + 1;
@@ -712,7 +752,8 @@ function updateProcess(name, updates) {
   if (newName && newName !== name) {
     procs[newName] = { ...procs[name], name: newName };
     delete procs[name];
-    if (runtime[name]) { runtime[newName] = runtime[name]; delete runtime[name]; }
+    if (runtime[name]) { runtime[newName] = runtime[name]; runtime[newName].name = newName; delete runtime[name]; }
+    if (name in _crashStreak) { _crashStreak[newName] = _crashStreak[name]; delete _crashStreak[name]; }
     memDetail.rename(name, newName);
     // Best-effort log file rename
     try {
@@ -752,6 +793,7 @@ function resetRestartCount(name) {
   const procs = storage.loadProcesses();
   if (!procs[name]) return { error: `Process "${name}" not found` };
   procs[name].restartCount = 0;
+  delete _crashStreak[name];
   storage.saveProcesses(procs);
   emit('process:update', procs[name]);
   return procs[name];
@@ -774,6 +816,8 @@ module.exports = {
                   : Promise.resolve({ error: `Process "${name}" is not running` }),
   memPollInterval: memDetail.POLL_MS,
   flushMemHistory: memDetail.flush,
+  // History of processes deleted before memDetail.drop existed would otherwise stay forever
+  pruneMemHistory: () => memDetail.prune(Object.keys(storage.loadProcesses())),
   resurrect,
   resolveProcess,
   updateProcess,
