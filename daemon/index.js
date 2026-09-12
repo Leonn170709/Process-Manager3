@@ -7,7 +7,7 @@ process.on('unhandledRejection', reason => console.error('[PM3] Unhandled reject
 const http = require('http');
 const os = require('os');
 const dns = require('dns');
-const { execFile } = require('child_process');
+const { execFile, execFileSync, spawn } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 const express = require('express');
@@ -16,6 +16,7 @@ const { EventEmitter } = require('events');
 const si = require('systeminformation');
 const sys = require('../core/sysMetrics');   // spawn-free Linux versions of the hot-path si calls
 const fs = require('fs');
+const path = require('path');
 
 const { DAEMON_PORT, DASHBOARD_PORT, PATHS, STATUS } = require('../config/constants');
 const storage = require('../storage');
@@ -642,6 +643,78 @@ app.get('/api/system/processes', async (req, res) => {
   }
 });
 
+// --- Self-update ---
+// An hourly `git fetch` of the install folder; when origin is ahead the dashboard offers to run
+// update.sh. Installing stays a click, never automatic: update.sh restarts the daemon, and every
+// managed process with it.
+const REPO_DIR = path.join(__dirname, '..');
+const UPDATE_LOG = path.join(PATHS.home, 'update.log');
+const _git = args => execFileAsync('git', args, { cwd: REPO_DIR, timeout: 60000 }).then(r => r.stdout.trim());
+const _update = { current: null, remote: null, behind: 0, commits: [], checkedAt: null, updating: false, error: null };
+// The commit this daemon runs; a dashboard that sees it change knows it is the old page.
+// Not a git clone: stays null and no checks run.
+try {
+  _update.current = execFileSync('git', ['rev-parse', '--short', 'HEAD'],
+    { cwd: REPO_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch {}
+
+async function _checkUpdate() {
+  if (!_update.current || userConfig.get('updateCheck') === false) return;
+  try {
+    await _git(['fetch', '--quiet']);
+    const [remote, behind, log] = await Promise.all([
+      _git(['rev-parse', '--short', '@{u}']),
+      _git(['rev-list', '--count', 'HEAD..@{u}']),
+      _git(['log', '-10', '--format=%h %s', 'HEAD..@{u}']),
+    ]);
+    Object.assign(_update, { remote, behind: Number(behind), commits: log ? log.split('\n') : [], checkedAt: Date.now() });
+    io.emit('update:state', _update);
+  } catch {}   // offline or no upstream branch: try again next hour
+}
+setTimeout(_checkUpdate, 60 * 1000);   // not right at boot, the network may not be up yet
+setInterval(_checkUpdate, 60 * 60 * 1000);
+
+app.get('/api/update', (req, res) => res.json(_update));
+
+// Detached, because halfway through update.sh stops this daemon (pm3 kill) and starts the new
+// version. The node running the daemon goes first on PATH: under systemd or nvm it may be missing.
+app.post('/api/update', (req, res) => {
+  if (_update.updating) return res.status(409).json({ error: 'An update is already running' });
+  const script = path.join(REPO_DIR, 'update.sh');
+  if (!fs.existsSync(script)) return res.status(400).json({ error: 'update.sh not found - is this a git clone?' });
+  const log = fs.openSync(UPDATE_LOG, 'w');
+  const child = spawn('bash', [script], {
+    cwd: REPO_DIR,
+    detached: true,
+    stdio: ['ignore', log, log],
+    // LC_ALL=C keeps git's messages English, so the error: lines below can be picked out
+    env: { ...process.env, LC_ALL: 'C', PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH || ''}` },
+  });
+  fs.closeSync(log);
+  child.unref();
+  Object.assign(_update, { updating: true, error: null });
+  io.emit('update:state', _update);
+
+  const done = error => {
+    Object.assign(_update, { updating: false, error });
+    io.emit('update:state', _update);
+    _checkUpdate();
+  };
+  child.on('error', err => done(err.message));
+  // Only seen when update.sh ends without restarting us: it failed, or there was nothing new
+  child.on('exit', code => {
+    if (!code) return done(null);
+    let why = '';
+    try {
+      const lines = fs.readFileSync(UPDATE_LOG, 'utf8').trim().split('\n');
+      const errors = lines.filter(l => /^(error|fatal):/.test(l));
+      why = (errors.length ? errors : lines.slice(-2)).join(' · ');
+    } catch {}
+    done(`update.sh exited with ${code}${why ? `: ${why}` : ''} (full log: ${UPDATE_LOG})`);
+  });
+  res.json({ ok: true });
+});
+
 // Save (mark all running processes for resurrect)
 app.post('/api/save', (req, res) => {
   const procs = pm.getAllProcesses();
@@ -677,6 +750,7 @@ io.on('connection', socket => {
     issues: issueTracker.getIssues(),
     prefs: storage.loadPrefs(),
     tools: _toolsCache || null,
+    update: _update,
   });
 });
 

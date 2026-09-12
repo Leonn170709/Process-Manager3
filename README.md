@@ -36,6 +36,9 @@ npm install -g .
 ./update.sh --no-restart  # same, but leave the running daemon alone
 ```
 
+The dashboard also checks GitHub every hour and shows an **Update now** button when a new
+version is out (turn the check off with `pm3 config set updateCheck false`).
+
 ---
 
 ## Quick Start

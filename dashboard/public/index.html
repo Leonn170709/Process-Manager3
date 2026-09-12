@@ -568,7 +568,8 @@
     .form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
 
     /* ── Tool notices ────────────────────────────── */
-    #tools-notices { display:flex;flex-direction:column;gap:6px;padding:0 16px; }
+    #tools-notices, #update-notice { display:flex;flex-direction:column;gap:6px;padding:0 16px; }
+    #update-notice:not(:empty) { margin-bottom:6px; }
     .tools-notice {
       display:flex;align-items:flex-start;gap:10px;
       padding:10px 12px;border-radius:var(--r-sm);
@@ -897,6 +898,7 @@
       </nav>
 
       <!-- ── Tool notices ──────────────────────────── -->
+      <div id="update-notice"></div>
       <div id="tools-notices"></div>
 
       <!-- ── Content ────────────────────────────────── -->
@@ -1443,7 +1445,9 @@ socket.on('init', data => {
   else { renderProcesses(); }
   renderIssues(); updateProcStats(); updateIssueStats();
   if (data.tools) { _toolsStatus = data.tools; _showToolsNotifications(); }
+  renderUpdate(data.update);
 });
+socket.on('update:state', renderUpdate);
 socket.on('prefs:update', prefs => {
   applyPrefs(prefs);
   applyColumns();
@@ -2462,6 +2466,53 @@ function _showToolsNotifications() {
       <button onclick="this.closest('.tools-notice').remove()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`;
     container.appendChild(el);
   }
+}
+// ── PM3 self-update ───────────────────────────────
+// The daemon checks GitHub hourly (config: updateCheck) and pushes its state as update:state.
+let _pm3Version = null;
+function renderUpdate(u) {
+  if (!u) return;
+  // The daemon came back on a different commit: it was just updated and this page is the old one
+  if (u.current && _pm3Version && u.current !== _pm3Version) return location.reload();
+  if (u.current) _pm3Version = u.current;
+  let dismissed = null;
+  try { dismissed = localStorage.getItem('pm3-dismissed-update'); } catch {}
+  const el = document.getElementById('update-notice');
+  if (!u.updating && !((u.error || u.behind > 0) && u.remote !== dismissed)) { el.innerHTML = ''; return; }
+
+  const title = u.updating ? 'Updating PM3…'
+    : u.error ? 'PM3 update failed'
+    : `PM3 update available · ${u.behind} new commit${u.behind === 1 ? '' : 's'}`;
+  const msg = u.updating ? 'Processes restart with the daemon; this page reloads when it is back.'
+    : u.error || `${u.current} → ${u.remote} · updating restarts the daemon and every process it manages.`;
+  let commits = '';
+  if (!u.updating && !u.error) {
+    commits = u.commits.map(c => `<div>${escapeHtml(c)}</div>`).join('');
+    if (u.behind > u.commits.length) commits += `<div>… and ${u.behind - u.commits.length} more</div>`;
+  }
+  el.innerHTML = `<div class="tools-notice">
+      <span style="font-size:14px">${u.error ? '⚠' : '⬆'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px;color:var(--t1)">${escapeHtml(title)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px;word-break:break-word">${escapeHtml(msg)}</div>
+        ${commits ? `<div style="margin-top:5px;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--t3)">${commits}</div>` : ''}
+      </div>
+      ${u.updating ? '' : `<button class="btn primary" onclick="runUpdate()">${u.error ? 'Retry' : 'Update now'}</button>
+      <button onclick="dismissUpdate()" title="Hide until the next version" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`}
+    </div>`;
+  el.dataset.remote = u.remote || '';
+}
+async function runUpdate() {
+  if (!confirm('Update PM3 now? The daemon restarts, and every process it manages restarts with it.')) return;
+  try {
+    const r = await fetch('/api/update', { method: 'POST' });
+    if (!r.ok) toast((await r.json().catch(() => ({}))).error || 'Update could not start', 'error');
+  } catch { toast('Could not reach the daemon', 'error'); }
+}
+function dismissUpdate() {
+  const el = document.getElementById('update-notice');
+  try { localStorage.setItem('pm3-dismissed-update', el.dataset.remote); } catch {}
+  el.innerHTML = '';
 }
 function formatUptime(s) {
   if (!s) return '—'; s=Math.floor(s);

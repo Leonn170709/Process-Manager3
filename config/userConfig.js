@@ -48,6 +48,11 @@ const SCHEMA = {
     unit: 'issues',
     desc: 'Maximum number of stored issues (-1 = unlimited)',
   },
+  updateCheck: {
+    default: true,
+    unit: '',
+    desc: 'Check GitHub every hour for a new PM3 version and offer it in the dashboard',
+  },
   discordToken: {
     default: '',
     unit: '',
