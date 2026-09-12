@@ -1,0 +1,44 @@
+/* @name Minimal
+   @description Flat and quiet: solid surfaces, hairline borders, no gradients, glass or glow.
+
+   System fonts, so nothing is downloaded. Colour is left for what it means (status, errors,
+   network direction); everything else is greys. */
+
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --accent: #2563eb; --accent2: #7c3aed;
+  --green: #15803d; --red: #b91c1c; --yellow: #a16207; --cyan: #0e7490;
+  --t1: #111113; --t2: #3f3f46; --t3: #71717a; --t4: #a1a1aa;
+  --g1: #f4f4f5; --g2: #fafafa; --g3: #f4f4f5;
+  --border: #e4e4e7; --border-sm: #ececef;
+  --spec: transparent; --spec-sm: transparent;
+  --shadow: none; --shadow-md: none; --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --pane: #ffffff; --surface: #ffffff; --modal-bg: #ffffff; --nav-bg: #ffffff; --tip-bg: #ffffff;
+  --r: 10px; --r-sm: 8px; --r-xs: 6px;
+  background: #f6f6f7;
+}
+[data-theme="dark"] {
+  --accent: #60a5fa; --accent2: #a78bfa;
+  --green: #4ade80; --red: #f87171; --yellow: #facc15; --cyan: #22d3ee;
+  --t1: #f4f4f5; --t2: #d4d4d8; --t3: #a1a1aa; --t4: #63636b;
+  --g1: #1f1f23; --g2: #18181b; --g3: #1c1c20;
+  --border: #2a2a2f; --border-sm: #232327;
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+  --pane: #141416; --surface: #141416; --modal-bg: #161618; --nav-bg: #111113; --tip-bg: #1c1c1f;
+  background: #0c0c0d;
+}
+
+#bg, .card::before { display: none; }
+.navbar, .btn, .card, .stat-pill, .issue-card, .modal, .toast, .nav-tab.active { box-shadow: none; }
+.btn:hover, .pab:hover, .issue-card:hover, .sys-metric.clickable:hover, .res-stat-box.clickable:hover { transform: none; box-shadow: none; }
+.nav-tab.active { background: var(--g1); border-color: var(--border); }
+.proc-row:hover { background: var(--g2); }
+
+/* Primary actions in plain ink instead of a blue gradient */
+.btn.primary { background: var(--t1); color: var(--pane); border-color: var(--t1); box-shadow: none; }
+.btn.primary:hover { background: var(--t2); border-color: var(--t2); box-shadow: none; }
+.nav-logo-icon { background: var(--t1); box-shadow: none; }
+
+.status-running::before { box-shadow: none; }
+.modal-overlay { background: rgba(0,0,0,0.35); backdrop-filter: none; -webkit-backdrop-filter: none; }

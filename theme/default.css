@@ -1,0 +1,20 @@
+/* @name Default
+   @description The built-in look: a soft gradient wash, frosted panels and IBM Plex type.
+
+   A theme is a plain CSS file in this folder. The dashboard loads it after its own styles, so
+   anything here overrides them. Pick one under Config → theme, or `pm3 config set theme <file>`.
+
+   This one is empty on purpose: the default look lives in the dashboard itself. To make your
+   own theme, copy this file, give it a new name and override the tokens below. Light values go
+   on :root, dark ones on [data-theme="dark"].
+
+     --accent --accent2 --green --red --yellow --cyan    colours
+     --t1 --t2 --t3 --t4                                 text, strongest to faintest
+     --g1 --g2 --g3 --border --border-sm                 translucent fills and edges
+     --pane --surface --modal-bg --nav-bg --tip-bg       panel backgrounds
+     --shadow --shadow-md --shadow-lg --spec --spec-sm   shadows and top-edge highlights
+     --r --r-sm --r-xs                                   corner radii
+     --font-sans --font-mono                             typefaces
+
+   plus #bg, the fixed background layer behind everything, and the root background.
+   liquid-glass.css and minimal.css show what a full theme looks like. */

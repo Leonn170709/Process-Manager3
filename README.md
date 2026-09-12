@@ -37,7 +37,15 @@ npm install -g .
 ```
 
 The dashboard also checks GitHub every hour and shows an **Update now** button when a new
-version is out (turn the check off with `pm3 config set updateCheck false`).
+version is out (turn the check off with `pm3 config set updateCheck false`). The notice uses
+each commit's subject as its headline and the commit body as the changelog.
+
+### Themes
+
+Pick a dashboard theme under **Config → theme** (or `pm3 config set theme minimal`). Themes are
+plain CSS files in the `theme/` folder: `default`, `liquid-glass` (Apple-style glass; uses blur,
+so it costs GPU on weak devices) and `minimal`. To make your own, copy `theme/default.css` —
+its header lists every colour, radius and font token you can override.
 
 ---
 

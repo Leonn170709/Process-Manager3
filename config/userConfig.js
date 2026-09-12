@@ -53,6 +53,11 @@ const SCHEMA = {
     unit: '',
     desc: 'Check GitHub every hour for a new PM3 version and offer it in the dashboard',
   },
+  theme: {
+    default: 'default',
+    unit: '',
+    desc: 'Dashboard theme: any .css file in the theme folder of the PM3 install',
+  },
   discordToken: {
     default: '',
     unit: '',

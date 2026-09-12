@@ -268,13 +268,16 @@ app.post('/api/issues/:id/resolve', (req, res) => {
 
 // Config
 app.get('/api/config', (req, res) => {
-  res.json({ config: userConfig.getAllMasked(), schema: userConfig.SCHEMA });
+  // The theme setting offers whatever is in the theme folder right now
+  const theme = { ...userConfig.SCHEMA.theme, choices: _listThemes().map(({ value, label }) => ({ value, label })) };
+  res.json({ config: userConfig.getAllMasked(), schema: { ...userConfig.SCHEMA, theme } });
 });
 
 app.post('/api/config', (req, res) => {
   const { key, value } = req.body;
   try {
     const result = userConfig.set(key, String(value));
+    if (key === 'theme') io.emit('theme:update');
     res.json({ ok: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -283,6 +286,7 @@ app.post('/api/config', (req, res) => {
 
 app.post('/api/config/reset', (req, res) => {
   userConfig.reset();
+  io.emit('theme:update');
   res.json({ ok: true, config: userConfig.getAllMasked() });
 });
 
@@ -681,6 +685,18 @@ try {
     { cwd: REPO_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 } catch {}
 
+// One entry per commit: the subject is the update notice's headline, the body its changelog.
+// A final paragraph made only of `Key: value` lines (Co-Authored-By, Signed-off-by) is git
+// metadata rather than changelog and is dropped - the same rule git uses to find trailers.
+function _commitNotes(log) {
+  return log.split('\x1e').map(s => s.trim()).filter(Boolean).map(entry => {
+    const [hash, subject, body = ''] = entry.split('\x1f');
+    const paras = body.trim().split(/\n\s*\n/);
+    if (paras[paras.length - 1].split('\n').every(l => /^[\w-]+: \S/.test(l))) paras.pop();
+    return { hash, subject, body: paras.join('\n\n').trim() };
+  });
+}
+
 async function _checkUpdate() {
   if (!_update.current || userConfig.get('updateCheck') === false) return;
   try {
@@ -688,9 +704,9 @@ async function _checkUpdate() {
     const [remote, behind, log] = await Promise.all([
       _git(['rev-parse', '--short', '@{u}']),
       _git(['rev-list', '--count', 'HEAD..@{u}']),
-      _git(['log', '-10', '--format=%h %s', 'HEAD..@{u}']),
+      _git(['log', '-10', '--format=%h%x1f%s%x1f%b%x1e', 'HEAD..@{u}']),
     ]);
-    Object.assign(_update, { remote, behind: Number(behind), commits: log ? log.split('\n') : [], checkedAt: Date.now() });
+    Object.assign(_update, { remote, behind: Number(behind), commits: _commitNotes(log), checkedAt: Date.now() });
     io.emit('update:state', _update);
   } catch {}   // offline or no upstream branch: try again next hour
 }
@@ -737,6 +753,33 @@ app.post('/api/update', (req, res) => {
   });
   res.json({ ok: true });
 });
+
+// --- Themes ---
+// Every *.css file in <install>/theme is a theme; its header comment may carry @name and
+// @description. The configured one is served as /theme/current.css, which the dashboard links
+// right after its own styles, so switching needs no page reload.
+const THEME_DIR = path.join(REPO_DIR, 'theme');
+function _listThemes() {
+  let files = [];
+  try { files = fs.readdirSync(THEME_DIR).filter(f => f.endsWith('.css')); } catch {}
+  return files.map(file => {
+    const value = file.slice(0, -4);
+    let head = '';
+    try { head = fs.readFileSync(path.join(THEME_DIR, file), 'utf8').slice(0, 600); } catch {}
+    const tag = t => ((head.match(new RegExp('@' + t + '\\s+(.+)')) || [])[1] || '').trim();
+    return { value, label: tag('name') || value, description: tag('description') };
+  }).sort((a, b) => (a.value === 'default' ? -1 : b.value === 'default' ? 1 : a.label.localeCompare(b.label)));
+}
+app.get('/api/themes', (req, res) => res.json(_listThemes()));
+app.get('/theme/current.css', (req, res) => {
+  // basename: the value comes from a config file anyone on the dashboard can edit
+  const file = path.join(THEME_DIR, path.basename(String(userConfig.get('theme') || 'default')) + '.css');
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(fs.existsSync(file) ? file : path.join(THEME_DIR, 'default.css'), err => {
+    if (err && !res.headersSent) res.type('css').send('');   // no theme folder: base styles only
+  });
+});
+app.use('/theme', express.static(THEME_DIR));
 
 // Save (mark all running processes for resurrect)
 app.post('/api/save', (req, res) => {

@@ -1,0 +1,99 @@
+/* @name Liquid Glass
+   @description Apple-style glass: blurred, saturated panels floating over a vivid wallpaper.
+
+   The only theme with backdrop-filter on every panel. Blur is what makes glass read as glass,
+   and it costs GPU time on weak devices such as a Raspberry Pi or an old phone. Default and
+   Minimal use none. The wallpaper is static, so the blur is computed once, not every frame. */
+
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, "IBM Plex Mono", monospace;
+  --accent: #007aff; --accent2: #af52de;
+  --green: #1f9d4a; --red: #e0352b; --yellow: #c77700; --cyan: #0a84c8;
+  --t1: #0b0b0f; --t2: #3a3a44; --t3: #6e6e78; --t4: #a0a0aa;
+  --g1: rgba(255,255,255,0.55); --g2: rgba(255,255,255,0.38); --g3: rgba(255,255,255,0.22);
+  --border: rgba(255,255,255,0.7); --border-sm: rgba(255,255,255,0.45);
+  --spec: rgba(255,255,255,0.95); --spec-sm: rgba(255,255,255,0.7);
+  --shadow:    0 4px 16px rgba(20,30,60,0.08);
+  --shadow-md: 0 10px 30px rgba(20,30,60,0.12);
+  --shadow-lg: 0 24px 60px rgba(20,30,60,0.2);
+  --pane: rgba(255,255,255,0.42);
+  --surface: rgba(255,255,255,0.72);
+  --modal-bg: rgba(255,255,255,0.66);
+  --nav-bg: rgba(255,255,255,0.45);
+  --tip-bg: rgba(255,255,255,0.94);
+  --r: 22px; --r-sm: 16px; --r-xs: 12px;
+  background: #dfe9ff;
+}
+[data-theme="dark"] {
+  --accent: #0a84ff; --accent2: #bf5af2;
+  --green: #30d158; --red: #ff453a; --yellow: #ffd60a; --cyan: #64d2ff;
+  --t1: #f5f5f7; --t2: #c7c7cc; --t3: #8e8e93; --t4: #5a5a60;
+  --g1: rgba(255,255,255,0.14); --g2: rgba(255,255,255,0.09); --g3: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.22); --border-sm: rgba(255,255,255,0.12);
+  --spec: rgba(255,255,255,0.35); --spec-sm: rgba(255,255,255,0.18);
+  --shadow:    0 4px 16px rgba(0,0,0,0.35);
+  --shadow-md: 0 10px 30px rgba(0,0,0,0.45);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,0.6);
+  --pane: rgba(44,44,56,0.36);
+  --surface: rgba(30,30,38,0.8);
+  --modal-bg: rgba(30,30,40,0.62);
+  --nav-bg: rgba(30,30,40,0.45);
+  --tip-bg: rgba(28,28,34,0.95);
+  background: #070b1f;
+}
+
+/* The wallpaper the glass floats over: distinct colour fields, so there is something to refract */
+#bg {
+  background:
+    radial-gradient(52% 58% at 10% 6%,  rgba(94,160,255,0.85),  transparent 70%),
+    radial-gradient(48% 52% at 90% 18%, rgba(255,120,200,0.55), transparent 70%),
+    radial-gradient(58% 54% at 72% 96%, rgba(80,220,200,0.6),   transparent 70%),
+    radial-gradient(44% 48% at 22% 88%, rgba(255,190,90,0.45),  transparent 70%),
+    linear-gradient(135deg, #dfe9ff, #f3e6ff 50%, #dff7f1);
+}
+[data-theme="dark"] #bg {
+  background:
+    radial-gradient(52% 58% at 10% 6%,  rgba(10,132,255,0.55), transparent 70%),
+    radial-gradient(48% 52% at 90% 18%, rgba(191,90,242,0.45), transparent 70%),
+    radial-gradient(58% 54% at 72% 96%, rgba(48,209,160,0.35), transparent 70%),
+    linear-gradient(135deg, #070b1f, #120a26 55%, #04161c);
+}
+
+/* Glass: blur plus saturation, a bright top edge and a faint bottom one */
+.navbar, .card, .stat-pill, .issue-card, .toast, .tools-notice {
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.modal { backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); border-radius: 28px; }
+.modal-overlay { background: rgba(10,20,40,0.22); }
+.card, .stat-pill, .issue-card {
+  box-shadow: inset 0 1px 0 var(--spec), inset 0 -1px 0 rgba(255,255,255,0.1), var(--shadow-md);
+}
+/* No blur on the header cells: each <th> would blur its own patch and the seams show. The card
+   underneath is already glass; the header only needs enough tint to hide rows scrolling under it. */
+.proc-table th { background: var(--surface); }
+
+/* A floating capsule for the navbar, with the tabs as a segmented control */
+.navbar { margin: 10px 12px 2px; border: 1px solid var(--border); border-radius: 999px; padding: 0 8px 0 10px; }
+.nav-tabs { flex: 0 1 auto; margin-right: auto; background: var(--g3); border-radius: 999px; padding: 3px; }
+.nav-tab { border-radius: 999px; }
+.nav-tab.active { background: var(--g1); border-color: transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.12), inset 0 1px 0 var(--spec); }
+.nav-logo { border-right: none; }
+.nav-sys { border: none; }
+.nav-chip { border-radius: 999px; }
+
+/* Controls are pills */
+.btn, .pab, .filter-chip, .res-sort-btn { border-radius: 999px; }
+.btn.primary {
+  background: linear-gradient(180deg, #3d9bff, var(--accent));
+  border-color: rgba(255,255,255,0.35);
+  box-shadow: 0 6px 18px rgba(0,122,255,0.35), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.btn.primary:hover { background: linear-gradient(180deg, #5aabff, #1a8bff); box-shadow: 0 8px 24px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.55); }
+.nav-logo-icon { border-radius: 10px; background: linear-gradient(160deg, #5ac8fa, #007aff 55%, #5e5ce6); }
+.form-input, .cfg-input-wrap input, .cfg-input-wrap select { border-radius: 12px; }
+
+@media (max-width: 640px) {
+  .navbar { margin: 6px 6px 0; }
+}

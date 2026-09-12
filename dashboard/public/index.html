@@ -22,7 +22,7 @@
     <style>
     /* ── Reset ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; overflow: hidden; }
+    html, body { height: 100%; font-family: var(--font-sans); font-size: 13px; overflow: hidden; }
 
     /* ── Light theme ─────────────────────────────── */
     :root {
@@ -41,6 +41,8 @@
       --t1: #0f172a; --t2: #334155; --t3: #64748b; --t4: #94a3b8;
       --r: 14px; --r-sm: 10px; --r-xs: 7px;
       --nav-h: 50px;
+      --font-sans: "IBM Plex Sans", sans-serif;
+      --font-mono: "IBM Plex Mono", monospace;
       --nav-bg: rgba(255,255,255,0.36);
       --log-bg: rgba(10,14,24,0.93);
       --log-border: rgba(255,255,255,0.10);
@@ -159,7 +161,7 @@
     .nav-tab {
       padding:5px 13px;border-radius:20px;cursor:pointer;font-size:12.5px;
       font-weight:500;color:var(--t3);background:transparent;border:none;
-      font-family:'IBM Plex Sans',sans-serif;transition:background-color 0.18s,color 0.18s;
+      font-family:var(--font-sans);transition:background-color 0.18s,color 0.18s;
       display:inline-flex;align-items:center;gap:5px;
     }
     .nav-tab:hover { color:var(--t2);background:var(--g3); }
@@ -184,14 +186,14 @@
       font-size:11.5px;
     }
     .nav-chip .lbl { color:var(--t3);font-size:10.5px; }
-    .nav-chip .val { color:var(--t1);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11px; }
+    .nav-chip .val { color:var(--t1);font-weight:600;font-family:var(--font-mono);font-size:11px; }
     .nav-actions { display:flex;gap:6px;padding-left:10px;flex-shrink:0; }
 
     /* ── Buttons ─────────────────────────────────── */
     .btn {
       padding:6px 14px;border-radius:var(--r-xs);border:1px solid var(--border);
       background:var(--g1);
-      color:var(--t1);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;
+      color:var(--t1);cursor:pointer;font-family:var(--font-sans);font-size:12.5px;
       font-weight:500;transition:background-color 0.15s,box-shadow 0.15s,transform 0.15s,border-color 0.15s;
       display:inline-flex;align-items:center;gap:5px;
       box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
@@ -247,7 +249,7 @@
       border:1px solid var(--border);border-radius:var(--r-sm);
       box-shadow:inset 0 1px 0 var(--spec-sm), var(--shadow);
     }
-    .sp-val   { font-size:17px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1.1;font-variant-numeric:tabular-nums; }
+    .sp-val   { font-size:17px;font-weight:600;font-family:var(--font-mono);line-height:1.1;font-variant-numeric:tabular-nums; }
     .sp-label { font-size:12.5px;color:var(--t2);font-weight:500; }
 
     /* ── Process Table ───────────────────────────── */
@@ -261,21 +263,21 @@
       border-bottom:1px solid var(--border-sm);position:sticky;top:0;z-index:1;
       /* Opaque enough that rows scrolling under it stay hidden — this used to
          lean on a blur that never made it opaque in the first place. */
-      background:var(--nav-bg);
+      background:var(--surface);
     }
-    .proc-row { border-bottom:1px solid rgba(255,255,255,0.25);transition:background 0.1s;cursor:pointer; }
+    .proc-row { border-bottom:1px solid var(--border-sm);transition:background 0.1s;cursor:pointer; }
     .proc-row:hover { background:var(--g3); }
     .proc-row td { padding:7px 12px;vertical-align:middle; }
     .proc-name   { font-weight:600;color:var(--t1);font-size:12.5px; }
-    .proc-script { font-size:10.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace;margin-top:1px; }
-    .mono { font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--t2); }
+    .proc-script { font-size:10.5px;color:var(--t4);font-family:var(--font-mono);margin-top:1px; }
+    .mono { font-family:var(--font-mono);font-size:11.5px;color:var(--t2); }
     .proc-actions { display:flex;gap:4px;flex-wrap:nowrap;align-items:center; }
     .proc-actions .sep { width:1px;height:18px;background:var(--border-sm);flex-shrink:0;margin:0 2px; }
 
     /* ── Process action buttons ──────────────────── */
     .pab {
       padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;
-      border:1px solid;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+      border:1px solid;cursor:pointer;font-family:var(--font-sans);
       display:inline-flex;align-items:center;gap:5px;
       transition:background-color 0.15s,color 0.15s,transform 0.15s;
       white-space:nowrap;letter-spacing:0.1px;
@@ -335,7 +337,7 @@
     }
     .log-title { font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;color:rgba(255,255,255,0.85); }
     .log-body {
-      font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.8;
+      font-family:var(--font-mono);font-size:11.5px;line-height:1.8;
       padding:12px 16px;overflow-y:auto;flex:1;
       white-space:pre-wrap;word-break:break-all;color:var(--log-text);
     }
@@ -372,8 +374,8 @@
     .issue-left { display:flex;align-items:center;gap:7px; }
     .issue-right { display:flex;align-items:center;gap:6px;flex-shrink:0; }
     .issue-name { font-weight:600;font-size:12.5px;color:var(--t1); }
-    .issue-time { font-size:10.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace; }
-    .issue-msg  { font-size:11.5px;color:var(--t2);font-family:'IBM Plex Mono',monospace;line-height:1.5;
+    .issue-time { font-size:10.5px;color:var(--t4);font-family:var(--font-mono); }
+    .issue-msg  { font-size:11.5px;color:var(--t2);font-family:var(--font-mono);line-height:1.5;
                   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
     .issue-meta { font-size:10.5px;color:var(--t4);margin-top:4px;display:flex;gap:10px; }
     .severity-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.5px; }
@@ -386,7 +388,7 @@
     .sys-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:7px;flex-shrink:0; }
     .sys-metric { padding:12px 14px; }
     .sm-label { font-size:10.5px;color:var(--t3);letter-spacing:0.5px;font-weight:600;margin-bottom:6px; }
-    .sm-val   { font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1; }
+    .sm-val   { font-size:24px;font-weight:700;font-family:var(--font-mono);line-height:1; }
     .sm-sub   { font-size:10.5px;color:var(--t4);margin-top:5px; }
     .progress { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;margin-top:9px;overflow:hidden; }
     .progress-fill { height:100%;border-radius:2px;transition:width 0.6s ease; }
@@ -406,12 +408,12 @@
     .mem-split-grid { display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0; }
     .mem-split-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:7px 9px; }
     .mem-split-lbl { font-size:9.5px;color:var(--t3);letter-spacing:0.4px; }
-    .mem-split-val { font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace;margin-top:2px; }
+    .mem-split-val { font-size:13px;font-weight:600;font-family:var(--font-mono);margin-top:2px; }
     .mem-note { font-size:10px;color:var(--t4);font-style:italic;margin:2px 0 6px; }
     .mem-track-hdr { display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px; }
     .mem-track-row { display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--border-sm);font-size:11px; }
-    .mem-track-name { font-family:'IBM Plex Mono',monospace;color:var(--t2);flex:1; }
-    .mem-track-count { font-family:'IBM Plex Mono',monospace;color:var(--accent2); }
+    .mem-track-name { font-family:var(--font-mono);color:var(--t2);flex:1; }
+    .mem-track-count { font-family:var(--font-mono);color:var(--accent2); }
     .res-stats-grid { display:grid;gap:6px;margin:10px 0 8px; }
     .res-stat-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:9px 12px; }
     .res-stat-box.clickable { cursor:pointer;transition:background 0.15s,border-color 0.15s,transform 0.12s; }
@@ -425,12 +427,12 @@
     }
     .nav-flash { animation:navFlash 1.6s ease-out !important; border-radius:var(--r-xs); }
     .res-stat-lbl { font-size:9.5px;color:var(--t3);letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
-    .res-stat-val { font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1);line-height:1.1; }
+    .res-stat-val { font-size:15px;font-weight:700;font-family:var(--font-mono);color:var(--t1);line-height:1.1; }
     .res-stat-sub { font-size:9.5px;color:var(--t4);margin-top:2px; }
     .res-core-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px;margin:8px 0 2px; }
     .res-core-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:6px 8px; }
     .res-core-lbl { font-size:9px;color:var(--t3);font-weight:600;margin-bottom:3px; }
-    .res-core-val { font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-bottom:3px; }
+    .res-core-val { font-size:11px;font-weight:700;font-family:var(--font-mono);margin-bottom:3px; }
     .res-core-bar { height:3px;background:rgba(0,0,0,0.07);border-radius:2px;overflow:hidden; }
     .res-core-fill { height:100%;border-radius:2px;transition:width 0.5s; }
     .res-sec-hdr { display:flex;align-items:center;justify-content:space-between;padding:8px 0 5px;border-top:1px solid var(--border-sm);margin-top:6px; }
@@ -446,16 +448,16 @@
     .res-proc-row.expanded { background:var(--g2); }
     .res-proc-name { font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .res-proc-script { font-size:10px;color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px; }
-    .rp-val { font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap; }
+    .rp-val { font-size:13px;font-weight:700;font-family:var(--font-mono);text-align:right;white-space:nowrap; }
     .rp-bar { height:6px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden;width:100%; }
     .rp-bar-fill { height:100%;border-radius:3px;transition:width 0.45s ease; }
-    .rp-sub { font-size:10.5px;color:var(--t3);font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap; }
+    .rp-sub { font-size:10.5px;color:var(--t3);font-family:var(--font-mono);text-align:right;white-space:nowrap; }
     .res-proc-detail { padding:10px 14px 13px 14px;border-bottom:1px solid var(--border-sm);background:var(--g3);animation:detailIn 0.14s ease; }
     @keyframes detailIn { from{opacity:0;margin-top:-6px}to{opacity:1;margin-top:0} }
     .rpd-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px;margin-bottom:8px; }
     .rpd-lbl { font-size:9px;color:var(--t3);letter-spacing:0.4px;font-weight:600;display:block;margin-bottom:1px; }
-    .rpd-val { font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-word; }
-    .rpd-cmd { font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--t3);word-break:break-all;margin:6px 0 8px;line-height:1.5;padding:5px 8px;background:var(--g2);border-radius:5px;border:1px solid var(--border-sm); }
+    .rpd-val { font-size:11.5px;font-family:var(--font-mono);color:var(--t1);word-break:break-word; }
+    .rpd-cmd { font-size:10px;font-family:var(--font-mono);color:var(--t3);word-break:break-all;margin:6px 0 8px;line-height:1.5;padding:5px 8px;background:var(--g2);border-radius:5px;border:1px solid var(--border-sm); }
     .res-mode-toggle { display:flex;background:var(--g2);border:1px solid var(--border-sm);border-radius:20px;padding:2px;gap:2px; }
     .rmt-btn { font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:16px;cursor:pointer;color:var(--t3);background:transparent;transition:all 0.15s;font-family:inherit; }
     .rmt-btn.active { background:var(--g1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,0.12); }
@@ -466,7 +468,7 @@
     .hw-info-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:5px;margin:6px 0; }
     .hw-box { background:var(--g2);border:1px solid var(--border-sm);border-radius:6px;padding:7px 10px; }
     .hw-lbl { font-size:9px;color:var(--t3);letter-spacing:0.4px;font-weight:600;margin-bottom:2px; }
-    .hw-val { font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-word;line-height:1.2; }
+    .hw-val { font-size:12px;font-weight:700;font-family:var(--font-mono);color:var(--t1);word-break:break-word;line-height:1.2; }
     /* ── Net interface table ─────────────────────── */
     .net-iface-row { display:grid;gap:8px 12px;padding:8px 12px;border-bottom:1px solid var(--border-sm);align-items:center; }
     .net-iface-row:last-child { border-bottom:none; }
@@ -480,18 +482,18 @@
       padding:13px 16px;border-bottom:1px solid var(--border-sm);gap:20px;
     }
     .cfg-row:last-child { border-bottom:none; }
-    .cfg-key { font-weight:600;font-size:12.5px;color:var(--t1);font-family:'IBM Plex Mono',monospace;margin-bottom:3px; }
+    .cfg-key { font-weight:600;font-size:12.5px;color:var(--t1);font-family:var(--font-mono);margin-bottom:3px; }
     .cfg-desc { font-size:11.5px;color:var(--t3); }
     .cfg-unit { font-size:10.5px;color:var(--t4);margin-left:5px; }
     .cfg-input-wrap { flex-shrink:0; }
     /* Every type, not an enumeration: the wrap holds exactly one input, and the
        secret keys render as type=password, which an enumeration silently misses. */
-    .cfg-input-wrap input {
+    .cfg-input-wrap input, .cfg-input-wrap select {
       width:150px;padding:7px 11px;background:var(--g2);border:1px solid var(--border-sm);
-      border-radius:var(--r-xs);color:var(--t1);font-family:'IBM Plex Mono',monospace;font-size:12px;
+      border-radius:var(--r-xs);color:var(--t1);font-family:var(--font-mono);font-size:12px;
       outline:none;transition:all 0.15s;
     }
-    .cfg-input-wrap input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+    .cfg-input-wrap input:focus, .cfg-input-wrap select:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
     .cfg-toggle { display:flex;align-items:center;gap:10px;cursor:pointer; }
     .toggle-track {
       width:38px;height:20px;border-radius:10px;background:rgba(0,0,0,0.1);
@@ -559,7 +561,7 @@
     .form-label { display:block;font-size:11.5px;font-weight:600;color:var(--t2);margin-bottom:5px; }
     .form-input {
       width:100%;padding:8px 12px;background:var(--g2);border:1px solid var(--border-sm);
-      border-radius:var(--r-xs);color:var(--t1);font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;
+      border-radius:var(--r-xs);color:var(--t1);font-family:var(--font-sans);font-size:12.5px;
       outline:none;transition:all 0.15s;
     }
     .form-input:focus { border-color:rgba(37,99,235,0.5);background:var(--g1);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
@@ -568,6 +570,9 @@
     /* ── Tool notices ────────────────────────────── */
     #tools-notices, #update-notice { display:flex;flex-direction:column;gap:6px;padding:0 16px; }
     #update-notice:not(:empty) { margin-bottom:6px; }
+    .upd-log { max-height:220px;overflow-y:auto;margin-top:6px;display:flex;flex-direction:column;gap:8px; }
+    .upd-subject { font-weight:600;font-size:12px;color:var(--t1); }
+    .upd-body { font-size:11.5px;color:var(--t2);white-space:pre-wrap;line-height:1.5;margin-top:2px; }
     .tools-notice {
       display:flex;align-items:flex-start;gap:10px;
       padding:10px 12px;border-radius:var(--r-sm);
@@ -598,10 +603,10 @@
     /* ── Issue detail ────────────────────────────── */
     .detail-row { display:flex;gap:12px;margin-bottom:8px; }
     .detail-key { font-size:11.5px;color:var(--t3);width:90px;flex-shrink:0;font-weight:500; }
-    .detail-val { font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--t1);word-break:break-all; }
+    .detail-val { font-size:11.5px;font-family:var(--font-mono);color:var(--t1);word-break:break-all; }
     .stack-trace {
       background:rgba(10,15,30,0.07);border:1px solid rgba(10,15,30,0.1);border-radius:var(--r-xs);
-      padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--t2);
+      padding:10px 12px;font-family:var(--font-mono);font-size:10.5px;color:var(--t2);
       white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:6px;
     }
     .stack-trace::-webkit-scrollbar { width:4px; }
@@ -617,11 +622,11 @@
       border-top:1px solid var(--log-border);flex-shrink:0;
       background:rgba(0,0,0,0.18);
     }
-    .stdin-prompt { color:#34d399;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0;user-select:none; }
+    .stdin-prompt { color:#34d399;font-family:var(--font-mono);font-size:14px;font-weight:700;flex-shrink:0;user-select:none; }
     .stdin-input {
       flex:1;padding:6px 10px;background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.12);border-radius:6px;
-      color:rgba(200,220,255,0.88);font-family:'IBM Plex Mono',monospace;font-size:12px;
+      color:rgba(200,220,255,0.88);font-family:var(--font-mono);font-size:12px;
       outline:none;transition:all 0.15s;
     }
     .stdin-input:focus { border-color:rgba(255,255,255,0.24);background:rgba(255,255,255,0.09); }
@@ -640,8 +645,8 @@
     .stat-cell:hover { color:var(--accent) !important; }
     .chart-block { margin-bottom:16px; }
     .chart-label { font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap; }
-    .chart-label .cur { font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1); }
-    .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace;font-weight:500;letter-spacing:0.2px; }
+    .chart-label .cur { font-size:18px;font-weight:700;font-family:var(--font-mono);color:var(--t1); }
+    .chart-label .chart-stats { font-size:9.5px;color:var(--t4);font-family:var(--font-mono);font-weight:500;letter-spacing:0.2px; }
     .chart-hover-area { position:relative;cursor:crosshair;touch-action:none; }
     /* Y-axis labels live here, not in the SVG — see _chartYLabels. Right-aligned into the
        gutter the SVG reserves on its right edge; `top` is set inline in px, which is exact
@@ -650,7 +655,7 @@
     .chart-yl { position:absolute;inset:0;pointer-events:none; }
     .chart-yl span {
       position:absolute;right:2px;transform:translateY(-50%);
-      font-size:9.5px;line-height:1;font-family:'IBM Plex Sans',sans-serif;
+      font-size:9.5px;line-height:1;font-family:var(--font-sans);
       color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums;
     }
     .chart-wrap { background:var(--g2);border:1px solid var(--border-sm);border-radius:var(--r-xs);padding:8px 8px 4px;overflow:hidden; }
@@ -672,24 +677,24 @@
       background:var(--tip-bg);
       border:1px solid var(--border-sm);
       box-shadow:inset 0 1px 0 var(--spec-sm),var(--shadow);
-      font-size:11px;font-family:'IBM Plex Mono',monospace;font-weight:600;
+      font-size:11px;font-family:var(--font-mono);font-weight:600;
       color:var(--t1);white-space:nowrap;letter-spacing:0.3px;z-index:11;
       transition:border-color 0.15s;
     }
     .chart-tip.locked { border-color:rgba(251,191,36,0.55);box-shadow:inset 0 1px 0 var(--spec-sm),0 0 8px rgba(251,191,36,0.18); }
     .stat-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:12px;border-top:1px solid var(--border-sm); }
     .stat-kv-label { font-size:10px;color:var(--t3);letter-spacing:0.4px;font-weight:600; }
-    .stat-kv-val   { font-size:12px;color:var(--t1);font-family:'IBM Plex Mono',monospace;margin-top:1px;word-break:break-all; }
+    .stat-kv-val   { font-size:12px;color:var(--t1);font-family:var(--font-mono);margin-top:1px;word-break:break-all; }
     .modal-wide { width:1020px; }
     /* Network section */
     .net-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px 14px; }
     .net-metric { }
-    .net-speed { font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin:3px 0; }
+    .net-speed { font-size:20px;font-weight:700;font-family:var(--font-mono);margin:3px 0; }
     /* Log filter controls */
     .log-filter-btn {
       padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:600;
       border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
-      color:rgba(255,255,255,0.45);cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+      color:rgba(255,255,255,0.45);cursor:pointer;font-family:var(--font-sans);
       transition:all 0.15s;
     }
     .log-filter-btn:hover { background:rgba(255,255,255,0.11);color:rgba(255,255,255,0.75); }
@@ -697,7 +702,7 @@
     .log-search-input {
       padding:3px 9px;border-radius:5px;font-size:10.5px;
       border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);
-      color:rgba(255,255,255,0.7);font-family:'IBM Plex Mono',monospace;outline:none;width:110px;
+      color:rgba(255,255,255,0.7);font-family:var(--font-mono);outline:none;width:110px;
       transition:all 0.15s;
     }
     .log-search-input:focus { border-color:rgba(255,255,255,0.28);background:rgba(255,255,255,0.09); }
@@ -736,25 +741,12 @@
     .proc-row[data-status="restarting"], .proc-row[data-status="starting"] { --rail:var(--yellow); }
     .proc-row[data-status="stopped"] { --rail:var(--t4); }
     .proc-row td.mono { white-space:nowrap;font-variant-numeric:tabular-nums; }
-    .proc-script { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px; }
-    .row-actions { display:flex;gap:2px;align-items:center; }
-    .row-actions .sep { width:1px;height:16px;background:var(--border-sm);margin:0 4px; }
-    /* Icons that take colour only when pointed at: six coloured buttons per row were the
-       loudest thing on the page, and a filled red Delete sat one misclick away. */
-    .ra {
-      width:30px;height:30px;display:inline-grid;place-items:center;border-radius:7px;
-      border:1px solid transparent;background:transparent;color:var(--t3);cursor:pointer;
-      transition:background-color 0.12s,color 0.12s,border-color 0.12s;
-    }
-    .ra svg { width:16px;height:16px; }
-    .ra:hover { background:var(--g1);border-color:var(--border-sm);color:var(--t1); }
-    .ra:focus-visible { outline:2px solid var(--accent);outline-offset:1px; }
-    .ra.go:hover   { color:var(--green); }
-    .ra.halt:hover { color:var(--red); }
-    .ra.del:hover  { color:#fff;background:var(--red);border-color:var(--red); }
+    /* --t3, not --t4: the faintest text colour all but vanished on the dark theme's navy */
+    .proc-script { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;color:var(--t3); }
+    .proc-name { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px; }
     .issue-count {
       min-width:24px;height:22px;padding:0 7px;border-radius:11px;cursor:pointer;
-      font:600 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;
+      font:600 11px var(--font-mono);font-variant-numeric:tabular-nums;
     }
     .issue-count:hover { filter:brightness(1.1); }
 
@@ -795,7 +787,7 @@
     /* Narrow enough that the process table would squash: let it scroll instead.
        Without the min-width the long script paths just wrap into a 6-line column. */
     @media (max-width: 1100px) {
-      .proc-table { min-width:880px; }
+      .proc-table { min-width:1000px; }
       .table-wrap { overflow:auto;-webkit-overflow-scrolling:touch; }
       .proc-table td:first-child { max-width:230px; }
       .proc-name, .proc-script { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
@@ -837,7 +829,7 @@
       .panel { padding:7px;gap:6px; }
       /* Every column still fits by scrolling, but shorten the trip: the script
          path is the one cell that is pure width and no information at a glance. */
-      .proc-table { min-width:720px; }
+      .proc-table { min-width:800px; }
       .proc-table td:first-child { max-width:150px; }
       .proc-script { display:none; }
       .stats-strip { flex-wrap:wrap;gap:6px; }
@@ -888,6 +880,8 @@
       }
     }
   </style>
+    <!-- The configured theme (theme/*.css). After the base styles, so it overrides them. -->
+    <link id="theme-css" rel="stylesheet" href="/theme/current.css" />
   </head>
   <body>
 
@@ -1105,8 +1099,8 @@
             <div class="card-hdr">
               <div class="card-title">Network</div>
               <div style="display:flex;gap:16px;font-size:11.5px;color:var(--t3)">
-                <span>↓ <span id="sys-net-rx" style="color:var(--green);font-weight:700;font-family:'IBM Plex Mono',monospace">—</span></span>
-                <span>↑ <span id="sys-net-tx" style="color:var(--cyan);font-weight:700;font-family:'IBM Plex Mono',monospace">—</span></span>
+                <span>↓ <span id="sys-net-rx" style="color:var(--green);font-weight:700;font-family:var(--font-mono)">—</span></span>
+                <span>↑ <span id="sys-net-tx" style="color:var(--cyan);font-weight:700;font-family:var(--font-mono)">—</span></span>
               </div>
             </div>
             <div class="net-grid">
@@ -1153,9 +1147,9 @@
                   class="empty-title">Loading config…</div><div
                   style="font-size:11.5px;color:var(--t4);margin-top:4px">If
                   this persists, run <code
-                    style="font-family:'IBM Plex Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    style="font-family:var(--font-mono);background:var(--g2);padding:1px 5px;border-radius:4px">pm3
                     kill</code> then <code
-                    style="font-family:'IBM Plex Mono',monospace;background:var(--g2);padding:1px 5px;border-radius:4px">pm3
+                    style="font-family:var(--font-mono);background:var(--g2);padding:1px 5px;border-radius:4px">pm3
                     list</code> to restart the daemon.</div></div>
             </div>
           </div>
@@ -1483,6 +1477,7 @@ socket.on('init', data => {
   renderUpdate(data.update);
 });
 socket.on('update:state', renderUpdate);
+socket.on('theme:update', reloadTheme);
 socket.on('prefs:update', prefs => {
   applyPrefs(prefs);
   applyColumns();
@@ -1701,7 +1696,7 @@ function updateSysTab(data) {
   if (data.disk) document.getElementById('disk-list').innerHTML = data.disk.map(d => `
     <div style="padding:9px 14px;border-bottom:1px solid var(--border-sm)">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--t2)">${escapeHtml(d.mount)}${d.mounts && d.mounts.length > 1 ? `<span title="${escapeHtml(d.mounts.join(', '))}" style="color:var(--t4);font-family:'IBM Plex Sans',sans-serif"> and ${d.mounts.length - 1} more</span>` : ''}</span>
+        <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--t2)">${escapeHtml(d.mount)}${d.mounts && d.mounts.length > 1 ? `<span title="${escapeHtml(d.mounts.join(', '))}" style="color:var(--t4);font-family:var(--font-sans)"> and ${d.mounts.length - 1} more</span>` : ''}</span>
         <span style="font-size:11.5px;color:var(--t3)">${fmt(d.used)} / ${fmt(d.size)} · ${d.percent||0}%</span>
       </div>
       <div class="progress"><div class="progress-fill" style="width:${d.percent||0}%;background:${d.percent>85?'var(--red)':d.percent>65?'var(--yellow)':'var(--accent)'}"></div></div>
@@ -1762,18 +1757,20 @@ const COL_RENDERERS = {
   id:           p => `<td class="mono" style="color:var(--t4)">${p.id}</td>`,
   pid:          p => `<td class="mono" style="color:var(--t4)">${p.pid||'—'}</td>`,
   actions:      p => {
-    const n = jsArg(p.name), label = escapeHtml(p.name);
-    const active = p.status === 'running' || p.status === 'starting';
-    return `<td onclick="event.stopPropagation()"><div class="row-actions">
-      ${active
-        ? `<button class="ra halt" title="Stop" aria-label="Stop ${label}" onclick="procAction('stop',${n})">${ICONS.stop}</button>`
-        : `<button class="ra go" title="Start" aria-label="Start ${label}" onclick="procAction('start',${n})">${ICONS.play}</button>`}
-      <button class="ra" title="Restart" aria-label="Restart ${label}" onclick="procAction('restart',${n})">${ICONS.restart}</button>
-      <button class="ra" title="Logs" aria-label="Logs of ${label}" onclick="openLogsFor(${n})">${ICONS.logs}</button>
-      <button class="ra" title="Edit settings" aria-label="Edit ${label}" onclick="openEditModal(${n})">${ICONS.edit}</button>
-      <span class="sep"></span>
-      <button class="ra del" title="Delete" aria-label="Delete ${label}" onclick="procAction('delete',${n})">${ICONS.trash}</button>
-    </div></td>`;
+    const n = jsArg(p.name);
+    return `<td onclick="event.stopPropagation()">
+    <div class="proc-actions">
+      ${p.status==='running'||p.status==='starting'
+        ? `<button class="pab pab-stop"    onclick="procAction('stop',${n})">■ Stop</button>`
+        : `<button class="pab pab-start"   onclick="procAction('start',${n})">▶ Start</button>`}
+      <button class="pab pab-restart" onclick="procAction('restart',${n})">↺ Restart</button>
+      <button class="pab pab-logs"    onclick="openLogsFor(${n})">📋 Logs</button>
+      <button class="pab pab-issues"  onclick="openIssuesFor(${n})">⚠ Issues</button>
+      <div class="sep"></div>
+      <button class="pab pab-gear"    onclick="openEditModal(${n})" title="Edit settings">⚙</button>
+      <button class="pab pab-delete"  onclick="procAction('delete',${n})">✕ Delete</button>
+    </div>
+  </td>`;
   },
 };
 function procCells(p) {
@@ -2367,7 +2364,11 @@ function renderConfig() {
     const val = configValues[key];
     const unitHtml = schema.unit ? `<span class="cfg-unit">(${schema.unit})</span>` : '';
     let inputHtml = '';
-    if (typeof schema.default === 'boolean') {
+    if (schema.choices) {
+      const pick = key === 'theme' ? ' onchange="previewTheme(this.value)"' : '';
+      inputHtml = `<div class="cfg-input-wrap"><select id="cfg-${key}"${pick}>${schema.choices.map(c =>
+        `<option value="${escapeHtml(c.value)}"${c.value === val ? ' selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select></div>`;
+    } else if (typeof schema.default === 'boolean') {
       const on = val === true;
       inputHtml = `<div class="cfg-toggle" onclick="toggleCfgBool('${key}')">
         <div class="toggle-track ${on?'on':''}" id="cfg-track-${key}">
@@ -2431,6 +2432,7 @@ async function saveConfig() {
   try {
     await Promise.all(saves);
     toast('Config saved', 'success');
+    reloadTheme();
     await loadConfig();
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -2440,6 +2442,7 @@ async function resetConfig() {
   try {
     await fetch('/api/config/reset', { method: 'POST' });
     toast('Config reset to defaults', 'info');
+    reloadTheme();
     await loadConfig();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
@@ -2504,15 +2507,21 @@ function _showToolsNotifications() {
         <div style="font-size:11px;color:var(--t3);margin-top:1px">${escapeHtml(n.msg)}</div>
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px">
           <span style="font-size:10px;color:var(--t4)">Run</span>
-          <code style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--accent);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px">pm3 doctor</code>
+          <code style="font-size:10.5px;font-family:var(--font-mono);color:var(--accent);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px">pm3 doctor</code>
           <span style="font-size:10px;color:var(--t4)">for full diagnostics</span>
-          ${n.fix ? `<span style="font-size:10px;color:var(--t4);margin-left:2px">·</span><code style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--t3);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px;word-break:break-all">${escapeHtml(n.fix)}</code>` : ''}
+          ${n.fix ? `<span style="font-size:10px;color:var(--t4);margin-left:2px">·</span><code style="font-size:10px;font-family:var(--font-mono);color:var(--t3);background:var(--g3);border:1px solid var(--border-sm);padding:1px 7px;border-radius:4px;word-break:break-all">${escapeHtml(n.fix)}</code>` : ''}
         </div>
       </div>
       <button onclick="this.closest('.tools-notice').remove()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`;
     container.appendChild(el);
   }
 }
+// ── Themes ────────────────────────────────────────
+// The daemon serves the configured theme as /theme/current.css. Picking one in Config previews it
+// straight away; saving switches every open dashboard (theme:update).
+function previewTheme(name) { document.getElementById('theme-css').href = `/theme/${encodeURIComponent(name)}.css`; }
+function reloadTheme() { document.getElementById('theme-css').href = `/theme/current.css?v=${Date.now()}`; }
+
 // ── PM3 self-update ───────────────────────────────
 // The daemon checks GitHub hourly (config: updateCheck) and pushes its state as update:state.
 let _pm3Version = null;
@@ -2526,22 +2535,25 @@ function renderUpdate(u) {
   const el = document.getElementById('update-notice');
   if (!u.updating && !((u.error || u.behind > 0) && u.remote !== dismissed)) { el.innerHTML = ''; return; }
 
+  // The newest commit's subject is the headline and every body is its changelog, so the
+  // commit message is exactly what the update notice tells you.
+  const [latest] = u.commits;
   const title = u.updating ? 'Updating PM3…'
     : u.error ? 'PM3 update failed'
-    : `PM3 update available · ${u.behind} new commit${u.behind === 1 ? '' : 's'}`;
+    : latest ? latest.subject : 'PM3 update available';
   const msg = u.updating ? 'Processes restart with the daemon; this page reloads when it is back.'
-    : u.error || `${u.current} → ${u.remote} · updating restarts the daemon and every process it manages.`;
+    : u.error || `Update available: ${u.current} → ${u.remote}. Updating restarts the daemon and every process it manages.`;
   let commits = '';
   if (!u.updating && !u.error) {
-    commits = u.commits.map(c => `<div>${escapeHtml(c)}</div>`).join('');
-    if (u.behind > u.commits.length) commits += `<div>… and ${u.behind - u.commits.length} more</div>`;
+    commits = u.commits.map((c, i) => `<div class="upd-commit">${i ? `<div class="upd-subject">${escapeHtml(c.subject)}</div>` : ''}${c.body ? `<div class="upd-body">${escapeHtml(c.body)}</div>` : ''}</div>`).join('');
+    if (u.behind > u.commits.length) commits += `<div class="upd-subject">… and ${u.behind - u.commits.length} older</div>`;
   }
   el.innerHTML = `<div class="tools-notice">
       <span style="font-size:14px">${u.error ? '⚠' : '⬆'}</span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:12px;color:var(--t1)">${escapeHtml(title)}</div>
         <div style="font-size:11px;color:var(--t3);margin-top:1px;word-break:break-word">${escapeHtml(msg)}</div>
-        ${commits ? `<div style="margin-top:5px;font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--t3)">${commits}</div>` : ''}
+        ${commits ? `<div class="upd-log">${commits}</div>` : ''}
       </div>
       ${u.updating ? '' : `<button class="btn primary" onclick="runUpdate()">${u.error ? 'Retry' : 'Update now'}</button>
       <button onclick="dismissUpdate()" title="Hide until the next version" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:14px;padding:0 4px;flex-shrink:0">✕</button>`}
@@ -2578,15 +2590,6 @@ function shortPath(p) {
   const parts = String(p).split('/');
   return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : String(p);
 }
-const _sv = (body, fill) => `<svg viewBox="0 0 20 20" aria-hidden="true" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'}>${body}</svg>`;
-const ICONS = {
-  play:    _sv('<path d="M6.5 4.2v11.6a.6.6 0 0 0 .9.5l9.3-5.8a.6.6 0 0 0 0-1L7.4 3.7a.6.6 0 0 0-.9.5z"/>', true),
-  stop:    _sv('<rect x="5" y="5" width="10" height="10" rx="1.8"/>', true),
-  restart: _sv('<path d="M15.5 10.5a5.5 5.5 0 1 1-1.6-4.4"/><path d="M14.2 2.8v3.6h-3.6"/>'),
-  logs:    _sv('<path d="M4 5.5h12M4 10h12M4 14.5h7"/>'),
-  edit:    _sv('<path d="M12.8 4.2l3 3L7.5 15.5H4.5v-3z"/>'),
-  trash:   _sv('<path d="M4 6h12M8 6V4.5h4V6M6 6l.8 9.5h6.4L14 6"/>'),
-};
 function flashHighlight(el, delay=0) {
   if (!el) return;
   const run = () => {
@@ -2842,7 +2845,7 @@ function _buildStatsModal() {
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Connections
-          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--t1)" id="sm-conn-cur">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:var(--t1)" id="sm-conn-cur">—</span>
           <span class="chart-stats" id="sm-conn-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-conn-area">
@@ -2853,7 +2856,7 @@ function _buildStatsModal() {
       </div>
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↓
-          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--green)" id="sm-net-rx">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:var(--green)" id="sm-net-rx">—</span>
           <span class="chart-stats" id="sm-netrx-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-netrx-area">
@@ -2864,7 +2867,7 @@ function _buildStatsModal() {
       </div>
       <div>
         <div class="chart-label" style="font-size:9.5px;margin-bottom:4px">Net ↑
-          <span style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--cyan)" id="sm-net-tx">—</span>
+          <span style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:var(--cyan)" id="sm-net-tx">—</span>
           <span class="chart-stats" id="sm-nettx-stats"></span>
         </div>
         <div class="chart-hover-area" id="sm-nettx-area">
@@ -3052,7 +3055,7 @@ function _tickStatsModal() {
     ? `<div style="grid-column:1/-1;margin-top:2px">
         <div class="stat-kv-label">Environment</div>
         <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
-          ${envEntries.map(([k,v])=>`<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;background:var(--g2);border:1px solid var(--border-sm);border-radius:4px;padding:1px 6px;color:var(--t2)">${escapeHtml(k)}=<span style="color:var(--accent)">${escapeHtml(String(v))}</span></span>`).join('')}
+          ${envEntries.map(([k,v])=>`<span style="font-size:10px;font-family:var(--font-mono);background:var(--g2);border:1px solid var(--border-sm);border-radius:4px;padding:1px 6px;color:var(--t2)">${escapeHtml(k)}=<span style="color:var(--accent)">${escapeHtml(String(v))}</span></span>`).join('')}
         </div>
       </div>`
     : '';
@@ -4076,11 +4079,11 @@ function _tickNetModal() {
       </div>
       <div class="res-stat-box">
         <div class="res-stat-lbl">Default Gateway</div>
-        <div class="res-stat-val" style="font-size:12px;font-family:'IBM Plex Mono',monospace">${escapeHtml(d.gateway||'—')}</div>
+        <div class="res-stat-val" style="font-size:12px;font-family:var(--font-mono)">${escapeHtml(d.gateway||'—')}</div>
       </div>
       <div class="res-stat-box">
         <div class="res-stat-lbl">DNS Servers</div>
-        <div class="res-stat-val" style="font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.4">${escapeHtml((d.dns||[]).slice(0,3).join('\n')||'—')}</div>
+        <div class="res-stat-val" style="font-size:11px;font-family:var(--font-mono);line-height:1.4">${escapeHtml((d.dns||[]).slice(0,3).join('\n')||'—')}</div>
       </div>
     </div>`);
 }
@@ -4107,8 +4110,8 @@ function _renderIfaceList() {
         <div style="font-size:10px;color:var(--t4);margin-top:1px">${escapeHtml(i.type||'—')}${speedLabel?' · '+speedLabel:''}</div>
       </div>
       <div style="min-width:0">
-        <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--t1)">${escapeHtml(i.ip4||'—')}</div>
-        <div style="font-size:9.5px;color:var(--t4);font-family:'IBM Plex Mono',monospace">${escapeHtml(i.mac||'—')}</div>
+        <div style="font-size:11px;font-family:var(--font-mono);color:var(--t1)">${escapeHtml(i.ip4||'—')}</div>
+        <div style="font-size:9.5px;color:var(--t4);font-family:var(--font-mono)">${escapeHtml(i.mac||'—')}</div>
       </div>
       <div style="font-size:10px;color:var(--accent);white-space:nowrap">Details →</div>
     </div>`;
@@ -4549,7 +4552,7 @@ function _renderDiskList() {
         ${dk.temperature!=null?`<div style="font-size:10px;color:${tCl};margin-top:1px">🌡 ${dk.temperature}°C</div>`:''}
       </div>
       <div style="text-align:right">
-        <div style="font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace">${fmt(dk.size)}</div>
+        <div style="font-size:12px;font-weight:700;font-family:var(--font-mono)">${fmt(dk.size)}</div>
         <div style="font-size:10px;color:${sCl};font-weight:600;margin-top:2px">SMART: ${escapeHtml(smartLabel)}</div>
         <div style="font-size:10px;color:var(--accent);margin-top:2px">Details →</div>
       </div>
@@ -4700,23 +4703,23 @@ function openEditModal(name) {
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">CPU</span>
-        <span id="els-cpu" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--accent)">${proc.cpu != null ? proc.cpu + '%' : '—'}</span>
+        <span id="els-cpu" style="font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${proc.cpu != null ? proc.cpu + '%' : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">RAM</span>
-        <span id="els-mem" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--accent2)">${proc.memory ? proc.memory + ' MB' : '—'}</span>
+        <span id="els-mem" style="font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--accent2)">${proc.memory ? proc.memory + ' MB' : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Net ↓</span>
-        <span id="els-netrx" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--green)">${proc.netRx != null ? fmtSpeed(proc.netRx) : '—'}</span>
+        <span id="els-netrx" style="font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--green)">${proc.netRx != null ? fmtSpeed(proc.netRx) : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Net ↑</span>
-        <span id="els-nettx" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--cyan)">${proc.netTx != null ? fmtSpeed(proc.netTx) : '—'}</span>
+        <span id="els-nettx" style="font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--cyan)">${proc.netTx != null ? fmtSpeed(proc.netTx) : '—'}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:9px;color:var(--t4);font-weight:600;letter-spacing:0.4px">Sockets</span>
-        <span id="els-conn" style="font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--t2)">${proc.connections != null ? proc.connections : '—'}</span>
+        <span id="els-conn" style="font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--t2)">${proc.connections != null ? proc.connections : '—'}</span>
       </div>
     </div>
     <div class="form-group">
@@ -4727,7 +4730,7 @@ function openEditModal(name) {
       <div class="form-group">
         <label class="form-label">Max Restarts</label>
         <input class="form-input" id="edit-max-restarts" type="number" min="-1" value="${proc.maxRestarts ?? 15}" oninput='if(+this.value<-1)this.value=-1' />
-        <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'IBM Plex Mono',monospace">
+        <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:var(--font-mono)">
           <span style="color:var(--accent)">-1</span> = infinite &nbsp;·&nbsp;
           <span style="color:var(--t3)">0</span> = no restarts &nbsp;·&nbsp;
           <span style="color:var(--t3)">N</span> = up to N times
@@ -4749,9 +4752,9 @@ function openEditModal(name) {
     <div class="form-group">
       <label class="form-label">Environment variables</label>
       <textarea class="form-input" id="edit-env" rows="6" spellcheck="false"
-        style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.55;resize:vertical;white-space:pre"
+        style="font-family:var(--font-mono);font-size:11.5px;line-height:1.55;resize:vertical;white-space:pre"
         placeholder="MALLOC_ARENA_MAX=2&#10;NODE_ENV=production">${escapeHtml(_envToText(proc.env))}</textarea>
-      <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:'IBM Plex Mono',monospace">
+      <div style="font-size:10.5px;color:var(--t4);margin-top:4px;font-family:var(--font-mono)">
         One <span style="color:var(--accent)">KEY=value</span> per line · overrides only, the rest is
         inherited from the daemon · <span style="color:var(--yellow)">applied on the next restart</span>
       </div>
