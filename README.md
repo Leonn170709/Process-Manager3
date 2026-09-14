@@ -23,6 +23,12 @@
 ## Installation
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/Leonn170709/Process-Manager3/main/install.sh | bash
+```
+
+Installs into `~/.local/share/pm3` (override with `PM3_DIR=...`); running it again updates. Or by hand:
+
+```bash
 git clone https://github.com/Leonn170709/Process-Manager3.git
 cd Process-Manager3
 npm install
