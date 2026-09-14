@@ -76,6 +76,17 @@ pm3 dashboard
 
 The PM3 daemon starts automatically on first use and runs in the background.
 
+### Rust projects
+
+```bash
+pm3 start path/to/Cargo.toml --watch
+```
+
+Every start and restart runs `cargo build --release` first (a no-op when nothing changed), then
+runs the binary itself, so CPU/RAM in the dashboard are your app's, not cargo's. With `--watch`,
+saving a source file rebuilds and restarts; `target/` is ignored. A failed build shows up in the
+logs as a crash. Needs `sh`, so Linux and macOS only.
+
 ---
 
 ## CLI Reference

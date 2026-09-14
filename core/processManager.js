@@ -1,6 +1,6 @@
 'use strict';
 
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const pidusage = require('pidusage');
@@ -67,9 +67,24 @@ function resolveCwd(cwd, script) {
   return process.cwd();
 }
 
+// `pm3 start path/to/Cargo.toml`: build on every (re)start - cargo skips it when nothing changed -
+// then exec the binary, so the pid PM3 samples and signals is the app itself, not cargo.
+// ponytail: goes through sh, so no Windows; there it would need a separate build step
+function cargoCommand(manifest) {
+  const meta = JSON.parse(execFileSync('cargo',
+    ['metadata', '--no-deps', '--format-version', '1', '--manifest-path', manifest], { encoding: 'utf8' }));
+  const pkg = meta.packages.find(p => fs.realpathSync(p.manifest_path) === fs.realpathSync(manifest));
+  const bin = pkg && (pkg.default_run || pkg.targets.find(t => t.kind.includes('bin'))?.name);
+  if (!bin) throw new Error(`No binary target in ${manifest}`);
+  const exe = path.join(meta.target_directory, 'release', bin);
+  // $0 = manifest, "$@" = the binary plus any extra args appended after these
+  return { cmd: 'sh', args: ['-c', 'cargo build --release --manifest-path "$0" && exec "$@"', manifest, exe] };
+}
+
 function parseCommand(script) {
   const parts = script.trim().split(/\s+/);
   if (parts.length > 1) return { cmd: parts[0], args: parts.slice(1) };
+  if (path.basename(script) === 'Cargo.toml') return cargoCommand(path.resolve(script));
   // Use only the basename's extension so absolute paths without dots don't confuse the lookup
   const ext = path.extname(script).slice(1).toLowerCase();
   const interp = INTERPRETERS[ext];
@@ -332,7 +347,8 @@ function _spawnProcess(procRecord) {
     // Required here, not at the top: ~7 MB the daemon only pays for once something uses --watch
     const chokidar = require('chokidar');
     const watcher = chokidar.watch(cwd, {
-      ignored: /node_modules|\.git/,
+      // target/ is cargo's build output: watching it would restart on every build it causes
+      ignored: [/node_modules|\.git/, path.join(cwd, 'target')],
       persistent: true,
       ignoreInitial: true,
     });
